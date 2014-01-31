@@ -1,0 +1,5 @@
+verilog work "sram.v"
+verilog work "serial_divide_uu.v"
+verilog work "async_transmit.v"
+verilog work "async_receiver.v"
+verilog work "main.v"
