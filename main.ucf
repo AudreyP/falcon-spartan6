@@ -87,7 +87,7 @@ NET "SRAM_DQ<15>"      LOC = "T8"  | IOSTANDARD = "LVCMOS33";   #Bank = 2, Pin n
 #NET "camera_data_scl" LOC = #"B4";
 #NET "camera_data_sda" LOC = #"D10";
 #NET "camera_data_vsync" LOC = #"A5";
-NET "main_hundred_clk" LOC = "V10" | IOSTANDARD = "LVCMOS33";
+NET "crystal_clk" LOC = "V10" | IOSTANDARD = "LVCMOS33";
 TIMESPEC TS_main_hundred_clk = PERIOD main_hundred_clk 100000 kHz;
 NET "LD0" LOC = "U16" | IOSTANDARD = "LVCMOS33";
 NET "LD1" LOC = "V16" | IOSTANDARD = "LVCMOS33"; ;

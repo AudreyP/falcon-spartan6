@@ -1,23 +1,23 @@
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date:    22:52:44 01/21/2014 
-// Design Name: 
-// Module Name:    color_pattern 
-// Project Name: 
-// Target Devices: 
-// Tool versions: 
-// Description: 
-//
-// Dependencies: 
-//
-// Revision: 
-// Revision 0.01 - File Created
-// Additional Comments: 
-//
-//////////////////////////////////////////////////////////////////////////////////
+/**********************************************************************
+
+ Copyright (c) 2014 Audrey Pearson <aud.pearson@gmail.com> 
+
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 2.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+ 02111-1307, USA
+
+**********************************************************************/
 module color_pattern(
 	input wire clk,
 	input wire reset,
@@ -107,13 +107,9 @@ module color_pattern(
 							bar27 = 53,
 							bar27_low = 54,
 							done_state = 55;
-							
-							
-	
+								
 	reg [17:0] hcount, vcount, state;
-	
-	
-	
+		
 	always @ (posedge clk) begin
 		if (reset)
 			state = initial_state;
@@ -646,8 +642,10 @@ module color_pattern(
 						state = bar27;
 						end
 			done_state: begin
-					data_write = 24'hz;
-					done = 1;
+					data_write = 24'bz;
+					wren = 1'bz;
+					addr = 17'bz;
+					done = 1;					
 					end
 			endcase
 		end //else

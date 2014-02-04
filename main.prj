@@ -1,5 +1,8 @@
 verilog work "sram.v"
 verilog work "serial_divide_uu.v"
+verilog work "ipcore_dir/stack_ram.v"
+verilog work "color_pattern.v"
+verilog work "clock_manager.v"
 verilog work "async_transmit.v"
 verilog work "async_receiver.v"
 verilog work "main.v"

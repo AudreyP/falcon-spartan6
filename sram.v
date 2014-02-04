@@ -1,23 +1,22 @@
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date:    01:33:05 01/20/2014 
-// Design Name: 
-// Module Name:    sram 
-// Project Name: 
-// Target Devices: 
-// Tool versions: 
-// Description: 
-//
-// Dependencies: 
-//
-// Revision: 
-// Revision 0.01 - File Created
-// Additional Comments: 
-//
-//////////////////////////////////////////////////////////////////////////////////
+/**********************************************************************
+ Copyright (C) 2014 Audrey Pearson <aud.pearson@gmail.com> 
+
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 2.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+ 02111-1307, USA
+
+**********************************************************************/
 module sram(
 	input wire clk,
 	input wire reset,
@@ -26,7 +25,7 @@ module sram(
 	output wire [31:0] data_read,       // data being read from memory
 	
 	//sram controls 
-	input wire [17:0] starting_address,
+	input wire [18:0] starting_address,
 	inout wire [31:0] SRAM_DQ,
 	output wire SRAM_CE_N,
 	output wire SRAM_OE_N,
