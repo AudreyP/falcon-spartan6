@@ -21,6 +21,8 @@
 
 **********************************************************************/
 
+//DO NOT MOVE SERIAL OUTPUT OR MAIN STATE MACHINE
+
 module main(
 	input crystal_clk, 
 	output LD0, 
@@ -83,13 +85,8 @@ module main(
 
 		wire clk;
 
-		reg median_filtering_holdoff = 0;
-		reg edge_detection_holdoff = 0;
-		reg x_pixel_filling_holdoff = 0;
-		reg y_pixel_filling_holdoff = 0;
-		reg border_drawing_holdoff = 0;
-		reg blob_extraction_holdoff = 0;
-		reg [2:0] tracking_output_holdoff = 0;
+		//reg border_drawing_holdoff = 0;	//Not used anywhere??
+		
 		reg serial_output_holdoff = 0;
 
 		reg [23:0] cnt;
@@ -102,9 +99,9 @@ module main(
 		reg [7:0] startup_sequencer = 0;
 		reg [23:0] startup_sequencer_timer = 0;
 
-		reg wren;
-		reg [17:0] address;
-		reg [31:0] data_write;
+		wire wren;
+		wire [17:0] address;
+		wire [31:0] data_write;
 		wire [31:0] data_read;
 		reg [31:0] data_read_sync;
 
@@ -118,37 +115,23 @@ module main(
 
 		reg processing_done_internal = 0;
 
-		sram sram(
-			.clk(modified_clock_sram),
-			.reset(0),
-			.starting_address(address), 
-			.wren(wren), 
-			.data_write(data_write), 
-			.data_read(data_read) 
-			/*.SRAM_DQ(SRAM_DQ),
-		      .SRAM_CE_N(SRAM_CE_N),
-			.SRAM_OE_N(SRAM_OE_N), 
-			.SRAM_LB_N(SRAM_LB_N), 
-			.SRAM_UB_N(SRAM_UB_N), 
-			.SRAM_WE_N(SRAM_WE_N), 
-			.SRAM_ADDR(SRAM_ADDR)*/);
-				 
-		reg [17:0] divider_dividend;
-		reg [17:0] divider_divisor;
+		//--------------------------------------------------------------------------
+		// Module Instantiations
+		//--------------------------------------------------------------------------
+		
+		wire [17:0] divider_dividend;	//was originally a reg. Is it ok to make it a wire?
+		wire [17:0] divider_divisor;		//was originally a reg. Is it ok to make it a wire?
 		wire [17:0] divider_quotient;
 		wire [17:0] divider_remainder;
 		wire divider_zeroflag;
-				 
-		serial_divide_uu serial_divide_uu (.dividend(divider_dividend), .divisor(divider_divisor), .quotient(divider_quotient), .remainder(divider_remainder), .zeroflag(divider_zeroflag));
 		
 		reg [17:0] divider_dividend_two;
 		reg [17:0] divider_divisor_two;
 		wire [17:0] divider_quotient_two;
 		wire [17:0] divider_remainder_two;
 		wire divider_zeroflag_two;
-				 
-		serial_divide_uu serial_divide_uu_two (.dividend(divider_dividend_two), .divisor(divider_divisor_two), .quotient(divider_quotient_two), .remainder(divider_remainder_two), .zeroflag(divider_zeroflag_two));
-
+		
+		//enable / dones
 		reg enable_camera_capture = 0;
 		reg camera_capture_done = 0;
 
@@ -168,15 +151,188 @@ module main(
 		reg border_drawing_done = 0;
 		
 		reg enable_blob_extraction = 0;
-		reg [3:0] enable_blob_extraction_verified = 0;
-		reg blob_extraction_done = 0;
+		reg blob_extraction_done = 0;;
 		
 		reg enable_tracking_output = 0;
-		reg [3:0] enable_tracking_output_verified = 0;
 		reg tracking_output_done = 0;
 		
 		reg enable_serial_output = 0;
 		reg serial_output_done = 0;
+		
+		assign address = address_edge_detection | address_tracking_output | address_x_pixel_filling 
+								| address_y_pixel_filling | address_blob_extraction | address_color_pattern 
+								| address_frame_dump | address_single_shot /*| address_median_filtering*/;
+								
+		assign wren = ~(wren_edge_detection | wren_tracking_output | wren_x_pixel_filling | wren_y_pixel_filling 
+								| wren_blob_extraction | wren_color_pattern | wren_frame_dump | wren_single_shot /*| wren_median_filtering*/);
+								
+		assign data_write = data_write_edge_detection | data_write_tracking_output | data_write_x_pixel_filling 
+									| data_write_y_pixel_filling | data_write_blob_extraction | data_write_color_pattern 
+									| data_write_frame_dump | data_write_single_shot /*| data_write_median_filtering*/;	
+		
+		
+		//------------------SRAM module
+		sram sram(
+			.clk(modified_clock_sram),
+			.reset(0),
+			.starting_address(address), 
+			.wren(wren), 
+			.data_write(data_write), 
+			.data_read(data_read) 
+			/*.SRAM_DQ(SRAM_DQ),
+		      .SRAM_CE_N(SRAM_CE_N),
+			.SRAM_OE_N(SRAM_OE_N), 
+			.SRAM_LB_N(SRAM_LB_N), 
+			.SRAM_UB_N(SRAM_UB_N), 
+			.SRAM_WE_N(SRAM_WE_N), 
+			.SRAM_ADDR(SRAM_ADDR)*/);
+				
+		//------------------EDGE DETECTION module
+		wire wren_edge_detection;
+		wire [17:0] address_edge_detection;
+		wire [31:0] data_out_edge_detection;
+		
+		reg [7:0] edge_detection_threshold_red = 30;
+		reg [7:0] edge_detection_threshold_green = 30;
+		reg [7:0] edge_detection_threshold_blue = 0;
+		
+		reg clk_div_by_two = 0;
+		
+		edge_detection edge_detection(
+			//input wires (as seen by module)
+			.clk_div_by_two(clk_div_by_two),
+			.data_read(data_read),
+			.enable_edge_detection(enable_edge_detection),
+			.edge_detection_threshold_red(edge_detection_threshold_red),
+			.edge_detection_threshold_green(edge_detection_threshold_green),
+			.edge_detection_threshold_blue(edge_detection_threshold_blue),
+			//ouput regs (as seen by module)
+			.wren(wren_edge_detection),
+			.data_write(data_write_edge_detection),
+			.address(address_edge_detection),
+			.edge_detection_done(edge_detection_done)
+			);
+		
+		
+		//------------------TRACKING OUTPUT module
+		wire wren_tracking_output;
+		wire [17:0] address_tracking_output;
+		wire [31:0] data_out_tracking_output;
+		
+		reg find_highest = 0;
+		reg find_biggest = 1;
+		
+		wire [15:0] blob_extraction_blob_counter;
+		
+		reg [7:0] x_centroids_array;
+		reg [7:0] y_centroids_array;
+		reg [15:0] s_centroids_array;
+		
+		reg [23:0] primary_color_slots [5:0][3:0];
+		reg [7:0] color_similarity_threshold = 0;
+		reg [7:0] minimum_blob_size = 0;
+		
+		reg [15:0] tracking_output_blob_sizes [7:0];
+	
+		tracking_output tracking_output(
+			//input wires (as seen by module)
+			.crystal_clk_div_by_two(),
+			.blob_extraction_blob_counter(blob_extraction_blob_counter),
+			.enable_tracking_output(enable_tracking_output),
+			.find_biggest(find_biggest),
+			.find_highest(find_highest),
+			.minimum_blob_size(minimum_blob_size),	
+			.slide_switches(slide_switches),		
+			.data_read(data_read),		
+			//output regs
+			.wren(wren_tracking_output),
+			.data_write(data_write_tracking_output),
+			.address(address_tracking_output),
+			.x_centroids_array(x_centroids_array),   
+			.y_centroids_array(y_centroids_array),  
+			.s_centroids_array(s_centroids_array),
+			.tracking_output_blob_sizes(tracking_output_blob_sizes),	//[15:0] by [7:0]
+			.tracking_output_done(tracking_output_done)
+			);			
+		
+		// X PIXEL FILLING module
+		wire wren_x_pixel_filling;
+		wire [17:0] address_x_pixel_filling;
+		wire [31:0] data_out_x_pixel_filling;
+		
+		x_pixel_filling x_pixel_filling(
+			//input wires
+			.clk_div_by_two(clk_div_by_two),
+			.enable_x_pixel_filling(enable_x_pixel_filling),
+			.data_read(data_read),	
+			//output regs
+			.wren(wren_x_pixel_filling),
+			.data_write(data_write_x_pixel_filling),
+			.address(address_x_pixel_filling),
+			.x_pixel_filling_done(x_pixel_filling_done)
+			);
+			
+		//Y PIXEL FILLING module
+		wire wren_y_pixel_filling;
+		wire [17:0] address_y_pixel_filling;
+		wire [31:0] data_out_y_pixel_filling;
+		
+		y_pixel_filling y_pixel_filling(
+			//input wires
+			.clk_div_by_two(clk_div_by_two),
+			.enable_y_pixel_filling(enable_y_pixel_filling),
+			.data_read(data_read),
+			//output regs
+			.wren(wren_y_pixel_filling),
+			.data_write(data_write_y_pixel_filling),
+			.address(address_y_pixel_filling),
+			.y_pixel_filling_done(y_pixel_filling_done)
+			);
+		
+		// BLOB EXTRACTION module
+		wire wren_blob_extraction;
+		wire [17:0] address_blob_extraction;
+		wire [31:0] data_out_blob_extraction;
+		
+		reg modified_clock_two_div_by_two = 0;
+		
+		//also used in another module
+		reg [16:0] stack_ram_dina;
+		reg [13:0] stack_ram_addra;
+		reg stack_ram_wea;
+		wire [16:0] stack_ram_douta;
+		
+		blob_extraction blob_extraction(
+			//input wires
+			.modified_clock_two_div_by_two(modified_clock_two_div_by_two),
+			.enable_blob_extraction(enable_blob_extraction),
+			.data_read(data_read),
+			.stack_ram_douta(stack_ram_douta),
+			.divider_quotient(divider_quotient),
+			.divider_quotient_two(divider_quotient_two),
+			.color_similarity_threshold(color_similarity_threshold),
+			.primary_color_slots(primary_color_slots),	//[23:0] by [5:0][3:0]
+			//output regs
+			.wren(wren_blob_extraction),
+			.data_write(data_write_blob_extraction),
+			.address(address_blob_extraction),
+			.blob_extraction_done(blob_extraction_done),
+			.stack_ram_addra(stack_ram_addra),
+			.stack_ram_wea(stack_ram_wea),
+			.stack_ram_dina(stack_ram_dina),
+			.divider_dividend(divider_dividend),
+			.divider_divisor(divider_divisor),
+			.divider_dividend_two(divider_dividend_two),
+			.divider_divisor_two(divider_divisor_two)
+			);
+		
+				 
+		serial_divide_uu serial_divide_uu (.dividend(divider_dividend), .divisor(divider_divisor), .quotient(divider_quotient), .remainder(divider_remainder), .zeroflag(divider_zeroflag));
+
+				 
+		serial_divide_uu serial_divide_uu_two (.dividend(divider_dividend_two), .divisor(divider_divisor_two), .quotient(divider_quotient_two), .remainder(divider_remainder_two), .zeroflag(divider_zeroflag_two));
+
+		
 
 		always @(posedge clk) cnt<=cnt+1;
 
@@ -224,10 +380,6 @@ module main(
 		
 		reg [7:0] tempdata;
 		
-		reg [23:0] primary_color_slots [5:0][3:0];
-		reg [7:0] color_similarity_threshold = 0;
-		reg [7:0] minimum_blob_size = 0;
-
 		reg [19:0] serial_output_index = 0;
 		reg [19:0] serial_output_index_mem = 0;
 		reg [19:0] serial_output_index_toggle = 0;
@@ -251,41 +403,12 @@ module main(
 		reg [8:0] red_value = 0;
 		reg [8:0] green_value = 0;
 		reg [8:0] blue_value = 0;
-		
-		reg [17:0] edge_detection_counter_tog = 0;
-		reg [17:0] edge_detection_counter_togg = 0;
-		reg [17:0] edge_detection_counter_toggle = 0;
-		reg [31:0] edge_detection_counter_temp = 0;
-		
-		reg [7:0] edge_detection_threshold_red = 30;
-		reg [7:0] edge_detection_threshold_green = 30;
-		reg [7:0] edge_detection_threshold_blue = 0;
-		
-		reg [17:0] x_pixel_filling_counter_tog = 0;
-		reg [17:0] x_pixel_filling_counter_togg = 0;
-		reg [17:0] x_pixel_filling_counter_toggle = 0;
-		reg [31:0] x_pixel_filling_counter_temp = 0;	
-		
-		reg [17:0] y_pixel_filling_counter_tog = 0;
-		reg [17:0] y_pixel_filling_counter_togg = 0;
-		reg [17:0] y_pixel_filling_counter_toggle = 0;
-		reg [31:0] y_pixel_filling_counter_temp = 0;	
-		
+				
 		reg [5:0] border_drawing_counter_tog = 0;
 		reg [17:0] border_drawing_counter_togg = 0;
 		reg [17:0] border_drawing_counter_toggle = 0;
 		reg [31:0] border_drawing_counter_temp = 0;	
-		
-		reg [5:0] blob_extraction_counter_tog = 0;
-		reg [5:0] blob_extraction_counter_togg = 0;
-		reg [5:0] blob_extraction_counter_toggle = 0;
-		reg [31:0] blob_extraction_counter_temp = 0;
-		
-		reg [5:0] tracking_output_counter_tog = 0;
-		reg [5:0] tracking_output_counter_togg = 0;
-		reg [5:0] tracking_output_counter_toggle = 0;
-		reg [31:0] tracking_output_counter_temp = 0;
-		
+				
 		reg run_frame_dump = 0;
 		reg run_single_shot_test = 0;
 		reg run_online_recognition = 0;
@@ -331,10 +454,7 @@ module main(
 		
 		reg enable_rgb = 0;
 		reg enable_ycrcb = 1;
-		
-		reg find_highest = 0;
-		reg find_biggest = 1;
-		
+				
 		wire modified_clock;
 		
 		//instantiate clock manager (2014 edit)
@@ -353,32 +473,26 @@ module main(
 			.reset(reset),
 			.enable(enable_camera_capture),
 			.starting_address(0),
-			.data_write(data_write),
-			.addr(address),
-			.wren(wren),
+			.data_write(data_write_color_pattern),
+			.addr(address_color_pattern),
+			.wren(wren_color_pattern),
 			.done(camera_capture_done));
 		
-		reg [16:0] stack_ram_dina;
-		reg [13:0] stack_ram_addra;
-		reg stack_ram_wea;
-		wire [16:0] stack_ram_douta;
-		
+
 		stack_ram stack_ram(.clka(modified_clock_two), .dina(stack_ram_dina), .addra(stack_ram_addra), .wea(stack_ram_wea), .douta(stack_ram_douta));
 		
-		reg modified_clock_two_div_by_two = 0;
 		
 		//always @(posedge modified_clock_two) begin
 		always @(negedge modified_clock_two) begin
 			modified_clock_two_div_by_two = !modified_clock_two_div_by_two;
 		end
 		
-		reg clk_fifty_div_by_two = 0;
+		reg crystal_clk_div_by_two = 0;
 		
 		always @(posedge crystal_clk) begin
-			clk_fifty_div_by_two = !clk_fifty_div_by_two;
+			crystal_clk_div_by_two = !crystal_clk_div_by_two;
 		end
 		
-		reg clk_div_by_two = 0;
 		
 		always @(posedge clk) begin
 			clk_div_by_two = !clk_div_by_two;
@@ -830,1856 +944,24 @@ module main(
 		//	end
 		//end
 		
-		reg [15:0] blob_extraction_blob_counter = 0;
 		
-		reg [31:0] data_read_sync_tracking_output = 0;
-		reg tracking_output_main_chunk_already_loaded = 0;
-		reg [15:0] tracking_output_pointer_counter = 0;
-		reg [7:0] tracking_output_counter_color;
-		reg [15:0] tracking_output_counter_size;
-		reg [7:0] tracking_output_counter_buffer_blue;
 		
-		reg tracking_output_ok_to_send_data = 0;
-		
-		reg [15:0] tracking_output_pointer = 0;
-		
-		reg [15:0] tracking_output_blob_sizes [17:0];
-		reg [15:0] tracking_output_blob_location [17:0];
-		
-		reg [31:0] tracking_output_temp_data;
-		
-		reg [7:0] x_centroids_array [7:0];
-		reg [7:0] y_centroids_array [7:0];
-		reg [15:0] s_centroids_array [7:0];
-		reg [7:0] first_x_centroids_array [7:0];
-		reg [7:0] first_y_centroids_array [7:0];
-		reg [15:0] first_s_centroids_array [7:0];
-		
-		reg [7:0] location_to_extract = 0;
-		
-		// Output the tracking data
-		//always @(posedge clk) begin
-		//always @(posedge clk_div_by_two) begin
-		always @(posedge clk_fifty_div_by_two) begin
-			data_read_sync_tracking_output = data_read;
-			
-			if (enable_tracking_output == 1) begin
-				enable_tracking_output_verified = enable_tracking_output_verified + 1;
-			end else begin
-				enable_tracking_output_verified = 0;
-			end
-			
-			if ((enable_tracking_output_verified >= 2) && (tracking_output_done == 0)) begin
-				enable_tracking_output_verified = 2;		// Keep this running!
-			
-				case (tracking_output_holdoff)
-				0:begin
-					wren = 0;
-					tracking_output_counter_tog = 5;
-					tracking_output_counter_togg = 0;
-					tracking_output_pointer_counter = 0;
-					tracking_output_ok_to_send_data = 0;
-					tracking_output_pointer = 6;
-					x_centroids_array[0] = 0;
-					y_centroids_array[0] = 0;
-					x_centroids_array[1] = 0;
-					y_centroids_array[1] = 0;
-					x_centroids_array[2] = 0;
-					y_centroids_array[2] = 0;
-					x_centroids_array[3] = 0;
-					y_centroids_array[3] = 0;
-					x_centroids_array[4] = 0;
-					y_centroids_array[4] = 0;
-					x_centroids_array[5] = 0;
-					y_centroids_array[5] = 0;
-					tracking_output_holdoff = 1;
-				end
-				
-				1:begin
-					tracking_output_blob_sizes[0] = 0;
-					tracking_output_blob_sizes[1] = 0;
-					tracking_output_blob_sizes[2] = 0;
-					tracking_output_blob_sizes[3] = 0;
-					tracking_output_blob_sizes[4] = 0;
-					tracking_output_blob_sizes[5] = 0;
-					tracking_output_blob_sizes[6] = 0;
-					tracking_output_blob_sizes[7] = 0;
-					tracking_output_blob_sizes[8] = 0;
-					tracking_output_blob_sizes[9] = 0;
-					tracking_output_blob_sizes[10] = 0;
-					tracking_output_blob_sizes[11] = 0;
-					tracking_output_blob_sizes[12] = 0;
-					tracking_output_blob_sizes[13] = 0;
-					tracking_output_blob_sizes[14] = 0;
-					tracking_output_blob_sizes[15] = 0;
-					tracking_output_blob_sizes[16] = 0;
-					tracking_output_blob_sizes[17] = 0;
-					tracking_output_holdoff = 2;
-				end
-				
-				2:begin
-					tracking_output_blob_location[0] = 0;
-					tracking_output_blob_location[1] = 0;
-					tracking_output_blob_location[2] = 0;
-					tracking_output_blob_location[3] = 0;
-					tracking_output_blob_location[4] = 0;
-					tracking_output_blob_location[5] = 0;
-					tracking_output_blob_location[6] = 0;
-					tracking_output_blob_location[7] = 0;
-					tracking_output_blob_location[8] = 0;
-					tracking_output_blob_location[9] = 0;
-					tracking_output_blob_location[10] = 0;
-					tracking_output_blob_location[11] = 0;
-					tracking_output_blob_location[12] = 0;
-					tracking_output_blob_location[13] = 0;
-					tracking_output_blob_location[14] = 0;
-					tracking_output_blob_location[15] = 0;
-					tracking_output_blob_location[16] = 0;
-					tracking_output_blob_location[17] = 0;
-					tracking_output_holdoff = 3;
-				end
-				
-				3:begin
-					if (tracking_output_pointer <= (blob_extraction_blob_counter * 3)) begin
-						// Cycle through the data points
-						if (tracking_output_counter_tog == 5) begin			// Only run this once to preload data
-							wren = 0;
-							address = tracking_output_pointer + 200000;
-						end
-						
-						if (tracking_output_counter_tog == 0) begin
-							tracking_output_counter_color = data_read_sync_tracking_output[7:0];
-							if (tracking_output_counter_color == 0) begin		// If the blob we are looking at is NOT a recognized color
-								tracking_output_pointer = tracking_output_pointer + 3;
-								wren = 0;
-								address = tracking_output_pointer + 200000;
-								tracking_output_counter_tog = 2;		// Go again with the next blob!
-							end else begin
-								tracking_output_counter_color = tracking_output_counter_color - 1;		// The color data is stored offset by 1
-								wren = 0;
-								tracking_output_pointer = tracking_output_pointer + 1;
-								address = tracking_output_pointer + 200000;
-							end
-						end
-						
-						if (tracking_output_counter_tog == 1) begin
-							if (find_biggest == 1) begin
-								tracking_output_counter_size = data_read_sync_tracking_output[15:0];
-							end
-							
-							if (find_highest == 1) begin
-								tracking_output_counter_size = data_read_sync_tracking_output[23:16];
-								if (tracking_output_counter_size > 120) begin
-									tracking_output_counter_size = 0;			// Ignore this; out of bounds!
-								end
-							end
-							wren = 0;
-							tracking_output_pointer = tracking_output_pointer + 2;
-							address = tracking_output_pointer + 200000;
-							if ((tracking_output_blob_sizes[tracking_output_counter_color] < tracking_output_counter_size) && (tracking_output_counter_size > minimum_blob_size)) begin
-								tracking_output_blob_sizes[tracking_output_counter_color + 12] = tracking_output_blob_sizes[tracking_output_counter_color + 6];
-								tracking_output_blob_location[tracking_output_counter_color + 12] = tracking_output_blob_location[tracking_output_counter_color + 6];
-							
-								tracking_output_blob_sizes[tracking_output_counter_color + 6] = tracking_output_blob_sizes[tracking_output_counter_color];
-								tracking_output_blob_location[tracking_output_counter_color + 6] = tracking_output_blob_location[tracking_output_counter_color];
-								
-								tracking_output_blob_sizes[tracking_output_counter_color] = tracking_output_counter_size;
-								tracking_output_blob_location[tracking_output_counter_color] = tracking_output_pointer;
-							end else begin						
-								if ((tracking_output_blob_sizes[tracking_output_counter_color + 6] < tracking_output_counter_size) && (tracking_output_counter_size > minimum_blob_size)) begin
-									tracking_output_blob_sizes[tracking_output_counter_color + 12] = tracking_output_blob_sizes[tracking_output_counter_color + 6];
-									tracking_output_blob_location[tracking_output_counter_color + 12] = tracking_output_blob_location[tracking_output_counter_color + 6];
-									
-									tracking_output_blob_sizes[tracking_output_counter_color + 6] = tracking_output_counter_size;
-									tracking_output_blob_location[tracking_output_counter_color + 6] = tracking_output_pointer;
-								end else begin
-									if ((tracking_output_blob_sizes[tracking_output_counter_color + 12] < tracking_output_counter_size) && (tracking_output_counter_size > minimum_blob_size)) begin
-										tracking_output_blob_sizes[tracking_output_counter_color + 12] = tracking_output_counter_size;
-										tracking_output_blob_location[tracking_output_counter_color + 12] = tracking_output_pointer;
-									end
-								end
-							end
-						end
-						
-						tracking_output_counter_tog = tracking_output_counter_tog + 1;
-						if (tracking_output_counter_tog > 1) begin
-							tracking_output_counter_tog = 0;
-						end
-					end else begin
-						// Write the zeroes to our selected blobs' sizes
-						location_to_extract = ((tracking_output_counter_tog - 1) / 2);
-						if ((slide_switches[1] == 1) && (slide_switches[0] == 1)) begin		// Enhanced mode!
-							if (slide_switches[2] == 0) begin		// 2 color 6 centroids
-								if (tracking_output_counter_tog == 3) begin
-									location_to_extract = 6; 
-								end
-								if (tracking_output_counter_tog == 4) begin
-									location_to_extract = 6; 
-								end
-								if (tracking_output_counter_tog == 5) begin
-									location_to_extract = 12; 
-								end
-								if (tracking_output_counter_tog == 6) begin
-									location_to_extract = 12; 
-								end
-								if (tracking_output_counter_tog == 9) begin
-									location_to_extract = 7; 
-								end
-								if (tracking_output_counter_tog == 10) begin
-									location_to_extract = 7; 
-								end
-								if (tracking_output_counter_tog == 11) begin
-									location_to_extract = 13;
-								end
-								if (tracking_output_counter_tog == 12) begin
-									location_to_extract = 13;
-								end
-							end
-						end
-						
-						if (tracking_output_counter_tog == 1) begin		// Pick up where we left off above...						
-							wren = 0;
-							address = tracking_output_blob_location[location_to_extract] + 199998;
-						end
-						
-						if ((tracking_output_counter_tog == 2) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
-							tracking_output_temp_data = data_read_sync_tracking_output;
-							x_centroids_array[0] = tracking_output_temp_data[31:24];
-							y_centroids_array[0] = tracking_output_temp_data[23:16];
-							s_centroids_array[0] = tracking_output_temp_data[15:0];
-							tracking_output_temp_data[15:0] = 0;
-							address = tracking_output_blob_location[location_to_extract];
-							data_write = tracking_output_temp_data;
-							wren = 1;
-						end
-						
-						if (tracking_output_counter_tog == 3) begin
-							wren = 0;
-							address = tracking_output_blob_location[location_to_extract] + 199998;
-						end
-						
-						if ((tracking_output_counter_tog == 4) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
-							tracking_output_temp_data = data_read_sync_tracking_output;
-							x_centroids_array[1] = tracking_output_temp_data[31:24];
-							y_centroids_array[1] = tracking_output_temp_data[23:16];
-							s_centroids_array[1] = tracking_output_temp_data[15:0];
-							tracking_output_temp_data[15:0] = 0;
-							address = tracking_output_blob_location[location_to_extract] + 199998;
-							data_write = tracking_output_temp_data;
-							wren = 1;
-						end
-						
-						if (tracking_output_counter_tog == 5) begin
-							wren = 0;
-							address = tracking_output_blob_location[location_to_extract] + 199998;
-						end
-						
-						if ((tracking_output_counter_tog == 6) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
-							tracking_output_temp_data = data_read_sync_tracking_output;
-							x_centroids_array[2] = tracking_output_temp_data[31:24];
-							y_centroids_array[2] = tracking_output_temp_data[23:16];
-							s_centroids_array[2] = tracking_output_temp_data[15:0];
-							tracking_output_temp_data[15:0] = 0;
-							address = tracking_output_blob_location[location_to_extract] + 199998;
-							data_write = tracking_output_temp_data;
-							wren = 1;
-						end
-						
-						if (tracking_output_counter_tog == 7) begin
-							wren = 0;
-							address = tracking_output_blob_location[location_to_extract] + 199998;
-						end
-						
-						if ((tracking_output_counter_tog == 8) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
-							tracking_output_temp_data = data_read_sync_tracking_output;
-							x_centroids_array[3] = tracking_output_temp_data[31:24];
-							y_centroids_array[3] = tracking_output_temp_data[23:16];
-							s_centroids_array[3] = tracking_output_temp_data[15:0];
-							tracking_output_temp_data[15:0] = 0;
-							address = tracking_output_blob_location[location_to_extract] + 199998;
-							data_write = tracking_output_temp_data;
-							wren = 1;
-						end
-						
-						if (tracking_output_counter_tog == 9) begin
-							wren = 0;
-							address = tracking_output_blob_location[location_to_extract] + 199998;
-						end
-						
-						if ((tracking_output_counter_tog == 10) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
-							tracking_output_temp_data = data_read_sync_tracking_output;
-							x_centroids_array[4] = tracking_output_temp_data[31:24];
-							y_centroids_array[4] = tracking_output_temp_data[23:16];
-							s_centroids_array[4] = tracking_output_temp_data[15:0];
-							tracking_output_temp_data[15:0] = 0;
-							address = tracking_output_blob_location[location_to_extract] + 199998;
-							data_write = tracking_output_temp_data;
-							wren = 1;
-						end
-						
-						if (tracking_output_counter_tog == 11) begin
-							wren = 0;
-							address = tracking_output_blob_location[location_to_extract] + 199998;
-						end
-						
-						if ((tracking_output_counter_tog == 12) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
-							tracking_output_temp_data = data_read_sync_tracking_output;
-							x_centroids_array[5] = tracking_output_temp_data[31:24];
-							y_centroids_array[5] = tracking_output_temp_data[23:16];
-							s_centroids_array[5] = tracking_output_temp_data[15:0];
-							tracking_output_temp_data[15:0] = 0;
-							address = tracking_output_blob_location[location_to_extract] + 199998;
-							data_write = tracking_output_temp_data;
-							wren = 1;
-						end
-						
-						if (tracking_output_counter_tog == 13) begin
-							wren = 0;
-						end
-						
-						if (tracking_output_counter_tog > 13) begin
-							// Done!
-							tracking_output_done = 1;
-							wren = 0;
-						end else begin
-							tracking_output_counter_tog = tracking_output_counter_tog + 1;
-						end
-					end
-				end
-				endcase
-			end
-			
-			if (enable_tracking_output == 0) begin
-				tracking_output_counter_tog = 0;
-				tracking_output_holdoff = 0;
-				tracking_output_done = 0;
-				address = 18'bz;
-				data_write = 32'bz;
-				wren = 1'bz;
-			end
-		end
-		
-		reg [31:0] data_read_sync_blob_extraction = 0;
-		reg blob_extraction_main_chunk_already_loaded = 0;
-		reg [8:0] blob_extraction_x_counter = 0;
-		reg [8:0] blob_extraction_y_counter = 0;
-		
-		reg [15:0] blob_extraction_x = 0;
-		reg [15:0] blob_extraction_y = 0;
-		
-		reg [15:0] blob_extraction_x_temp = 0;
-		reg [15:0] blob_extraction_y_temp = 0;
-		
-		reg [15:0] blob_extraction_x_temp_1 = 0;
-		reg [15:0] blob_extraction_y_temp_1 = 0;
-		
-		reg spanLeft = 0;
-		reg spanRight = 0;
-		
-		reg [31:0] blob_extraction_data_temp = 0;
-		
-		reg blob_extraction_execution_interrupted = 0;
-		
-		// Here is the stack in all of its glory...we are using 9 bit numbers for X coordinate storage here, with a max. stack depth of 2000
-		// We will be using 8 bit numbers for the Y coordinates
-		//reg [17999:0] stack_x = 0;
-		//reg [15999:0] stack_y = 0;
-		//reg [11:0] stack_pointer = 0;
-		
-		//reg [31:0] stack = 0;
-		reg [15:0] stack_pointer = 0;
-		
-		reg [4:0] blob_extraction_toggler = 0;
-		reg [3:0] blob_extraction_inner_toggler = 0;
-		
-		reg [24:0] blob_extraction_red_average = 0;
-		reg [24:0] blob_extraction_green_average = 0;
-		reg [24:0] blob_extraction_blue_average = 0;
-		reg [24:0] blob_extraction_x_average = 0;
-		reg [24:0] blob_extraction_y_average = 0;
-		
-		reg [15:0] blob_extraction_red_average_final = 0;
-		reg [15:0] blob_extraction_green_average_final = 0;
-		reg [15:0] blob_extraction_blue_average_final = 0;
-		reg [15:0] blob_extraction_x_average_final = 0;
-		reg [15:0] blob_extraction_y_average_final = 0;
-		
-		reg [15:0] blob_extraction_lowest_x_value = 0;
-		reg [15:0] blob_extraction_lowest_y_value = 0;
-		reg [15:0] blob_extraction_highest_x_value = 0;
-		reg [15:0] blob_extraction_highest_y_value = 0;
-		
-		reg [16:0] blob_extraction_blob_size = 0;
-		
-		reg [15:0] blob_extraction_current_difference = 0;	
-		reg [15:0] blob_extraction_minimum_difference = 0;
-		reg [7:0] blob_extraction_blob_color_number = 0;
-		
-		reg [2:0] blob_extraction_color_loop = 0;
-		reg [4:0] blob_extraction_slot_loop = 0;
-		
-		reg ok_to_do_averaging = 0;
-		
-		// Now it's time to find and extract the blobs
-		//always @(posedge clk_div_by_four) begin
-		//always @(posedge clk_fifty_div_by_two) begin
-		//always @(posedge clk_div_by_two) begin
-		//always @(posedge modified_clock) begin
-		//always @(posedge clk) begin
-		//always @(posedge modified_clock_two) begin
-		always @(posedge modified_clock_two_div_by_two) begin
-			data_read_sync_blob_extraction = data_read;
-			
-			//leds[5:0] = blob_extraction_toggler + 1;
-			
-			if (enable_blob_extraction == 1) begin
-				enable_blob_extraction_verified = enable_blob_extraction_verified + 1;
-			end else begin
-				enable_blob_extraction_verified = 0;
-			end
-			
-			if (enable_blob_extraction_verified >= 2) begin
-				enable_blob_extraction_verified = 2;		// Keep this running!
-				
-				if (blob_extraction_holdoff == 0) begin
-					wren = 0;
-					address = 2240;								// Skip the topmost 7 lines of the image
-					blob_extraction_counter_tog = 2240;
-					blob_extraction_counter_togg = 2240;
-					blob_extraction_holdoff = 1;
-					blob_extraction_toggler = 0;
-					blob_extraction_blob_counter = 1;
-					blob_extraction_execution_interrupted = 0;
-					
-					blob_extraction_x = 7;
-					blob_extraction_y = 8;
-				end else begin
-					if (blob_extraction_execution_interrupted == 0) begin
-						// For blob_extraction_y = 7 to 233
-						if (blob_extraction_y < 233) begin
-							// For blob_extraction_x = 7 to 313
-							if (blob_extraction_x < 313) begin
-								if (blob_extraction_toggler == 0) begin
-									// Set up the next read
-									wren = 0;
-									address = ((blob_extraction_y * 320) + blob_extraction_x);
-									
-									blob_extraction_toggler = 1;
-								end else begin
-									// Read the current X, Y pixel
-									// If pixel == 0, then we need to fill this region
-									if (data_read_sync_blob_extraction == 0) begin
-										blob_extraction_data_temp[16:8] = blob_extraction_x;
-										blob_extraction_data_temp[7:0] = blob_extraction_y;
-										stack_ram_dina = blob_extraction_data_temp;
-										stack_pointer = 1;
-										stack_ram_addra = 1;
-										stack_ram_wea = 1;
-										// This must only be executed once!
-										// Basically, just interrupt execution of the above routines
-										blob_extraction_execution_interrupted = 1;
-										blob_extraction_blob_counter = blob_extraction_blob_counter + 1;
-										
-										blob_extraction_red_average_final = 0;
-										blob_extraction_green_average_final = 0;
-										blob_extraction_blue_average_final = 0;
-										blob_extraction_x_average_final = 0;
-										blob_extraction_y_average_final = 0;
-											
-										blob_extraction_lowest_x_value = 0;
-										blob_extraction_lowest_y_value = 0;
-										blob_extraction_highest_x_value = 0;
-										blob_extraction_highest_y_value = 0;
-										
-										blob_extraction_blob_size = 1;
-										ok_to_do_averaging = 0;
-									end
-									
-									blob_extraction_toggler = 0;
-									blob_extraction_x = blob_extraction_x + 1;
-								end
-							end else begin
-								blob_extraction_x = 0;
-								blob_extraction_y = blob_extraction_y + 1;
-							end
-						end else begin
-							// Done!
-							blob_extraction_y = 0;
-							blob_extraction_counter_tog = 0;
-							blob_extraction_counter_togg = 0;
-							blob_extraction_counter_toggle = 0;
-							blob_extraction_done = 1;
-							blob_extraction_holdoff = 0;
-							wren = 0;
-						end
-					end else begin		// Interrupted
-								if (blob_extraction_toggler == 0) begin
-									// Set up stack read operation
-									stack_ram_wea = 0;
-									stack_ram_addra = stack_pointer;
-									
-									// Do this here for later
-									blob_extraction_inner_toggler = 0;
-								end
-								
-								if (blob_extraction_toggler == 1) begin
-									// Pop data from the stack
-									blob_extraction_x_temp = stack_ram_douta[16:8];
-									blob_extraction_y_temp = stack_ram_douta[7:0];
-									stack_pointer = stack_pointer - 1;
-									
-									blob_extraction_y_temp_1 = blob_extraction_y_temp;
-									
-									spanLeft = 0;
-									spanRight = 0;
-									
-									address = ((blob_extraction_y_temp_1 * 320) + blob_extraction_x_temp);
-								end
-								
-								if (blob_extraction_toggler == 2) begin
-									// Go up until an edge is found
-									
-									if ((data_read_sync_blob_extraction == 0) && (blob_extraction_x_temp > 7) && (blob_extraction_x_temp < 313) && (blob_extraction_y_temp_1 > 7) && (blob_extraction_y_temp_1 < 233)) begin
-										// Set up the read operation
-										wren = 0;
-										blob_extraction_y_temp_1 = blob_extraction_y_temp_1 - 1;
-										address = ((blob_extraction_y_temp_1 * 320) + blob_extraction_x_temp);
-											
-										blob_extraction_inner_toggler = 1;
-									end else begin
-										blob_extraction_inner_toggler = 0;
-										blob_extraction_y_temp_1 = blob_extraction_y_temp_1 + 1;
-										blob_extraction_toggler = 3;
-									end
-								end
-								
-								if (blob_extraction_toggler == 3) begin
-									// Set up a read operation for the pixel at (blob_extraction_x_temp, blob_extraction_y_temp)
-									address = ((blob_extraction_y_temp_1 * 320) + blob_extraction_x_temp);
-								end
-
-								if (blob_extraction_toggler == 4) begin
-									blob_extraction_toggler = 5;
-								end
-									
-								if (blob_extraction_toggler == 5) begin
-									// Read in the first pixel
-									// If the pixel is zero, write the current blob number in its place
-									if (blob_extraction_inner_toggler == 0) begin
-										if ((data_read_sync_blob_extraction == 0) && (blob_extraction_x_temp > 7) && (blob_extraction_x_temp < 313) && (blob_extraction_y_temp_1 > 7) && (blob_extraction_y_temp_1 < 233)) begin
-											// Write the data
-											address = ((blob_extraction_y_temp_1 * 320) + blob_extraction_x_temp);
-											data_write = blob_extraction_blob_counter;
-											wren = 1;
-											
-											blob_extraction_inner_toggler = 1;
-										end else begin
-											blob_extraction_toggler = 6;
-											blob_extraction_inner_toggler = 0;
-										end
-									end
-									
-									if (blob_extraction_inner_toggler == 1) begin
-										// Wait a clock cycle--DO NOT SWITCH OUT OF WRITE MODE HERE!
-									end
-										
-									if (blob_extraction_inner_toggler == 2) begin
-										// Switch to read; we need to read the RGB value of the median-filtered image
-										wren = 0;
-										address = (((blob_extraction_y_temp_1 * 320) + blob_extraction_x_temp) + 76801);
-									end
-
-									if (blob_extraction_inner_toggler == 3) begin
-										// And compute the running average, lowest pixel, centroid, etc.
-										if (ok_to_do_averaging == 1) begin
-											blob_extraction_red_average = blob_extraction_red_average + data_read_sync_blob_extraction[7:0];
-											blob_extraction_green_average = blob_extraction_green_average + data_read_sync_blob_extraction[15:8];
-											blob_extraction_blue_average = blob_extraction_blue_average + data_read_sync_blob_extraction[31:24];
-											blob_extraction_x_average = blob_extraction_x_average + blob_extraction_x_temp;
-											blob_extraction_y_average = blob_extraction_y_average + blob_extraction_y_temp_1;
-											
-											if (blob_extraction_lowest_x_value > blob_extraction_x_temp) begin
-												blob_extraction_lowest_x_value = blob_extraction_x_temp;
-											end
-											
-											if (blob_extraction_highest_x_value < blob_extraction_x_temp) begin
-												blob_extraction_highest_x_value = blob_extraction_x_temp;
-											end
-											
-											if (blob_extraction_lowest_y_value > blob_extraction_y_temp_1) begin
-												blob_extraction_lowest_y_value = blob_extraction_y_temp_1;
-											end
-											
-											if (blob_extraction_highest_y_value < blob_extraction_y_temp_1) begin
-												blob_extraction_highest_y_value = blob_extraction_y_temp_1;
-											end
-											
-											blob_extraction_blob_size = blob_extraction_blob_size + 1;
-										end else begin
-											blob_extraction_red_average = data_read_sync_blob_extraction[7:0];
-											blob_extraction_green_average = data_read_sync_blob_extraction[15:8];
-											blob_extraction_blue_average = data_read_sync_blob_extraction[31:24];
-											blob_extraction_x_average = blob_extraction_x_temp;
-											blob_extraction_y_average = blob_extraction_y_temp_1;
-											
-											blob_extraction_lowest_x_value = blob_extraction_x_temp;
-											blob_extraction_lowest_y_value = blob_extraction_y_temp_1;
-											blob_extraction_highest_x_value = blob_extraction_x_temp;
-											blob_extraction_highest_y_value = blob_extraction_y_temp_1;
-											
-											blob_extraction_blob_size = 1;
-											ok_to_do_averaging = 1;
-										end
-										
-										// Set up the red averaging
-										if (blob_extraction_red_average < 65535) begin
-											divider_dividend_two = blob_extraction_red_average;
-											divider_divisor_two = blob_extraction_blob_size;
-										end
-										if ((blob_extraction_red_average > 65534) && (blob_extraction_red_average < 131071)) begin
-											divider_dividend_two = (blob_extraction_red_average / 2);
-											divider_divisor_two = (blob_extraction_blob_size / 2);
-										end
-										if ((blob_extraction_red_average > 131070) && (blob_extraction_red_average < 262143)) begin
-											divider_dividend_two = (blob_extraction_red_average / 4);
-											divider_divisor_two = (blob_extraction_blob_size / 4);
-										end
-										if ((blob_extraction_red_average > 262142) && (blob_extraction_red_average < 524287)) begin
-											divider_dividend_two = (blob_extraction_red_average / 8);
-											divider_divisor_two = (blob_extraction_blob_size / 8);
-										end
-										if ((blob_extraction_red_average > 524286) && (blob_extraction_red_average < 1048575)) begin
-											divider_dividend_two = (blob_extraction_red_average / 16);
-											divider_divisor_two = (blob_extraction_blob_size / 16);
-										end
-										if ((blob_extraction_red_average > 1048575) && (blob_extraction_red_average < 2097151)) begin
-											divider_dividend_two = (blob_extraction_red_average / 32);
-											divider_divisor_two = (blob_extraction_blob_size / 32);
-										end
-										if (blob_extraction_red_average > 2097150) begin
-											divider_dividend_two = (blob_extraction_red_average / 128);
-											divider_divisor_two = (blob_extraction_blob_size / 128);
-										end
-										
-										// Set up the green averaging									
-										if (blob_extraction_green_average < 65535) begin
-											divider_dividend = blob_extraction_green_average;
-											divider_divisor = blob_extraction_blob_size;
-										end
-										if ((blob_extraction_green_average > 65534) && (blob_extraction_green_average < 131071)) begin
-											divider_dividend = (blob_extraction_green_average / 2);
-											divider_divisor = (blob_extraction_blob_size / 2);
-										end
-										if ((blob_extraction_green_average > 131070) && (blob_extraction_green_average < 262143)) begin
-											divider_dividend = (blob_extraction_green_average / 4);
-											divider_divisor = (blob_extraction_blob_size / 4);
-										end
-										if ((blob_extraction_green_average > 262142) && (blob_extraction_green_average < 524287)) begin
-											divider_dividend = (blob_extraction_green_average / 8);
-											divider_divisor = (blob_extraction_blob_size / 8);
-										end
-										if ((blob_extraction_green_average > 524286) && (blob_extraction_green_average < 1048575)) begin
-											divider_dividend = (blob_extraction_green_average / 16);
-											divider_divisor = (blob_extraction_blob_size / 16);
-										end
-										if ((blob_extraction_green_average > 1048575) && (blob_extraction_green_average < 2097151)) begin
-											divider_dividend = (blob_extraction_green_average / 32);
-											divider_divisor = (blob_extraction_blob_size / 32);
-										end
-										if (blob_extraction_green_average > 2097150) begin
-											divider_dividend = (blob_extraction_green_average / 128);
-											divider_divisor = (blob_extraction_blob_size / 128);
-										end
-									end
-										
-									if (blob_extraction_inner_toggler == 4) begin
-										// Read the red averaging result
-										blob_extraction_red_average_final = divider_quotient_two;
-										
-										// Read the green averaging result and set up the blue averaging
-										blob_extraction_green_average_final = divider_quotient;
-										if (blob_extraction_blue_average < 65535) begin
-											divider_dividend = blob_extraction_blue_average;
-											divider_divisor = blob_extraction_blob_size;
-										end
-										if ((blob_extraction_blue_average > 65534) && (blob_extraction_blue_average < 131071)) begin
-											divider_dividend_two = (blob_extraction_blue_average / 2);
-											divider_divisor_two = (blob_extraction_blob_size / 2);
-										end
-										if ((blob_extraction_blue_average > 131070) && (blob_extraction_blue_average < 262143)) begin
-											divider_dividend_two = (blob_extraction_blue_average / 4);
-											divider_divisor_two = (blob_extraction_blob_size / 4);
-										end
-										if ((blob_extraction_blue_average > 262142) && (blob_extraction_blue_average < 524287)) begin
-											divider_dividend_two = (blob_extraction_blue_average / 8);
-											divider_divisor_two = (blob_extraction_blob_size / 8);
-										end
-										if ((blob_extraction_blue_average > 524286) && (blob_extraction_blue_average < 1048575)) begin
-											divider_dividend_two = (blob_extraction_blue_average / 16);
-											divider_divisor_two = (blob_extraction_blob_size / 16);
-										end
-										if ((blob_extraction_blue_average > 1048575) && (blob_extraction_blue_average < 2097151)) begin
-											divider_dividend_two = (blob_extraction_blue_average / 32);
-											divider_divisor_two = (blob_extraction_blob_size / 32);
-										end
-										if (blob_extraction_blue_average > 2097150) begin
-											divider_dividend_two = (blob_extraction_blue_average / 128);
-											divider_divisor_two = (blob_extraction_blob_size / 128);
-										end
-										
-										// Set up the X averaging
-										if (blob_extraction_x_average < 65535) begin
-											divider_dividend = blob_extraction_x_average;
-											divider_divisor = blob_extraction_blob_size;
-										end
-										if ((blob_extraction_x_average > 65534) && (blob_extraction_x_average < 131071)) begin
-											divider_dividend = (blob_extraction_x_average / 2);
-											divider_divisor = (blob_extraction_blob_size / 2);
-										end
-										if ((blob_extraction_x_average > 131070) && (blob_extraction_x_average < 262143)) begin
-											divider_dividend = (blob_extraction_x_average / 4);
-											divider_divisor = (blob_extraction_blob_size / 4);
-										end
-										if ((blob_extraction_x_average > 262142) && (blob_extraction_x_average < 524287)) begin
-											divider_dividend = (blob_extraction_x_average / 8);
-											divider_divisor = (blob_extraction_blob_size / 8);
-										end
-										if ((blob_extraction_x_average > 524286) && (blob_extraction_x_average < 1048575)) begin
-											divider_dividend = (blob_extraction_x_average / 16);
-											divider_divisor = (blob_extraction_blob_size / 16);
-										end
-										if ((blob_extraction_x_average > 1048575) && (blob_extraction_x_average < 2097151)) begin
-											divider_dividend = (blob_extraction_x_average / 32);
-											divider_divisor = (blob_extraction_blob_size / 32);
-										end
-										if (blob_extraction_x_average > 2097150) begin
-											divider_dividend = (blob_extraction_x_average / 512);
-											divider_divisor = (blob_extraction_blob_size / 512);
-										end
-										
-										// We need to read data from the image here, so set up another read cycle
-										address = ((blob_extraction_y_temp_1 * 320) + blob_extraction_x_temp - 1);
-										wren = 0;
-									end
-									
-									if (blob_extraction_inner_toggler == 5) begin
-										// Read the blue averaging result
-										blob_extraction_blue_average_final = divider_quotient_two;
-										
-										// Read the X averaging result and set up the Y averaging
-										blob_extraction_x_average_final = divider_quotient;
-										if (blob_extraction_y_average < 65535) begin
-											divider_dividend = blob_extraction_y_average;
-											divider_divisor = blob_extraction_blob_size;
-										end
-										if ((blob_extraction_y_average > 65534) && (blob_extraction_y_average < 131071)) begin
-											divider_dividend = (blob_extraction_y_average / 2);
-											divider_divisor = (blob_extraction_blob_size / 2);
-										end
-										if ((blob_extraction_y_average > 131070) && (blob_extraction_y_average < 262143)) begin
-											divider_dividend = (blob_extraction_y_average / 4);
-											divider_divisor = (blob_extraction_blob_size / 4);
-										end
-										if ((blob_extraction_y_average > 262142) && (blob_extraction_y_average < 524287)) begin
-											divider_dividend = (blob_extraction_y_average / 8);
-											divider_divisor = (blob_extraction_blob_size / 8);
-										end
-										if ((blob_extraction_y_average > 524286) && (blob_extraction_y_average < 1048575)) begin
-											divider_dividend = (blob_extraction_y_average / 16);
-											divider_divisor = (blob_extraction_blob_size / 16);
-										end
-										if ((blob_extraction_y_average > 1048575) && (blob_extraction_y_average < 2097151)) begin
-											divider_dividend = (blob_extraction_y_average / 32);
-											divider_divisor = (blob_extraction_blob_size / 32);
-										end
-										if (blob_extraction_y_average > 2097150) begin
-											divider_dividend = (blob_extraction_y_average / 128);
-											divider_divisor = (blob_extraction_blob_size / 128);
-										end
-										
-										// Now read in the data
-										if ((spanLeft == 0) && (data_read_sync_blob_extraction == 0)) begin
-											// Push data!
-											stack_pointer = stack_pointer + 1;
-											stack_ram_addra = stack_pointer;
-											blob_extraction_data_temp[16:8] = blob_extraction_x_temp - 1;
-											blob_extraction_data_temp[7:0] = blob_extraction_y_temp_1;
-											stack_ram_dina = blob_extraction_data_temp;
-											stack_ram_wea = 1;
-											spanLeft = 1;
-										end else begin
-											if ((spanLeft == 1) && (data_read_sync_blob_extraction != 0)) begin
-												spanLeft = 0;
-											end
-										end
-										
-										blob_extraction_inner_toggler = 6;
-									end
-									
-									if (blob_extraction_inner_toggler == 6) begin
-										/*divider_dividend = 320;
-										divider_divisor = 2;*/
-										
-										// We need to read some more data from the image here, so set up yet another read cycle
-										address = ((blob_extraction_y_temp_1 * 320) + blob_extraction_x_temp + 1);
-										wren = 0;
-									end
-										
-									if (blob_extraction_inner_toggler == 7) begin
-										// Read the Y averaging result...done!
-										blob_extraction_y_average_final = divider_quotient;
-										
-										// Now read in the data
-										if ((spanRight == 0) && (data_read_sync_blob_extraction == 0)) begin
-											// Push data!
-											stack_pointer = stack_pointer + 1;
-											stack_ram_addra = stack_pointer;
-											blob_extraction_data_temp[16:8] = blob_extraction_x_temp + 1;
-											blob_extraction_data_temp[7:0] = blob_extraction_y_temp_1;
-											stack_ram_dina = blob_extraction_data_temp;
-											stack_ram_wea = 1;
-											spanRight = 1;
-										end else begin
-											if ((spanRight == 1) && (data_read_sync_blob_extraction != 0)) begin
-												spanRight = 0;
-											end
-										end
-										
-										blob_extraction_inner_toggler = 8;
-									end								
-									
-									if (blob_extraction_inner_toggler == 8) begin									
-										// Wait a clock cycle
-										wren = 0;
-										blob_extraction_y_temp_1 = blob_extraction_y_temp_1 + 1;
-										address = ((blob_extraction_y_temp_1 * 320) + blob_extraction_x_temp);	// Set up the next read
-										blob_extraction_inner_toggler = 0;
-										blob_extraction_toggler = 4;			// Go again...this will become 5 on the next loop!
-									end
-								end
-								
-								if (blob_extraction_toggler == 6) begin
-									// All of that above is done while the stack pointer is greater than 0
-									// If it is now zero, cut out!
-									if (stack_pointer != 0) begin
-										// Skip all of the blob information writing stuff below...
-										blob_extraction_toggler = 16;
-									end
-									
-									blob_extraction_color_loop = 0;
-									blob_extraction_slot_loop = 0;
-									
-									blob_extraction_minimum_difference = color_similarity_threshold;
-									blob_extraction_blob_color_number = 0;		// Default to 'not found'
-								end
-								
-								if (blob_extraction_toggler == 7) begin
-									// Before we can fill the last data slot, we need to find which color slot this is!
-									// We will be calculating the sum of the errors for each color, winner takes all and is then compared against the threshold
-									
-									//for (blob_extraction_color_loop = 0; blob_extraction_color_loop < 6; blob_extraction_color_loop = blob_extraction_color_loop + 1) begin
-										//for (blob_extraction_slot_loop = 0; blob_extraction_slot_loop < 8; blob_extraction_slot_loop = blob_extraction_slot_loop + 1) begin
-											// Red
-											if (blob_extraction_red_average_final > primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][7:0]) begin
-												blob_extraction_current_difference = blob_extraction_red_average_final - primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][7:0];
-											end else begin
-												blob_extraction_current_difference = primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][7:0] - blob_extraction_red_average_final;
-											end
-											
-											// Green
-											if (blob_extraction_green_average_final > primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][15:8]) begin
-												blob_extraction_current_difference = (blob_extraction_current_difference + (blob_extraction_green_average_final - primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][15:8]));
-											end else begin
-												blob_extraction_current_difference = (blob_extraction_current_difference + (primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][15:8] - blob_extraction_green_average_final));
-											end
-											
-											// Blue
-											if (blob_extraction_blue_average_final > primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][23:16]) begin
-												blob_extraction_current_difference = (blob_extraction_current_difference + (blob_extraction_blue_average_final - primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][23:16]));
-											end else begin
-												blob_extraction_current_difference = (blob_extraction_current_difference + (primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][23:16] - blob_extraction_blue_average_final));
-											end
-											
-											// Compare...
-											if (blob_extraction_current_difference < blob_extraction_minimum_difference) begin
-												blob_extraction_minimum_difference = blob_extraction_current_difference;
-												blob_extraction_blob_color_number = blob_extraction_color_loop + 1;
-											end
-										//end
-									//end	
-									
-									blob_extraction_slot_loop = blob_extraction_slot_loop + 1;
-									if (blob_extraction_slot_loop > 3) begin
-										blob_extraction_slot_loop = 0;
-										blob_extraction_color_loop = blob_extraction_color_loop + 1;
-									end
-									if (blob_extraction_color_loop < 6) begin
-										blob_extraction_toggler = blob_extraction_toggler - 1;		// This will make us go again here
-									end
-									
-									// TESTING ONLY!!! ***FIXME***
-									/*blob_extraction_x_average_final = 160;
-									blob_extraction_y_average_final = 120;*/
-								end
-								
-								if (blob_extraction_toggler == 8) begin
-									// Begin writing the data
-									address = ((blob_extraction_blob_counter * 3) + 200000);
-									blob_extraction_data_temp[31:24] = blob_extraction_red_average_final;
-									blob_extraction_data_temp[23:16] = blob_extraction_green_average_final;
-									blob_extraction_data_temp[15:8] = blob_extraction_blue_average_final;
-									
-									/*blob_extraction_data_temp[31:24] = 255;
-									blob_extraction_data_temp[23:16] = 127;
-									blob_extraction_data_temp[15:8] = 0;*/
-									
-									blob_extraction_data_temp[7:0] = blob_extraction_blob_color_number;
-									data_write = blob_extraction_data_temp;
-									wren = 1;
-								end
-								
-								if (blob_extraction_toggler == 9) begin
-									// Delay a cycle
-									wren = 0;
-								end
-								
-								if (blob_extraction_toggler == 10) begin
-									// Continue writing the data
-									address = ((blob_extraction_blob_counter * 3) + 200001);
-									blob_extraction_data_temp[31:24] = ((blob_extraction_x_average_final - 8) / 2);
-									blob_extraction_data_temp[23:16] = ((blob_extraction_y_average_final - 8) / 2);
-									blob_extraction_data_temp[15:0] = (blob_extraction_blob_size / 2);
-									if (blob_extraction_data_temp[7:0] == 176) begin
-										blob_extraction_data_temp[7:0] = 177;
-									end
-									if (blob_extraction_data_temp[15:8] == 176) begin
-										blob_extraction_data_temp[15:8] = 177;
-									end
-									data_write = blob_extraction_data_temp;
-									wren = 1;
-								end
-								
-								if (blob_extraction_toggler == 11) begin
-									// Delay a cycle
-									wren = 0;
-								end
-								
-								if (blob_extraction_toggler == 12) begin
-									// Write the third and last data frame
-									address = ((blob_extraction_blob_counter * 3) + 200002);
-									blob_extraction_data_temp[31:24] = (blob_extraction_lowest_x_value / 2);
-									blob_extraction_data_temp[23:16] = (blob_extraction_lowest_y_value / 2);
-									blob_extraction_data_temp[15:8] = (blob_extraction_highest_x_value / 2);
-									blob_extraction_data_temp[7:0] = (blob_extraction_highest_y_value / 2);
-									data_write = blob_extraction_data_temp;
-									wren = 1;
-								end
-								
-								if (blob_extraction_toggler == 13) begin
-									// Delay a cycle
-									wren = 0;
-								end
-								
-								if (blob_extraction_toggler == 14) begin
-									// Put a little red dot dot where the centroid is
-									address = ((blob_extraction_y_average_final * 320) + blob_extraction_x_average_final) + 76801;	// Set up the next write
-									blob_extraction_data_temp = 255;
-									blob_extraction_data_temp[31:24] = blob_extraction_blob_color_number;
-									data_write = blob_extraction_data_temp;
-									wren = 1;
-								end
-								
-								if (blob_extraction_toggler == 15) begin		// There is no more data on the stack, so return to top
-									wren = 0;
-									blob_extraction_execution_interrupted = 0;
-									blob_extraction_toggler = 17;
-								end
-								
-								if (blob_extraction_toggler == 16) begin		// There is still data on the stack, so go again
-									wren = 0;
-									blob_extraction_toggler = 17;
-								end
-								
-								// Increment our counters
-								if (blob_extraction_inner_toggler == 0) begin
-									blob_extraction_toggler = blob_extraction_toggler + 1;
-								end else begin
-									blob_extraction_inner_toggler = blob_extraction_inner_toggler + 1;
-								end
-								
-								if (blob_extraction_toggler >= 17) begin
-									blob_extraction_toggler = 0;
-									blob_extraction_inner_toggler = 0;
-								end
-					end	// Interrupted
-				end
-			end else begin
-				blob_extraction_done = 0;
-				address = 18'bz;
-				data_write = 32'bz;
-				wren = 1'bz;
-			end
-		end
-		
-		reg [31:0] data_read_sync_y_pixel_filling = 0;
-		reg y_pixel_filling_main_chunk_already_loaded = 0;
-		reg [7:0] y_pixel_filling_x_counter = 0;
-		reg [7:0] y_pixel_filling_y_counter = 0;
-		reg [31:0] y_pixel_filling_counter_buffer_red;
-		reg [31:0] y_pixel_filling_counter_buffer_green;
-		reg [31:0] y_pixel_filling_counter_buffer_blue;
-		
-		// Fill in missing edge pixels in the Y direction.
-		//always @(posedge clk) begin
-		always @(posedge clk_div_by_two) begin
-		//always @(posedge modified_clock) begin
-			data_read_sync_y_pixel_filling = data_read;
-			
-			if (enable_y_pixel_filling == 1) begin
-				if (y_pixel_filling_holdoff == 0) begin
-					wren = 0;
-					address = 2240;								// Skip the topmost 7 lines of the image
-					y_pixel_filling_counter_tog = 2240;
-					y_pixel_filling_counter_togg = 2240;
-					y_pixel_filling_holdoff = 1;
-				end else begin
-					// Load in the first pixel
-					if (y_pixel_filling_counter_toggle == 1) begin
-						y_pixel_filling_counter_buffer_red = data_read_sync_y_pixel_filling;			// This is the center pixel
-						y_pixel_filling_counter_tog = y_pixel_filling_counter_tog + 320;				// Set next read address (one pixel down)
-					end
-					
-					if (y_pixel_filling_counter_toggle == 2) begin
-						y_pixel_filling_counter_buffer_green = data_read_sync_y_pixel_filling;		// This is the rightmost pixel
-						y_pixel_filling_counter_tog = y_pixel_filling_counter_tog - 640;					// Set next read address (two pixels up)
-					end
-					
-					if (y_pixel_filling_counter_toggle == 3) begin
-						y_pixel_filling_counter_buffer_blue = data_read_sync_y_pixel_filling;		// This is the leftmost pixel
-						y_pixel_filling_counter_tog = y_pixel_filling_counter_tog + 321;					// Set next read address (one pixel to the right and one down)
-						
-						// OK, we have our data, now we can see if we need to fill this pixel or not!
-						y_pixel_filling_counter_temp = y_pixel_filling_counter_buffer_red;
-						
-						if ((y_pixel_filling_counter_buffer_blue == 1) && (y_pixel_filling_counter_buffer_green == 1)) begin
-							y_pixel_filling_counter_temp = 1;
-						end
-					end
-					
-					if (y_pixel_filling_counter_togg == 74561) begin		// All done!	It is 74561 because we don't need to process the last 7 lines of the image, as they are just garbage anyway!
-						y_pixel_filling_counter_tog = 0;
-						y_pixel_filling_counter_togg = 0;
-						y_pixel_filling_counter_toggle = 0;
-						y_pixel_filling_done = 1;
-						y_pixel_filling_holdoff = 0;
-						wren = 0;
-					end
-					
-					y_pixel_filling_counter_toggle = y_pixel_filling_counter_toggle + 1;
-					if (y_pixel_filling_counter_toggle < 4) begin
-						address = y_pixel_filling_counter_tog;
-						wren = 0;
-					end
-					if (y_pixel_filling_counter_toggle == 4) begin
-						address = y_pixel_filling_counter_togg;
-						data_write = y_pixel_filling_counter_temp;
-						wren = 1;
-					end
-					if (y_pixel_filling_counter_toggle == 5) begin
-						wren = 0;
-						address = y_pixel_filling_counter_tog;
-						y_pixel_filling_counter_togg = y_pixel_filling_counter_togg + 1;
-						y_pixel_filling_counter_toggle = 0;
-					end
-				end
-			end else begin
-				y_pixel_filling_done = 0;
-				address = 18'bz;
-				data_write = 32'bz;
-				wren = 1'bz;
-			end
-		end
-		
-		reg [31:0] data_read_sync_x_pixel_filling = 0;
-		reg x_pixel_filling_main_chunk_already_loaded = 0;
-		reg [7:0] x_pixel_filling_x_counter = 0;
-		reg [7:0] x_pixel_filling_y_counter = 0;
-		reg [31:0] x_pixel_filling_counter_buffer_red;
-		reg [31:0] x_pixel_filling_counter_buffer_green;
-		reg [31:0] x_pixel_filling_counter_buffer_blue;
-		
-		// Fill in missing edge pixels in the X direction.
-		//always @(posedge clk) begin
-		always @(posedge clk_div_by_two) begin
-		//always @(posedge modified_clock) begin
-			data_read_sync_x_pixel_filling = data_read;
-			
-			if (enable_x_pixel_filling == 1) begin
-				if (x_pixel_filling_holdoff == 0) begin
-					wren = 0;
-					address = 2240;								// Skip the topmost 7 lines of the image
-					x_pixel_filling_counter_tog = 2240;
-					x_pixel_filling_counter_togg = 2240;
-					x_pixel_filling_holdoff = 1;
-				end else begin
-					// Load in the first pixel
-					if (x_pixel_filling_counter_toggle == 1) begin
-						x_pixel_filling_counter_buffer_red = data_read_sync_x_pixel_filling;			// This is the center pixel
-						x_pixel_filling_counter_tog = x_pixel_filling_counter_tog + 1;							// Set next read address (one pixel to the right)
-					end
-					
-					if (x_pixel_filling_counter_toggle == 2) begin
-						x_pixel_filling_counter_buffer_green = data_read_sync_x_pixel_filling;		// This is the rightmost pixel
-						x_pixel_filling_counter_tog = x_pixel_filling_counter_tog - 2;							// Set next read address (two pixels to the left)
-					end
-					
-					if (x_pixel_filling_counter_toggle == 3) begin
-						x_pixel_filling_counter_buffer_blue = data_read_sync_x_pixel_filling;			// This is the leftmost pixel
-						x_pixel_filling_counter_tog = x_pixel_filling_counter_tog + 2;							// Set next read address (two pixels to the right)
-						
-						// OK, we have our data, now we can see if we need to fill this pixel or not!
-						x_pixel_filling_counter_temp = x_pixel_filling_counter_buffer_red;
-						
-						if ((x_pixel_filling_counter_buffer_blue == 1) && (x_pixel_filling_counter_buffer_green == 1)) begin
-							x_pixel_filling_counter_temp = 1;
-						end
-					end
-					
-					if (x_pixel_filling_counter_togg == 74561) begin		// All done!	It is 74561 because we don't need to process the last 7 lines of the image, as they are just garbage anyway!
-						x_pixel_filling_counter_tog = 0;
-						x_pixel_filling_counter_togg = 0;
-						x_pixel_filling_counter_toggle = 0;
-						x_pixel_filling_done = 1;
-						x_pixel_filling_holdoff = 0;
-						wren = 0;
-					end
-					
-					x_pixel_filling_counter_toggle = x_pixel_filling_counter_toggle + 1;
-					if (x_pixel_filling_counter_toggle < 4) begin
-						address = x_pixel_filling_counter_tog;
-						wren = 0;
-					end
-					if (x_pixel_filling_counter_toggle == 4) begin
-						address = x_pixel_filling_counter_togg;
-						data_write = x_pixel_filling_counter_temp;
-						wren = 1;
-					end
-					if (x_pixel_filling_counter_toggle == 5) begin
-						wren = 0;
-						address = x_pixel_filling_counter_tog;
-						x_pixel_filling_counter_togg = x_pixel_filling_counter_togg + 1;
-						x_pixel_filling_counter_toggle = 0;
-					end
-				end
-			end else begin
-				x_pixel_filling_done = 0;
-				address = 18'bz;
-				data_write = 32'bz;
-				wren = 1'bz;
-			end
-		end
-		
-		reg [31:0] data_read_sync_edge_detection = 0;
-		reg edge_detection_main_chunk_already_loaded = 0;
-		reg [7:0] edge_detection_x_counter = 0;
-		reg [7:0] edge_detection_y_counter = 0;
-		reg [23:0] edge_detection_counter_buffer_red;
-		reg [23:0] edge_detection_counter_buffer_green;
-		reg [23:0] edge_detection_counter_buffer_blue;
-		reg [15:0] edge_detection_running_total_red = 0;
-		reg [15:0] edge_detection_running_total_green = 0;
-		reg [15:0] edge_detection_running_total_blue = 0;
-		reg [15:0] edge_detection_running_total_ave_red = 0;
-		reg [15:0] edge_detection_running_total_ave_green = 0;
-		reg [15:0] edge_detection_running_total_ave_blue = 0;
-		
-		reg edge_detection_skip_this_column = 0;
-		
-		parameter edge_detector_averaging_window = 16;
-		//parameter edge_detector_averaging_window = 15;
-		//parameter edge_detector_averaging_window = 14;
-		
-		// For every pixel, see if it lies on an edge.
-		//always @(posedge modified_clock) begin
-		//always @(posedge camera_data_pclk) begin
-		always @(posedge clk_div_by_two) begin
-		//always @(posedge clk) begin		
-			if (enable_edge_detection == 1) begin
-				if (edge_detection_holdoff == 0) begin
-					wren = 0;
-					address = 79041;								// Skip the topmost 7 lines of the image
-					edge_detection_counter_tog = 79041;
-					edge_detection_counter_togg = 2240;
-					edge_detection_holdoff = 1;
-					edge_detection_counter_toggle = 1;
-					edge_detection_main_chunk_already_loaded = 0;
-					edge_detection_running_total_red = 0;
-					edge_detection_running_total_green = 0;
-					edge_detection_running_total_blue = 0;
-				end else begin				
-					data_read_sync_edge_detection = data_read;
-					
-					// Now find the average of the surrounding pixels (8 in either direction :ahh:)
-					if (edge_detection_counter_toggle == 4) begin
-						if (edge_detection_main_chunk_already_loaded == 1) begin
-							// Main chunk already loaded--simply load what we need to continue
-							if (edge_detection_skip_this_column == 0) begin
-								if (edge_detection_y_counter < (edge_detector_averaging_window * 2)) begin
-									if (edge_detection_y_counter < edge_detector_averaging_window) begin
-										// Set up the next read operation
-										if (edge_detection_y_counter != (edge_detector_averaging_window - 2)) begin
-											address = (((edge_detection_counter_tog - (edge_detector_averaging_window / 2)) + (edge_detection_y_counter * 320)) - (((edge_detector_averaging_window / 2) - 2) * 320));
-										end else begin
-											address = ((edge_detection_counter_tog + (edge_detector_averaging_window / 2)) - (((edge_detector_averaging_window / 2) - 1) * 320));
-										end
-										
-										// Load the leftmost column and subtract each value from the accumulators
-										edge_detection_running_total_red = edge_detection_running_total_red - data_read[7:0];	// This is whatever pixel I previously loaded in!
-										edge_detection_running_total_green = edge_detection_running_total_green - data_read[15:8];
-										edge_detection_running_total_blue = edge_detection_running_total_blue - data_read[31:24];
-									end else begin
-										// Set up the next read operation
-										address = (((edge_detection_counter_tog + (edge_detector_averaging_window / 2)) + ((edge_detection_y_counter - edge_detector_averaging_window) * 320)) - (((edge_detector_averaging_window / 2) - 2) * 320));
-										
-										// Load the rightmost column and add each value to the accumulators
-										edge_detection_running_total_red = edge_detection_running_total_red + data_read[7:0];	// This is whatever pixel I previously loaded in!
-										edge_detection_running_total_green = edge_detection_running_total_green + data_read[15:8];
-										edge_detection_running_total_blue = edge_detection_running_total_blue + data_read[31:24];
-									end
-									edge_detection_y_counter = edge_detection_y_counter + 2;
-								end else begin
-									edge_detection_y_counter = 0;
-									edge_detection_skip_this_column = 1;
-									edge_detection_counter_toggle = edge_detection_counter_toggle + 1;	// Next stage, please!
-								end
-							end else begin
-								edge_detection_skip_this_column = 0;
-								edge_detection_counter_toggle = edge_detection_counter_toggle + 1;	// Next stage, please!
-							end
-						end else begin
-							// for x=0 to 16
-							if (edge_detection_x_counter < edge_detector_averaging_window) begin
-								// for y=0 to 16
-								if (edge_detection_y_counter < edge_detector_averaging_window) begin
-									// Set up the next read operation...
-									address = ((((edge_detection_counter_tog + edge_detection_x_counter) - ((edge_detector_averaging_window / 2) - 1)) + (edge_detection_y_counter * 320)) - (((edge_detector_averaging_window / 2) - 1) * 320));
-									wren = 0;
-
-									// Keep a running total of all the points that I visit...
-									edge_detection_running_total_red = edge_detection_running_total_red + data_read[7:0];	// This is whatever pixel I previously loaded in!
-									edge_detection_running_total_green = edge_detection_running_total_green + data_read[15:8];
-									edge_detection_running_total_blue = edge_detection_running_total_blue + data_read[31:24];
-							
-									// next y
-									edge_detection_y_counter = edge_detection_y_counter + 2;
-								end else begin
-									edge_detection_y_counter = 0;
-									// next x
-									edge_detection_x_counter = edge_detection_x_counter + 2;
-								end
-							end else begin
-								edge_detection_y_counter = 0;
-								edge_detection_skip_this_column = 1;
-								edge_detection_main_chunk_already_loaded = 1;
-								edge_detection_counter_toggle = edge_detection_counter_toggle + 1;	// Next stage, please!
-							end
-						end
-					end
-					
-					// Yes, this one IS supposed to be "out of sequence", as it does not need to wait a cycle before continuing on!
-					if (edge_detection_counter_toggle == 5) begin
-						edge_detection_counter_temp = 0;
-						
-						// Now that we have all of our data, we can see if this is an edge or not!
-						// Finish calculating the average
-						edge_detection_running_total_ave_red = edge_detection_running_total_red / 256;
-						edge_detection_running_total_ave_green = edge_detection_running_total_green / 256;
-						edge_detection_running_total_ave_blue = edge_detection_running_total_blue / 256;
-						
-						// Add the noise floor thresholds...
-						edge_detection_running_total_ave_red = edge_detection_running_total_ave_red + edge_detection_threshold_red;
-						edge_detection_running_total_ave_green = edge_detection_running_total_ave_green + edge_detection_threshold_green;
-						edge_detection_running_total_ave_blue = edge_detection_running_total_ave_blue + edge_detection_threshold_blue;
-						
-						// First the red...
-						if (edge_detection_counter_buffer_red[7:0] > edge_detection_running_total_ave_red) begin
-							if (edge_detection_counter_buffer_red[15:8] < edge_detection_running_total_ave_red) begin
-								edge_detection_counter_temp = 1;		// We found an edge!
-							end
-							if (edge_detection_counter_buffer_red[23:16] < edge_detection_running_total_ave_red) begin
-								edge_detection_counter_temp = 1;		// We found an edge!
-							end
-						end else begin
-							if (edge_detection_counter_buffer_red[15:8] > edge_detection_running_total_ave_red) begin
-								edge_detection_counter_temp = 1;		// We found an edge!
-							end
-							if (edge_detection_counter_buffer_red[23:16] > edge_detection_running_total_ave_red) begin
-								edge_detection_counter_temp = 1;		// We found an edge!
-							end
-						end
-						
-						// ...next the green...
-						if (edge_detection_counter_buffer_green[7:0] > edge_detection_running_total_ave_green) begin
-							if (edge_detection_counter_buffer_green[15:8] < edge_detection_running_total_ave_green) begin
-								edge_detection_counter_temp = 1;		// We found an edge!
-							end
-							if (edge_detection_counter_buffer_green[23:16] < edge_detection_running_total_ave_green) begin
-								edge_detection_counter_temp = 1;		// We found an edge!
-							end
-						end else begin
-							if (edge_detection_counter_buffer_green[15:8] > edge_detection_running_total_ave_green) begin
-								edge_detection_counter_temp = 1;		// We found an edge!
-							end
-							if (edge_detection_counter_buffer_green[23:16] > edge_detection_running_total_ave_green) begin
-								edge_detection_counter_temp = 1;		// We found an edge!
-							end
-						end
-						
-						// ...and finally the blue!
-						if (edge_detection_counter_buffer_blue[7:0] > edge_detection_running_total_ave_blue) begin
-							if (edge_detection_counter_buffer_blue[15:8] < edge_detection_running_total_ave_blue) begin
-								edge_detection_counter_temp = 1;		// We found an edge!
-							end
-							if (edge_detection_counter_buffer_blue[23:16] < edge_detection_running_total_ave_blue) begin
-								edge_detection_counter_temp = 1;		// We found an edge!
-							end
-						end else begin
-							if (edge_detection_counter_buffer_blue[15:8] > edge_detection_running_total_ave_blue) begin
-								edge_detection_counter_temp = 1;		// We found an edge!
-							end
-							if (edge_detection_counter_buffer_blue[23:16] > edge_detection_running_total_ave_blue) begin
-								edge_detection_counter_temp = 1;		// We found an edge!
-							end
-						end
-						
-						// For testing ONLY, load in the average values for this pixel and store them so that I can see them!
-						//edge_detection_counter_temp[7:0] = edge_detection_running_total_ave_red;
-						//edge_detection_counter_temp[15:8] = edge_detection_running_total_ave_green;
-						//edge_detection_counter_temp[31:24] = edge_detection_running_total_ave_blue;
-						
-						edge_detection_counter_tog = edge_detection_counter_tog + 1;			// We need to read from the next pixel
-						edge_detection_counter_toggle = edge_detection_counter_toggle + 1;	// Next stage, please!
-					end
-					
-					// Load in the pixel to the right
-					if (edge_detection_counter_toggle == 3) begin
-						edge_detection_counter_buffer_red[23:16] = data_read[7:0];			// This is the bottom pixel
-						edge_detection_counter_buffer_green[23:16] = data_read[15:8];
-						edge_detection_counter_buffer_blue[23:16] = data_read[31:24];
-						if (edge_detection_main_chunk_already_loaded == 0) begin
-							address = edge_detection_counter_tog + (((edge_detector_averaging_window / 2) * 320) + (edge_detector_averaging_window / 2));			// Set next read address (8 down and 8 to the right)
-						end else begin
-							address = edge_detection_counter_tog - ((((edge_detector_averaging_window / 2) - 1) * 320) + (edge_detector_averaging_window / 2));			// Set next read address (7 up and 8 to the left)
-						end
-						edge_detection_counter_toggle = edge_detection_counter_toggle + 1;	// Next stage, please!
-						edge_detection_x_counter = 0;
-						edge_detection_y_counter = 0;
-					end
-					
-					// Load in the pixel to the right
-					if (edge_detection_counter_toggle == 2) begin
-						edge_detection_counter_buffer_red[15:8] = data_read[7:0];			// This is the rightmost pixel
-						edge_detection_counter_buffer_green[15:8] = data_read[15:8];
-						edge_detection_counter_buffer_blue[15:8] = data_read[31:24];
-						address = edge_detection_counter_tog + 320;			// Set next read address (1 down)
-						edge_detection_counter_toggle = edge_detection_counter_toggle + 1;	// Next stage, please!
-						edge_detection_x_counter = 0;
-						edge_detection_y_counter = 0;
-					end
-					
-					// Load in the first pixel
-					if (edge_detection_counter_toggle == 1) begin
-						edge_detection_counter_buffer_red[7:0] = data_read[7:0];			// This is the center pixel
-						edge_detection_counter_buffer_green[7:0] = data_read[15:8];
-						edge_detection_counter_buffer_blue[7:0] = data_read[31:24];
-						address = edge_detection_counter_tog + 1;			// Set next read address (1 to the right)
-						edge_detection_counter_toggle = edge_detection_counter_toggle + 1;	// Next stage, please!
-						edge_detection_x_counter = 0;
-						edge_detection_y_counter = 0;
-					end
-					
-					if (edge_detection_counter_togg == 74561) begin		// All done!	It is 74561 because we don't need to process the last 7 lines of the image, as they would just be garbage anyway!
-						edge_detection_counter_tog = 0;
-						edge_detection_counter_togg = 0;
-						edge_detection_counter_toggle = 0;
-						edge_detection_done = 1;
-						edge_detection_holdoff = 0;
-						wren = 0;
-					end
-					
-					if (edge_detection_counter_toggle == 6) begin
-						address = edge_detection_counter_togg;
-						data_write = edge_detection_counter_temp;
-						wren = 1;
-					end
-					if (edge_detection_counter_toggle == 7) begin
-						wren = 0;
-						address = edge_detection_counter_tog;
-						edge_detection_counter_togg = edge_detection_counter_togg + 1;
-						edge_detection_counter_toggle = 1;
-					end
-					if (edge_detection_counter_toggle > 5) begin
-						edge_detection_counter_toggle = edge_detection_counter_toggle + 1;
-					end
-				end
-			end else begin
-				edge_detection_done = 0;
-				address = 18'bz;
-				data_write = 32'bz;
-				wren = 1'bz;
-			end
-		end
-		
-		reg [7:0] median_filtering_swap_buffer;
-		reg [31:0] data_read_sync_median_filtering;
-		reg [71:0] median_filtering_counter_buffer_red;
-		reg [71:0] median_filtering_counter_buffer_green;
-		reg [71:0] median_filtering_counter_buffer_blue;
-	/*
-		// For every pixel, check the 9 pixels around and including it, and find the 'middle' value.
-		always @(posedge clk) begin
-		//always @(posedge modified_clock) begin
-		//always @(posedge clk_div_by_two) begin
-			data_read_sync_median_filtering = data_read;
-		
-			if (enable_median_filtering == 1) begin
-				if (median_filtering_holdoff == 0) begin
-					wren = 0;
-					address = 320;								// Skip the topmost line of the image
-					median_filtering_counter_tog = 320;
-					median_filtering_holdoff = 1;
-				end else begin
-					// Load in the first pixel
-					if (median_filtering_counter_toggle == 1) begin
-						median_filtering_counter_buffer_red[7:0] = data_read_sync_median_filtering[7:0];			// This is the center pixel
-						median_filtering_counter_buffer_green[7:0] = data_read_sync_median_filtering[15:8];
-						median_filtering_counter_buffer_blue[7:0] = data_read_sync_median_filtering[31:24];
-						median_filtering_counter_tog = median_filtering_counter_tog - 1;	// Set next read address (one pixel to the left)
-					end
-
-					if (median_filtering_counter_toggle == 2) begin
-						median_filtering_counter_buffer_red[15:8] = data_read_sync_median_filtering[7:0];			// This is the left pixel
-						median_filtering_counter_buffer_green[15:8] = data_read_sync_median_filtering[15:8];
-						median_filtering_counter_buffer_blue[15:8] = data_read_sync_median_filtering[31:24];
-						median_filtering_counter_tog = median_filtering_counter_tog + 2;	// Set next read address (two pixels to the right)
-					end
-		
-					if (median_filtering_counter_toggle == 3) begin
-						median_filtering_counter_buffer_red[23:16] = data_read_sync_median_filtering[7:0];			// This is the right pixel
-						median_filtering_counter_buffer_green[23:16] = data_read_sync_median_filtering[15:8];
-						median_filtering_counter_buffer_blue[23:16] = data_read_sync_median_filtering[31:24];
-						median_filtering_counter_tog = median_filtering_counter_tog - 320;	// Set next read address (one pixel up)
-					end
-					
-					if (median_filtering_counter_toggle == 4) begin
-						median_filtering_counter_buffer_red[31:24] = data_read_sync_median_filtering[7:0];			// This is the top-right pixel
-						median_filtering_counter_buffer_green[31:24] = data_read_sync_median_filtering[15:8];
-						median_filtering_counter_buffer_blue[31:24] = data_read_sync_median_filtering[31:24];
-						median_filtering_counter_tog = median_filtering_counter_tog - 1;	// Set next read address (one pixel to the left)
-					end
-					
-					if (median_filtering_counter_toggle == 5) begin
-						median_filtering_counter_buffer_red[39:32] = data_read_sync_median_filtering[7:0];			// This is the top pixel
-						median_filtering_counter_buffer_green[39:32] = data_read_sync_median_filtering[15:8];
-						median_filtering_counter_buffer_blue[39:32] = data_read_sync_median_filtering[31:24];
-						median_filtering_counter_tog = median_filtering_counter_tog - 1;	// Set next read address (one pixel to the left)
-					end
-					
-					if (median_filtering_counter_toggle == 6) begin
-						median_filtering_counter_buffer_red[47:40] = data_read_sync_median_filtering[7:0];			// This is the top-left pixel
-						median_filtering_counter_buffer_green[47:40] = data_read_sync_median_filtering[15:8];
-						median_filtering_counter_buffer_blue[47:40] = data_read_sync_median_filtering[31:24];
-						median_filtering_counter_tog = median_filtering_counter_tog + 640;	// Set next read address (two pixels down)
-					end
-					
-					if (median_filtering_counter_toggle == 7) begin
-						median_filtering_counter_buffer_red[55:48] = data_read_sync_median_filtering[7:0];			// This is the bottom-left pixel
-						median_filtering_counter_buffer_green[55:48] = data_read_sync_median_filtering[15:8];
-						median_filtering_counter_buffer_blue[55:48] = data_read_sync_median_filtering[31:24];
-						median_filtering_counter_tog = median_filtering_counter_tog + 1;	// Set next read address (one pixel to the right)
-					end
-					
-					if (median_filtering_counter_toggle == 8) begin
-						median_filtering_counter_buffer_red[63:56] = data_read_sync_median_filtering[7:0];			// This is the bottom pixel
-						median_filtering_counter_buffer_green[63:56] = data_read_sync_median_filtering[15:8];
-						median_filtering_counter_buffer_blue[63:56] = data_read_sync_median_filtering[31:24];
-						median_filtering_counter_tog = median_filtering_counter_tog + 1;	// Set next read address (one pixel to the right)
-					end
-					
-					if (median_filtering_counter_toggle == 9) begin
-						median_filtering_counter_buffer_red[71:64] = data_read_sync_median_filtering[7:0];			// This is the bottom-right pixel
-						median_filtering_counter_buffer_green[71:64] = data_read_sync_median_filtering[15:8];
-						median_filtering_counter_buffer_blue[71:64] = data_read_sync_median_filtering[31:24];
-						median_filtering_counter_tog = median_filtering_counter_tog - 320;	// Set next read address (one pixel up) (this is to put the "cursor" in the correct position for the next pixel!
-						
-						// Now, since we have all of this data collected (finally!), we can calculate the median of the numbers
-						// First the red image...LOTS of processing here!
-						if (median_filtering_counter_buffer_red[15:8] > median_filtering_counter_buffer_red[23:16]) begin	// 1,2
-							median_filtering_swap_buffer = median_filtering_counter_buffer_red[15:8];
-							median_filtering_counter_buffer_red[15:8] = median_filtering_counter_buffer_red[23:16];
-							median_filtering_counter_buffer_red[23:16] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_red[39:32] > median_filtering_counter_buffer_red[47:40]) begin	// 4,5
-							median_filtering_swap_buffer = median_filtering_counter_buffer_red[39:32];
-							median_filtering_counter_buffer_red[39:32] = median_filtering_counter_buffer_red[47:40];
-							median_filtering_counter_buffer_red[47:40] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_red[63:56] > median_filtering_counter_buffer_red[71:64]) begin	// 7,8
-							median_filtering_swap_buffer = median_filtering_counter_buffer_red[63:56];
-							median_filtering_counter_buffer_red[63:56] = median_filtering_counter_buffer_red[71:64];
-							median_filtering_counter_buffer_red[71:64] = median_filtering_swap_buffer;
-						end
-						// ---
-						if (median_filtering_counter_buffer_red[7:0] > median_filtering_counter_buffer_red[15:8]) begin		// 0,1
-							median_filtering_swap_buffer = median_filtering_counter_buffer_red[7:0];
-							median_filtering_counter_buffer_red[7:0] = median_filtering_counter_buffer_red[15:8];
-							median_filtering_counter_buffer_red[15:8] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_red[31:24] > median_filtering_counter_buffer_red[39:32]) begin	// 3,4
-							median_filtering_swap_buffer = median_filtering_counter_buffer_red[31:24];
-							median_filtering_counter_buffer_red[31:24] = median_filtering_counter_buffer_red[39:32];
-							median_filtering_counter_buffer_red[39:32] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_red[55:48] > median_filtering_counter_buffer_red[63:56]) begin	// 6,7
-							median_filtering_swap_buffer = median_filtering_counter_buffer_red[55:48];
-							median_filtering_counter_buffer_red[55:48] = median_filtering_counter_buffer_red[63:56];
-							median_filtering_counter_buffer_red[63:56] = median_filtering_swap_buffer;
-						end
-						// ---
-						if (median_filtering_counter_buffer_red[15:8] > median_filtering_counter_buffer_red[23:16]) begin	// 1,2
-							median_filtering_swap_buffer = median_filtering_counter_buffer_red[15:8];
-							median_filtering_counter_buffer_red[15:8] = median_filtering_counter_buffer_red[23:16];
-							median_filtering_counter_buffer_red[23:16] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_red[39:32] > median_filtering_counter_buffer_red[47:40]) begin	// 4,5
-							median_filtering_swap_buffer = median_filtering_counter_buffer_red[39:32];
-							median_filtering_counter_buffer_red[39:32] = median_filtering_counter_buffer_red[47:40];
-							median_filtering_counter_buffer_red[47:40] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_red[63:56] > median_filtering_counter_buffer_red[71:64]) begin	// 7,8
-							median_filtering_swap_buffer = median_filtering_counter_buffer_red[63:56];
-							median_filtering_counter_buffer_red[63:56] = median_filtering_counter_buffer_red[71:64];
-							median_filtering_counter_buffer_red[71:64] = median_filtering_swap_buffer;
-						end
-						// ---
-						if (median_filtering_counter_buffer_red[7:0] > median_filtering_counter_buffer_red[31:24]) begin	// 0,3
-							median_filtering_swap_buffer = median_filtering_counter_buffer_red[7:0];
-							median_filtering_counter_buffer_red[7:0] = median_filtering_counter_buffer_red[31:24];
-							median_filtering_counter_buffer_red[31:24] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_red[47:40] > median_filtering_counter_buffer_red[71:64]) begin	// 5,8
-							median_filtering_swap_buffer = median_filtering_counter_buffer_red[47:40];
-							median_filtering_counter_buffer_red[47:40] = median_filtering_counter_buffer_red[71:64];
-							median_filtering_counter_buffer_red[71:64] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_red[39:32] > median_filtering_counter_buffer_red[63:56]) begin	// 4,7
-							median_filtering_swap_buffer = median_filtering_counter_buffer_red[39:32];
-							median_filtering_counter_buffer_red[39:32] = median_filtering_counter_buffer_red[63:56];
-							median_filtering_counter_buffer_red[63:56] = median_filtering_swap_buffer;
-						end
-						// ---
-						if (median_filtering_counter_buffer_red[31:24] > median_filtering_counter_buffer_red[55:48]) begin	// 3,6
-							median_filtering_swap_buffer = median_filtering_counter_buffer_red[31:24];
-							median_filtering_counter_buffer_red[31:24] = median_filtering_counter_buffer_red[55:48];
-							median_filtering_counter_buffer_red[55:48] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_red[15:8] > median_filtering_counter_buffer_red[39:32]) begin	// 1,4
-							median_filtering_swap_buffer = median_filtering_counter_buffer_red[15:8];
-							median_filtering_counter_buffer_red[15:8] = median_filtering_counter_buffer_red[39:32];
-							median_filtering_counter_buffer_red[39:32] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_red[23:16] > median_filtering_counter_buffer_red[47:40]) begin	// 2,5
-							median_filtering_swap_buffer = median_filtering_counter_buffer_red[23:16];
-							median_filtering_counter_buffer_red[23:16] = median_filtering_counter_buffer_red[47:40];
-							median_filtering_counter_buffer_red[47:40] = median_filtering_swap_buffer;
-						end
-						// ---
-						if (median_filtering_counter_buffer_red[39:32] > median_filtering_counter_buffer_red[63:56]) begin	// 4,7
-							median_filtering_swap_buffer = median_filtering_counter_buffer_red[39:32];
-							median_filtering_counter_buffer_red[39:32] = median_filtering_counter_buffer_red[63:56];
-							median_filtering_counter_buffer_red[63:56] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_red[39:32] > median_filtering_counter_buffer_red[23:16]) begin	// 4,2
-							median_filtering_swap_buffer = median_filtering_counter_buffer_red[39:32];
-							median_filtering_counter_buffer_red[39:32] = median_filtering_counter_buffer_red[23:16];
-							median_filtering_counter_buffer_red[23:16] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_red[55:48] > median_filtering_counter_buffer_red[39:32]) begin	// 6,4
-							median_filtering_swap_buffer = median_filtering_counter_buffer_red[55:48];
-							median_filtering_counter_buffer_red[55:48] = median_filtering_counter_buffer_red[39:32];
-							median_filtering_counter_buffer_red[39:32] = median_filtering_swap_buffer;
-						end
-						// ---
-						if (median_filtering_counter_buffer_red[39:32] > median_filtering_counter_buffer_red[23:16]) begin	// 4,2
-							median_filtering_swap_buffer = median_filtering_counter_buffer_red[39:32];
-							median_filtering_counter_buffer_red[39:32] = median_filtering_counter_buffer_red[23:16];
-							median_filtering_counter_buffer_red[23:16] = median_filtering_swap_buffer;
-						end
-						// FINALLY DONE WITH THE RED ARRAY!!! YIPPEE!!!
-						median_filtering_counter_temp[7:0] = median_filtering_counter_buffer_red[39:32];		// Store the median in the red slot of the data to write
-						
-						// Next the green image...LOTS of processing here again!
-						if (median_filtering_counter_buffer_green[15:8] > median_filtering_counter_buffer_green[23:16]) begin		// 1,2
-							median_filtering_swap_buffer = median_filtering_counter_buffer_green[15:8];
-							median_filtering_counter_buffer_green[15:8] = median_filtering_counter_buffer_green[23:16];
-							median_filtering_counter_buffer_green[23:16] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_green[39:32] > median_filtering_counter_buffer_green[47:40]) begin	// 4,5
-							median_filtering_swap_buffer = median_filtering_counter_buffer_green[39:32];
-							median_filtering_counter_buffer_green[39:32] = median_filtering_counter_buffer_green[47:40];
-							median_filtering_counter_buffer_green[47:40] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_green[63:56] > median_filtering_counter_buffer_green[71:64]) begin	// 7,8
-							median_filtering_swap_buffer = median_filtering_counter_buffer_green[63:56];
-							median_filtering_counter_buffer_green[63:56] = median_filtering_counter_buffer_green[71:64];
-							median_filtering_counter_buffer_green[71:64] = median_filtering_swap_buffer;
-						end
-						// ---
-						if (median_filtering_counter_buffer_green[7:0] > median_filtering_counter_buffer_green[15:8]) begin		// 0,1
-							median_filtering_swap_buffer = median_filtering_counter_buffer_green[7:0];
-							median_filtering_counter_buffer_green[7:0] = median_filtering_counter_buffer_green[15:8];
-							median_filtering_counter_buffer_green[15:8] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_green[31:24] > median_filtering_counter_buffer_green[39:32]) begin	// 3,4
-							median_filtering_swap_buffer = median_filtering_counter_buffer_green[31:24];
-							median_filtering_counter_buffer_green[31:24] = median_filtering_counter_buffer_green[39:32];
-							median_filtering_counter_buffer_green[39:32] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_green[55:48] > median_filtering_counter_buffer_green[63:56]) begin	// 6,7
-							median_filtering_swap_buffer = median_filtering_counter_buffer_green[55:48];
-							median_filtering_counter_buffer_green[55:48] = median_filtering_counter_buffer_green[63:56];
-							median_filtering_counter_buffer_green[63:56] = median_filtering_swap_buffer;
-						end
-						// ---
-						if (median_filtering_counter_buffer_green[15:8] > median_filtering_counter_buffer_green[23:16]) begin		// 1,2
-							median_filtering_swap_buffer = median_filtering_counter_buffer_green[15:8];
-							median_filtering_counter_buffer_green[15:8] = median_filtering_counter_buffer_green[23:16];
-							median_filtering_counter_buffer_green[23:16] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_green[39:32] > median_filtering_counter_buffer_green[47:40]) begin	// 4,5
-							median_filtering_swap_buffer = median_filtering_counter_buffer_green[39:32];
-							median_filtering_counter_buffer_green[39:32] = median_filtering_counter_buffer_green[47:40];
-							median_filtering_counter_buffer_green[47:40] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_green[63:56] > median_filtering_counter_buffer_green[71:64]) begin	// 7,8
-							median_filtering_swap_buffer = median_filtering_counter_buffer_green[63:56];
-							median_filtering_counter_buffer_green[63:56] = median_filtering_counter_buffer_green[71:64];
-							median_filtering_counter_buffer_green[71:64] = median_filtering_swap_buffer;
-						end
-						// ---
-						if (median_filtering_counter_buffer_green[7:0] > median_filtering_counter_buffer_green[31:24]) begin		// 0,3
-							median_filtering_swap_buffer = median_filtering_counter_buffer_green[7:0];
-							median_filtering_counter_buffer_green[7:0] = median_filtering_counter_buffer_green[31:24];
-							median_filtering_counter_buffer_green[31:24] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_green[47:40] > median_filtering_counter_buffer_green[71:64]) begin	// 5,8
-							median_filtering_swap_buffer = median_filtering_counter_buffer_green[47:40];
-							median_filtering_counter_buffer_green[47:40] = median_filtering_counter_buffer_green[71:64];
-							median_filtering_counter_buffer_green[71:64] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_green[39:32] > median_filtering_counter_buffer_green[63:56]) begin	// 4,7
-							median_filtering_swap_buffer = median_filtering_counter_buffer_green[39:32];
-							median_filtering_counter_buffer_green[39:32] = median_filtering_counter_buffer_green[63:56];
-							median_filtering_counter_buffer_green[63:56] = median_filtering_swap_buffer;
-						end
-						// ---
-						if (median_filtering_counter_buffer_green[31:24] > median_filtering_counter_buffer_green[55:48]) begin	// 3,6
-							median_filtering_swap_buffer = median_filtering_counter_buffer_green[31:24];
-							median_filtering_counter_buffer_green[31:24] = median_filtering_counter_buffer_green[55:48];
-							median_filtering_counter_buffer_green[55:48] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_green[15:8] > median_filtering_counter_buffer_green[39:32]) begin		// 1,4
-							median_filtering_swap_buffer = median_filtering_counter_buffer_green[15:8];
-							median_filtering_counter_buffer_green[15:8] = median_filtering_counter_buffer_green[39:32];
-							median_filtering_counter_buffer_green[39:32] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_green[23:16] > median_filtering_counter_buffer_green[47:40]) begin	// 2,5
-							median_filtering_swap_buffer = median_filtering_counter_buffer_green[23:16];
-							median_filtering_counter_buffer_green[23:16] = median_filtering_counter_buffer_green[47:40];
-							median_filtering_counter_buffer_green[47:40] = median_filtering_swap_buffer;
-						end
-						// ---
-						if (median_filtering_counter_buffer_green[39:32] > median_filtering_counter_buffer_green[63:56]) begin	// 4,7
-							median_filtering_swap_buffer = median_filtering_counter_buffer_green[39:32];
-							median_filtering_counter_buffer_green[39:32] = median_filtering_counter_buffer_green[63:56];
-							median_filtering_counter_buffer_green[63:56] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_green[39:32] > median_filtering_counter_buffer_green[23:16]) begin	// 4,2
-							median_filtering_swap_buffer = median_filtering_counter_buffer_green[39:32];
-							median_filtering_counter_buffer_green[39:32] = median_filtering_counter_buffer_green[23:16];
-							median_filtering_counter_buffer_green[23:16] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_green[55:48] > median_filtering_counter_buffer_green[39:32]) begin	// 6,4
-							median_filtering_swap_buffer = median_filtering_counter_buffer_green[55:48];
-							median_filtering_counter_buffer_green[55:48] = median_filtering_counter_buffer_green[39:32];
-							median_filtering_counter_buffer_green[39:32] = median_filtering_swap_buffer;
-						end
-						// ---
-						if (median_filtering_counter_buffer_green[39:32] > median_filtering_counter_buffer_green[23:16]) begin	// 4,2
-							median_filtering_swap_buffer = median_filtering_counter_buffer_green[39:32];
-							median_filtering_counter_buffer_green[39:32] = median_filtering_counter_buffer_green[23:16];
-							median_filtering_counter_buffer_green[23:16] = median_filtering_swap_buffer;
-						end
-						// FINALLY DONE WITH THE GREEN ARRAY!!! YIPPEE!!!
-						median_filtering_counter_temp[15:8] = median_filtering_counter_buffer_green[39:32];		// Store the median in the green slot of the data to write
-						
-						// Finally the blue image...again, LOTS of processing here!
-						if (median_filtering_counter_buffer_blue[15:8] > median_filtering_counter_buffer_blue[23:16]) begin	// 1,2
-							median_filtering_swap_buffer = median_filtering_counter_buffer_blue[15:8];
-							median_filtering_counter_buffer_blue[15:8] = median_filtering_counter_buffer_blue[23:16];
-							median_filtering_counter_buffer_blue[23:16] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_blue[39:32] > median_filtering_counter_buffer_blue[47:40]) begin	// 4,5
-							median_filtering_swap_buffer = median_filtering_counter_buffer_blue[39:32];
-							median_filtering_counter_buffer_blue[39:32] = median_filtering_counter_buffer_blue[47:40];
-							median_filtering_counter_buffer_blue[47:40] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_blue[63:56] > median_filtering_counter_buffer_blue[71:64]) begin	// 7,8
-							median_filtering_swap_buffer = median_filtering_counter_buffer_blue[63:56];
-							median_filtering_counter_buffer_blue[63:56] = median_filtering_counter_buffer_blue[71:64];
-							median_filtering_counter_buffer_blue[71:64] = median_filtering_swap_buffer;
-						end
-						// ---
-						if (median_filtering_counter_buffer_blue[7:0] > median_filtering_counter_buffer_blue[15:8]) begin		// 0,1
-							median_filtering_swap_buffer = median_filtering_counter_buffer_blue[7:0];
-							median_filtering_counter_buffer_blue[7:0] = median_filtering_counter_buffer_blue[15:8];
-							median_filtering_counter_buffer_blue[15:8] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_blue[31:24] > median_filtering_counter_buffer_blue[39:32]) begin	// 3,4
-							median_filtering_swap_buffer = median_filtering_counter_buffer_blue[31:24];
-							median_filtering_counter_buffer_blue[31:24] = median_filtering_counter_buffer_blue[39:32];
-							median_filtering_counter_buffer_blue[39:32] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_blue[55:48] > median_filtering_counter_buffer_blue[63:56]) begin	// 6,7
-							median_filtering_swap_buffer = median_filtering_counter_buffer_blue[55:48];
-							median_filtering_counter_buffer_blue[55:48] = median_filtering_counter_buffer_blue[63:56];
-							median_filtering_counter_buffer_blue[63:56] = median_filtering_swap_buffer;
-						end
-						// ---
-						if (median_filtering_counter_buffer_blue[15:8] > median_filtering_counter_buffer_blue[23:16]) begin	// 1,2
-							median_filtering_swap_buffer = median_filtering_counter_buffer_blue[15:8];
-							median_filtering_counter_buffer_blue[15:8] = median_filtering_counter_buffer_blue[23:16];
-							median_filtering_counter_buffer_blue[23:16] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_blue[39:32] > median_filtering_counter_buffer_blue[47:40]) begin	// 4,5
-							median_filtering_swap_buffer = median_filtering_counter_buffer_blue[39:32];
-							median_filtering_counter_buffer_blue[39:32] = median_filtering_counter_buffer_blue[47:40];
-							median_filtering_counter_buffer_blue[47:40] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_blue[63:56] > median_filtering_counter_buffer_blue[71:64]) begin	// 7,8
-							median_filtering_swap_buffer = median_filtering_counter_buffer_blue[63:56];
-							median_filtering_counter_buffer_blue[63:56] = median_filtering_counter_buffer_blue[71:64];
-							median_filtering_counter_buffer_blue[71:64] = median_filtering_swap_buffer;
-						end
-						// ---
-						if (median_filtering_counter_buffer_blue[7:0] > median_filtering_counter_buffer_blue[31:24]) begin	// 0,3
-							median_filtering_swap_buffer = median_filtering_counter_buffer_blue[7:0];
-							median_filtering_counter_buffer_blue[7:0] = median_filtering_counter_buffer_blue[31:24];
-							median_filtering_counter_buffer_blue[31:24] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_blue[47:40] > median_filtering_counter_buffer_blue[71:64]) begin	// 5,8
-							median_filtering_swap_buffer = median_filtering_counter_buffer_blue[47:40];
-							median_filtering_counter_buffer_blue[47:40] = median_filtering_counter_buffer_blue[71:64];
-							median_filtering_counter_buffer_blue[71:64] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_blue[39:32] > median_filtering_counter_buffer_blue[63:56]) begin	// 4,7
-							median_filtering_swap_buffer = median_filtering_counter_buffer_blue[39:32];
-							median_filtering_counter_buffer_blue[39:32] = median_filtering_counter_buffer_blue[63:56];
-							median_filtering_counter_buffer_blue[63:56] = median_filtering_swap_buffer;
-						end
-						// ---
-						if (median_filtering_counter_buffer_blue[31:24] > median_filtering_counter_buffer_blue[55:48]) begin	// 3,6
-							median_filtering_swap_buffer = median_filtering_counter_buffer_blue[31:24];
-							median_filtering_counter_buffer_blue[31:24] = median_filtering_counter_buffer_blue[55:48];
-							median_filtering_counter_buffer_blue[55:48] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_blue[15:8] > median_filtering_counter_buffer_blue[39:32]) begin	// 1,4
-							median_filtering_swap_buffer = median_filtering_counter_buffer_blue[15:8];
-							median_filtering_counter_buffer_blue[15:8] = median_filtering_counter_buffer_blue[39:32];
-							median_filtering_counter_buffer_blue[39:32] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_blue[23:16] > median_filtering_counter_buffer_blue[47:40]) begin	// 2,5
-							median_filtering_swap_buffer = median_filtering_counter_buffer_blue[23:16];
-							median_filtering_counter_buffer_blue[23:16] = median_filtering_counter_buffer_blue[47:40];
-							median_filtering_counter_buffer_blue[47:40] = median_filtering_swap_buffer;
-						end
-						// ---
-						if (median_filtering_counter_buffer_blue[39:32] > median_filtering_counter_buffer_blue[63:56]) begin	// 4,7
-							median_filtering_swap_buffer = median_filtering_counter_buffer_blue[39:32];
-							median_filtering_counter_buffer_blue[39:32] = median_filtering_counter_buffer_blue[63:56];
-							median_filtering_counter_buffer_blue[63:56] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_blue[39:32] > median_filtering_counter_buffer_blue[23:16]) begin	// 4,2
-							median_filtering_swap_buffer = median_filtering_counter_buffer_blue[39:32];
-							median_filtering_counter_buffer_blue[39:32] = median_filtering_counter_buffer_blue[23:16];
-							median_filtering_counter_buffer_blue[23:16] = median_filtering_swap_buffer;
-						end
-						if (median_filtering_counter_buffer_blue[55:48] > median_filtering_counter_buffer_blue[39:32]) begin	// 6,4
-							median_filtering_swap_buffer = median_filtering_counter_buffer_blue[55:48];
-							median_filtering_counter_buffer_blue[55:48] = median_filtering_counter_buffer_blue[39:32];
-							median_filtering_counter_buffer_blue[39:32] = median_filtering_swap_buffer;
-						end
-						// ---
-						if (median_filtering_counter_buffer_blue[39:32] > median_filtering_counter_buffer_blue[23:16]) begin	// 4,2
-							median_filtering_swap_buffer = median_filtering_counter_buffer_blue[39:32];
-							median_filtering_counter_buffer_blue[39:32] = median_filtering_counter_buffer_blue[23:16];
-							median_filtering_counter_buffer_blue[23:16] = median_filtering_swap_buffer;
-						end
-						// FINALLY DONE WITH THE BLUE ARRAY!!! YIPPEE!!!
-						median_filtering_counter_temp[31:24] = median_filtering_counter_buffer_blue[39:32];		// Store the median in the blue slot of the data to write
-						
-						// Make sure none of our pixels are set to 255, as 255 is a reserved value for "edge found".
-						if (median_filtering_counter_temp[7:0] == 255) begin
-							median_filtering_counter_temp[7:0] = 254;
-						end
-						if (median_filtering_counter_temp[15:8] == 255) begin
-							median_filtering_counter_temp[15:8] = 254;
-						end
-						if (median_filtering_counter_temp[31:24] == 255) begin
-							median_filtering_counter_temp[31:24] = 254;
-						end
-					end
-
-					if (median_filtering_counter_togg == 76481) begin		// All done!	It is 76481 because we don't need to process the last line of the image, as it would just be garbage anyway!
-						median_filtering_coun = 0;
-						median_filtering_counter_tog = 0;
-						median_filtering_counter_togg = 0;
-						median_filtering_counter_toggle = 0;
-						median_filtering_done = 1;
-						median_filtering_holdoff = 0;
-						wren = 0;
-					end
-
-					median_filtering_counter_toggle = median_filtering_counter_toggle + 1;
-					if (median_filtering_counter_toggle < 10) begin
-						address = median_filtering_counter_tog;
-						wren = 0;
-					end
-					if (median_filtering_counter_toggle == 10) begin
-						address = median_filtering_counter_togg + 76801;
-						data_write = median_filtering_counter_temp;
-						wren = 1;
-					end
-					if (median_filtering_counter_toggle == 11) begin
-						wren = 0;
-						address = median_filtering_counter_tog;
-						median_filtering_counter_togg = median_filtering_counter_togg + 1;
-						median_filtering_counter_toggle = 0;
-					end
-				end
-			end else begin
-				median_filtering_done = 0;
-				address = 18'bz;
-				data_write = 32'bz;
-				wren = 1'bz;
-			end
-		end
-	*/
 		reg thisiswhite = 0;
 		reg pleasedelayhere = 0;
 		
+		reg [7:0] first_x_centroids_array [7:0];
+		reg [7:0] first_y_centroids_array [7:0];
+		reg [15:0] first_s_centroids_array [7:0];
 
 		// Main data processor
+		reg wren_single_shot;
+		reg [17:0] address_single_shot;
+		reg [31:0] data_write_single_shot;
+		
+		reg wren_frame_dump;
+		reg [17:0] address_frame_dump;
+		reg [31:0] data_write_frame_dump;
+		
 		localparam
 		STATE_INITIAL = 0,
 		STATE_CAMERA_CAPTURE =1,
@@ -2881,9 +1163,13 @@ module main(
 						if ((run_frame_dump_internal == 0) && (run_single_shot_test_internal == 0) && (run_online_recognition_internal == 0)) begin
 							// Run again!
 							current_main_processing_state = STATE_INITIAL;
-							address = 18'bz;
-							data_write = 32'bz;
-							wren = 1'bz;
+							
+							// 2014 edit
+							//these used to be set to Z
+							/*address = 18'b0;
+							data_write = 32'b0;
+							wren = 1'b0;*/
+														
 							current_main_processing_state = STATE_INITIAL;
 							processing_done_internal = 1;
 							
@@ -2897,10 +1183,10 @@ module main(
 						
 						if (serial_output_holdoff == 0) begin
 							serial_output_holdoff = 1;
-							//address = 0;
-							address = 76801;
-							//address = 153602;
-							//address = 230403;
+							//address_frame_dump = 0;
+							address_frame_dump = 76801;
+							//address_frame_dump = 153602;
+							//address_frame_dump = 230403;
 							serial_output_index = 0;
 							serial_output_index_toggle = 0;
 							processing_ended = 1;
@@ -2930,11 +1216,11 @@ module main(
 									end
 									serial_output_index = serial_output_index + 1;
 		
-									wren = 0;				// Read data from RAM
-									//address = serial_output_index_mem + 0;
-									address = serial_output_index_mem + 76801;
-									//address = serial_output_index_mem + 153602;
-									//address = serial_output_index_mem + 230403;
+									wren_frame_dump = 0;				// Read data from RAM
+									//address_frame_dump = serial_output_index_mem + 0;
+									address_frame_dump = serial_output_index_mem + 76801;
+									//address_frame_dump = serial_output_index_mem + 153602;
+									//address_frame_dump = serial_output_index_mem + 230403;
 								end else begin
 									if (state == 5'b10000) begin	// Wait for transmission of byte to complete
 										TxD_start = 0;
@@ -2956,9 +1242,13 @@ module main(
 										serial_output_index_toggle = 0;
 										serial_output_enabled = 0;
 										current_main_processing_state = STATE_INITIAL;
-										address = 18'bz;
-										data_write = 32'bz;
-										wren = 1'bz;
+										
+										// 2014 edit
+										// used to be set to z
+										address_frame_dump = 18'b0;
+										data_write_frame_dump = 32'b0;
+										wren_frame_dump = 1'b0;
+										
 										processing_done_internal = 1;
 									end
 								end
@@ -2972,7 +1262,7 @@ module main(
 						
 						if (serial_output_holdoff == 0) begin
 							serial_output_holdoff = 1;
-							address = 0;
+							address_single_shot = 0;
 							//address = 76801;
 							//address = 153602;
 							//address = 230403;
@@ -2985,8 +1275,8 @@ module main(
 								// Transmit the entire contents of the image buffer to the serial port
 								if (tx_toggle == 0) begin
 									if (serial_output_index_toggle == 0) begin
-										wren = 0;
-										address = ((data_read_sync * 3) + 200000);
+										wren_single_shot = 0;
+										address_single_shot = ((data_read_sync * 3) + 200000);
 										//address = address + 76801;
 										
 										if (data_read_sync == 1) begin
@@ -2998,7 +1288,7 @@ module main(
 									
 									if (serial_output_index_toggle == 1) begin
 										// Do nothing
-										wren = 0;
+										wren_single_shot = 0;
 									end
 									
 									if (serial_output_index_toggle == 2) begin
@@ -3041,11 +1331,11 @@ module main(
 									end
 		
 									if (serial_output_index_toggle == 0) begin
-										wren = 0;				// Read data from RAM
-										address = serial_output_index_mem + 0;
-										//address = serial_output_index_mem + 76801;
-										//address = serial_output_index_mem + 153602;
-										//address = serial_output_index_mem + 230403;
+										wren_single_shot = 0;				// Read data from RAM
+										address_single_shot = serial_output_index_mem + 0;
+										//address_single_shot = serial_output_index_mem + 76801;
+										//address_single_shot = serial_output_index_mem + 153602;
+										//address_single_shot = serial_output_index_mem + 230403;
 									end
 								end else begin
 									if (state == 5'b10000) begin	// Wait for transmission of byte to complete
@@ -3067,9 +1357,10 @@ module main(
 										serial_output_index_toggle = 0;
 										serial_output_enabled = 0;
 										current_main_processing_state = STATE_INITIAL;
-										address = 18'bz;
-										data_write = 32'bz;
-										wren = 1'bz;
+										// 2014 edit
+										address_single_shot = 18'b0;
+										data_write_single_shot = 32'b0;
+										wren_single_shot = 1'b0;
 										processing_done_internal = 1;
 									end
 								end
@@ -3367,9 +1658,9 @@ module main(
 										//leds[5:1] = 0;
 										leds[7] = 0;
 			
-										address = 18'bz;
+										/*address = 18'bz;
 										data_write = 32'bz;
-										wren = 1'bz;
+										wren = 1'bz;*/
 										current_main_processing_state = STATE_INITIAL;
 										processing_done_internal = 1;
 										

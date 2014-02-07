@@ -1,9 +1,6 @@
-set -tmpdir "xst/projnav.tmp"
-set -xsthdpdir "xst"
-run
--ifn main.prj
--ofn main
--ofmt NGC
+set -tmpdir "/home/audrey/Xilinx Projects/Falcon_Spartan6/xst/projnav.tmp"
+set -xsthdpdir "/home/audrey/Xilinx Projects/Falcon_Spartan6/xst"
+run -compileonly yes
 -p xc6slx16-3-csg324
 -top main
 -opt_mode Speed
@@ -51,3 +48,4 @@ run
 -iob Auto
 -equivalent_register_removal YES
 -slice_utilization_ratio_maxmargin 5
+-ifn main.prj
