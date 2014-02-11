@@ -30,7 +30,9 @@ module y_pixel_filling (
 	output reg [17:0] address,
 	output reg y_pixel_filling_done
 	);
-				
+
+		initial y_pixel_filling_done = 0;
+		
 		reg y_pixel_filling_holdoff = 0;
 
 		reg [17:0] y_pixel_filling_counter_tog = 0;

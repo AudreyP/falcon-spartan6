@@ -53,14 +53,17 @@ module main(
 
 	input [3:0] buttons,
 
-//no longer needed in main. Taken care of entirely in sram.v
-/*	inout wire [31:0] SRAM_DQ,
+	// sram i/o
+	inout wire [15:0] SRAM_DQ,
 	output wire SRAM_CE_N,
 	output wire SRAM_OE_N,
 	output wire SRAM_LB_N,
 	output wire SRAM_UB_N,
 	output wire SRAM_WE_N,
-	output wire [17:0] SRAM_ADDR,*/
+	output wire [18:0] SRAM_ADDR,
+	output wire RamClk,
+	output wire RamAdv,
+
 
 	input wire [15:0] camera_data_port,
 	input wire camera_data_href,
@@ -110,7 +113,7 @@ module main(
 		wire [18:0] camera_data_address;
 		
 
-		reg camera_transfer_done = 0;
+		
 		reg processing_done = 1;
 
 		reg processing_done_internal = 0;
@@ -125,36 +128,36 @@ module main(
 		wire [17:0] divider_remainder;
 		wire divider_zeroflag;
 		
-		reg [17:0] divider_dividend_two;
-		reg [17:0] divider_divisor_two;
+		wire [17:0] divider_dividend_two;	//connects blob_extraction (where it is is set) to serial_divide_uu (where quotient is assigned the value of this as an input wire)
+		wire [17:0] divider_divisor_two; //connects blob_extraction (where it is set) to serial_divide_uu (where div is assigned the value of this as an input wire)
 		wire [17:0] divider_quotient_two;
 		wire [17:0] divider_remainder_two;
 		wire divider_zeroflag_two;
 		
 		//enable / dones
 		reg enable_camera_capture = 0;
-		reg camera_capture_done = 0;
+		wire camera_capture_done;
 
 		reg enable_median_filtering = 0;
 		reg median_filtering_done = 0;
 		
 		reg enable_edge_detection = 0;
-		reg edge_detection_done = 0;
+		wire edge_detection_done ;
 		
 		reg enable_x_pixel_filling = 0;
-		reg x_pixel_filling_done = 0;
+		wire x_pixel_filling_done;
 		
 		reg enable_y_pixel_filling = 0;
-		reg y_pixel_filling_done = 0;
+		wire y_pixel_filling_done;
 		
 		reg enable_border_drawing = 0;
 		reg border_drawing_done = 0;
 		
 		reg enable_blob_extraction = 0;
-		reg blob_extraction_done = 0;;
+		wire blob_extraction_done;
 		
 		reg enable_tracking_output = 0;
-		reg tracking_output_done = 0;
+		wire tracking_output_done;
 		
 		reg enable_serial_output = 0;
 		reg serial_output_done = 0;
@@ -174,25 +177,27 @@ module main(
 		//------------------SRAM module
 		sram sram(
 			.clk(modified_clock_sram),
-			.reset(0),
 			.starting_address(address), 
 			.wren(wren), 
 			.data_write(data_write), 
-			.data_read(data_read) 
-			/*.SRAM_DQ(SRAM_DQ),
+			.data_read(data_read), 
+			.SRAM_DQ(SRAM_DQ),
 		      .SRAM_CE_N(SRAM_CE_N),
 			.SRAM_OE_N(SRAM_OE_N), 
 			.SRAM_LB_N(SRAM_LB_N), 
 			.SRAM_UB_N(SRAM_UB_N), 
 			.SRAM_WE_N(SRAM_WE_N), 
-			.SRAM_ADDR(SRAM_ADDR)*/);
+			.SRAM_ADDR(SRAM_ADDR),
+			.RamClk(RamClk),
+			.RamAdv(RamAdv)
+			);
 				
 		//------------------EDGE DETECTION module
 		wire wren_edge_detection;
 		wire [17:0] address_edge_detection;
 		wire [31:0] data_out_edge_detection;
 		
-		reg [7:0] edge_detection_threshold_red = 30;
+		reg [7:0] edge_detection_threshold_red = 30; 
 		reg [7:0] edge_detection_threshold_green = 30;
 		reg [7:0] edge_detection_threshold_blue = 0;
 		
@@ -224,19 +229,72 @@ module main(
 		
 		wire [15:0] blob_extraction_blob_counter;
 		
-		reg [7:0] x_centroids_array;
-		reg [7:0] y_centroids_array;
-		reg [15:0] s_centroids_array;
+		localparam	S_CENTROIDS_WORD_SIZE = 16,
+						S_CENTROIDS_WORD_0 = 1*S_CENTROIDS_WORD_SIZE - 1,
+						S_CENTROIDS_WORD_1 = 2*S_CENTROIDS_WORD_SIZE - 1,
+						S_CENTROIDS_WORD_2 = 3*S_CENTROIDS_WORD_SIZE - 1,
+						S_CENTROIDS_WORD_3 = 4*S_CENTROIDS_WORD_SIZE - 1,
+						S_CENTROIDS_WORD_4 = 5*S_CENTROIDS_WORD_SIZE - 1,
+						S_CENTROIDS_WORD_5 = 6*S_CENTROIDS_WORD_SIZE - 1,
+						S_CENTROIDS_WORD_6 = 7*S_CENTROIDS_WORD_SIZE - 1,
+						S_CENTROIDS_WORD_7 = 8*S_CENTROIDS_WORD_SIZE - 1,
+						
+						X_CENTROIDS_WORD_SIZE = 8,
+						X_CENTROIDS_WORD_0 = 1*X_CENTROIDS_WORD_SIZE - 1,
+						X_CENTROIDS_WORD_1 = 2*X_CENTROIDS_WORD_SIZE - 1,
+						X_CENTROIDS_WORD_2 = 3*X_CENTROIDS_WORD_SIZE - 1,
+						X_CENTROIDS_WORD_3 = 4*X_CENTROIDS_WORD_SIZE - 1,
+						X_CENTROIDS_WORD_4 = 5*X_CENTROIDS_WORD_SIZE - 1,
+						X_CENTROIDS_WORD_5 = 6*X_CENTROIDS_WORD_SIZE - 1,
+						X_CENTROIDS_WORD_6 = 7*X_CENTROIDS_WORD_SIZE - 1,
+						X_CENTROIDS_WORD_7 = 8*X_CENTROIDS_WORD_SIZE - 1,
+						
+						Y_CENTROIDS_WORD_SIZE = 8,
+						Y_CENTROIDS_WORD_0 = 1*Y_CENTROIDS_WORD_SIZE - 1,
+						Y_CENTROIDS_WORD_1 = 2*Y_CENTROIDS_WORD_SIZE - 1,
+						Y_CENTROIDS_WORD_2 = 3*Y_CENTROIDS_WORD_SIZE - 1,
+						Y_CENTROIDS_WORD_3 = 4*Y_CENTROIDS_WORD_SIZE - 1,
+						Y_CENTROIDS_WORD_4 = 5*Y_CENTROIDS_WORD_SIZE - 1,
+						Y_CENTROIDS_WORD_5 = 6*Y_CENTROIDS_WORD_SIZE - 1,
+						Y_CENTROIDS_WORD_6 = 7*Y_CENTROIDS_WORD_SIZE - 1,
+						Y_CENTROIDS_WORD_7 = 8*Y_CENTROIDS_WORD_SIZE - 1;
+				
 		
-		reg [23:0] primary_color_slots [5:0][3:0];
+		wire [63:0] x_centroids_array;
+		wire [63:0] y_centroids_array;
+		wire [127:0] s_centroids_array;
+		
+		reg [575:0] primary_color_slots;
 		reg [7:0] color_similarity_threshold = 0;
 		reg [7:0] minimum_blob_size = 0;
 		
-		reg [15:0] tracking_output_blob_sizes [7:0];
+		reg crystal_clk_div_by_two = 0;
+	
+		localparam  	BLOB_SIZE_WORD_SIZE = 16,
+						BLOB_SIZE_WORD_0 = 1*BLOB_SIZE_WORD_SIZE-1,
+						BLOB_SIZE_WORD_1 = 2*BLOB_SIZE_WORD_SIZE-1,
+						BLOB_SIZE_WORD_2 = 3*BLOB_SIZE_WORD_SIZE-1,
+						BLOB_SIZE_WORD_3 = 4*BLOB_SIZE_WORD_SIZE-1,
+						BLOB_SIZE_WORD_4 = 5*BLOB_SIZE_WORD_SIZE-1,
+						BLOB_SIZE_WORD_5 = 6*BLOB_SIZE_WORD_SIZE-1,
+						BLOB_SIZE_WORD_6 = 7*BLOB_SIZE_WORD_SIZE-1,
+						BLOB_SIZE_WORD_7 = 8*BLOB_SIZE_WORD_SIZE-1,
+						BLOB_SIZE_WORD_8 = 9*BLOB_SIZE_WORD_SIZE-1,
+						BLOB_SIZE_WORD_9 = 10*BLOB_SIZE_WORD_SIZE-1,
+						BLOB_SIZE_WORD_10 = 11*BLOB_SIZE_WORD_SIZE-1,
+						BLOB_SIZE_WORD_11 = 12*BLOB_SIZE_WORD_SIZE-1,
+						BLOB_SIZE_WORD_12 = 13*BLOB_SIZE_WORD_SIZE-1,
+						BLOB_SIZE_WORD_13 = 14*BLOB_SIZE_WORD_SIZE-1,
+						BLOB_SIZE_WORD_14 = 15*BLOB_SIZE_WORD_SIZE-1,
+						BLOB_SIZE_WORD_15 = 16*BLOB_SIZE_WORD_SIZE-1,
+						BLOB_SIZE_WORD_16 = 17*BLOB_SIZE_WORD_SIZE-1,
+						BLOB_SIZE_WORD_17 = 18*BLOB_SIZE_WORD_SIZE-1;
+						
+		wire [288:0] tracking_output_blob_sizes /*[17:0]*/;
 	
 		tracking_output tracking_output(
 			//input wires (as seen by module)
-			.crystal_clk_div_by_two(),
+			.crystal_clk_div_by_two(crystal_clk_div_by_two),
 			.blob_extraction_blob_counter(blob_extraction_blob_counter),
 			.enable_tracking_output(enable_tracking_output),
 			.find_biggest(find_biggest),
@@ -248,10 +306,10 @@ module main(
 			.wren(wren_tracking_output),
 			.data_write(data_write_tracking_output),
 			.address(address_tracking_output),
-			.x_centroids_array(x_centroids_array),   
+			.x_centroids_array(x_centroids_array),  
 			.y_centroids_array(y_centroids_array),  
 			.s_centroids_array(s_centroids_array),
-			.tracking_output_blob_sizes(tracking_output_blob_sizes),	//[15:0] by [7:0]
+			.tracking_output_blob_sizes(tracking_output_blob_sizes),	//[15:0] by [17:0]
 			.tracking_output_done(tracking_output_done)
 			);			
 		
@@ -297,10 +355,10 @@ module main(
 		reg modified_clock_two_div_by_two = 0;
 		
 		//also used in another module
-		reg [16:0] stack_ram_dina;
-		reg [13:0] stack_ram_addra;
-		reg stack_ram_wea;
-		wire [16:0] stack_ram_douta;
+		wire [16:0] stack_ram_dina;	//set in blob_extraction. Sent to generated core stack_ram as an input wire. (Used to be a reg in original main.v)
+		wire [13:0] stack_ram_addra;	//set in blob_extraction. Sent to generated core stack_ram as an input wire. (Used to be a reg in original main.v)
+		wire stack_ram_wea;			//set in blob_extraction. Sent to generated core stack_ram as an input wire. (Used to be a reg in original main.v)
+		wire [16:0] stack_ram_douta;	//was always a wire
 		
 		blob_extraction blob_extraction(
 			//input wires
@@ -311,7 +369,7 @@ module main(
 			.divider_quotient(divider_quotient),
 			.divider_quotient_two(divider_quotient_two),
 			.color_similarity_threshold(color_similarity_threshold),
-			.primary_color_slots(primary_color_slots),	//[23:0] by [5:0][3:0]
+			.primary_color_slots(primary_color_slots),	//[23:0] by [5:0][3:0] ==> [575:0]
 			//output regs
 			.wren(wren_blob_extraction),
 			.data_write(data_write_blob_extraction),
@@ -487,7 +545,6 @@ module main(
 			modified_clock_two_div_by_two = !modified_clock_two_div_by_two;
 		end
 		
-		reg crystal_clk_div_by_two = 0;
 		
 		always @(posedge crystal_clk) begin
 			crystal_clk_div_by_two = !crystal_clk_div_by_two;
@@ -949,9 +1006,9 @@ module main(
 		reg thisiswhite = 0;
 		reg pleasedelayhere = 0;
 		
-		reg [7:0] first_x_centroids_array [7:0];
-		reg [7:0] first_y_centroids_array [7:0];
-		reg [15:0] first_s_centroids_array [7:0];
+		reg [63:0] first_x_centroids_array;
+		reg [63:0] first_y_centroids_array;
+		reg [127:0] first_s_centroids_array;
 
 		// Main data processor
 		reg wren_single_shot;
@@ -985,7 +1042,7 @@ module main(
 		//always @(posedge camera_data_pclk) begin
 			data_read_sync = data_read;
 			
-			if ((camera_transfer_done == 1) && (processing_done_internal == 0)) begin
+			if ((processing_done_internal == 0)) begin
 			//if (camera_transfer_done == 1) begin
 				if (i_need_the_serial_transmitter_now == 0) begin
 					processing_done = 0;
@@ -1100,31 +1157,31 @@ module main(
 					end
 					
 					if (current_main_processing_state == STATE_ASSEMBLE_DATA) begin
-						first_x_centroids_array[0] = x_centroids_array[0];
-						first_y_centroids_array[0] = y_centroids_array[0];
-						first_s_centroids_array[0] = s_centroids_array[0];
-						first_x_centroids_array[1] = x_centroids_array[1];
-						first_y_centroids_array[1] = y_centroids_array[1];
-						first_s_centroids_array[1] = s_centroids_array[1];
-						first_x_centroids_array[2] = x_centroids_array[2];
-						first_y_centroids_array[2] = y_centroids_array[2];
-						first_s_centroids_array[2] = s_centroids_array[2];
-						first_x_centroids_array[3] = x_centroids_array[3];
-						first_y_centroids_array[3] = y_centroids_array[3];
-						first_s_centroids_array[3] = s_centroids_array[3];
-						first_x_centroids_array[4] = x_centroids_array[4];
-						first_y_centroids_array[4] = y_centroids_array[4];
-						first_s_centroids_array[4] = s_centroids_array[4];
-						first_x_centroids_array[5] = x_centroids_array[5];
-						first_y_centroids_array[5] = y_centroids_array[5];
-						first_s_centroids_array[5] = s_centroids_array[5];
+						first_x_centroids_array[X_CENTROIDS_WORD_0 : 0] = x_centroids_array[X_CENTROIDS_WORD_0 : 0];		
+						first_y_centroids_array[Y_CENTROIDS_WORD_0 : 0] = y_centroids_array[Y_CENTROIDS_WORD_0 : 0];
+						first_s_centroids_array[S_CENTROIDS_WORD_0 : 0] = s_centroids_array[S_CENTROIDS_WORD_0 : 0];
+						first_x_centroids_array[X_CENTROIDS_WORD_1 : 1+X_CENTROIDS_WORD_0] = x_centroids_array[X_CENTROIDS_WORD_1 : 1+X_CENTROIDS_WORD_0];
+						first_y_centroids_array[Y_CENTROIDS_WORD_1 : 1+Y_CENTROIDS_WORD_0] = y_centroids_array[Y_CENTROIDS_WORD_1 : 1+Y_CENTROIDS_WORD_0];
+						first_s_centroids_array[S_CENTROIDS_WORD_1 : 1+S_CENTROIDS_WORD_0] = s_centroids_array[S_CENTROIDS_WORD_1 : 1+S_CENTROIDS_WORD_0];
+						first_x_centroids_array[X_CENTROIDS_WORD_2 : 1+X_CENTROIDS_WORD_1] = x_centroids_array[X_CENTROIDS_WORD_2 : 1+X_CENTROIDS_WORD_1];
+						first_y_centroids_array[Y_CENTROIDS_WORD_2 : 1+Y_CENTROIDS_WORD_1] = y_centroids_array[Y_CENTROIDS_WORD_2 : 1+Y_CENTROIDS_WORD_1];
+						first_s_centroids_array[S_CENTROIDS_WORD_2 : 1+S_CENTROIDS_WORD_1] = s_centroids_array[S_CENTROIDS_WORD_2 : 1+S_CENTROIDS_WORD_1];
+						first_x_centroids_array[X_CENTROIDS_WORD_3 : 1+X_CENTROIDS_WORD_2] = x_centroids_array[X_CENTROIDS_WORD_3 : 1+X_CENTROIDS_WORD_2];
+						first_y_centroids_array[Y_CENTROIDS_WORD_3 : 1+Y_CENTROIDS_WORD_2] = y_centroids_array[Y_CENTROIDS_WORD_3 : 1+Y_CENTROIDS_WORD_2];
+						first_s_centroids_array[S_CENTROIDS_WORD_3 : 1+S_CENTROIDS_WORD_2] = s_centroids_array[S_CENTROIDS_WORD_3 : 1+S_CENTROIDS_WORD_2];
+						first_x_centroids_array[X_CENTROIDS_WORD_4 : 1+X_CENTROIDS_WORD_3] = x_centroids_array[X_CENTROIDS_WORD_4 : 1+X_CENTROIDS_WORD_3];
+						first_y_centroids_array[Y_CENTROIDS_WORD_4 : 1+Y_CENTROIDS_WORD_3] = y_centroids_array[Y_CENTROIDS_WORD_4 : 1+Y_CENTROIDS_WORD_3];
+						first_s_centroids_array[S_CENTROIDS_WORD_4 : 1+S_CENTROIDS_WORD_3] = s_centroids_array[S_CENTROIDS_WORD_4 : 1+S_CENTROIDS_WORD_3];
+						first_x_centroids_array[X_CENTROIDS_WORD_5 : 1+X_CENTROIDS_WORD_4] = x_centroids_array[X_CENTROIDS_WORD_5 : 1+X_CENTROIDS_WORD_4];
+						first_y_centroids_array[Y_CENTROIDS_WORD_5 : 1+Y_CENTROIDS_WORD_4 ] = y_centroids_array[Y_CENTROIDS_WORD_5 : 1+Y_CENTROIDS_WORD_4];
+						first_s_centroids_array[S_CENTROIDS_WORD_5 : 1+S_CENTROIDS_WORD_4] = s_centroids_array[S_CENTROIDS_WORD_5 : 1+S_CENTROIDS_WORD_4];
 						
-						if (tracking_output_blob_sizes[0] != 0) leds[0] = 1;
-						if (tracking_output_blob_sizes[1] != 0) leds[1] = 1;
-						if (tracking_output_blob_sizes[2] != 0) leds[2] = 1;
-						if (tracking_output_blob_sizes[3] != 0) leds[3] = 1;
-						if (tracking_output_blob_sizes[4] != 0) leds[4] = 1;
-						if (tracking_output_blob_sizes[5] != 0) leds[5] = 1;
+						if (tracking_output_blob_sizes[BLOB_SIZE_WORD_0 : 0] != 0) leds[0] = 1;
+						if (tracking_output_blob_sizes[BLOB_SIZE_WORD_1 : 1+BLOB_SIZE_WORD_0] != 0) leds[1] = 1;
+						if (tracking_output_blob_sizes[BLOB_SIZE_WORD_2 : 1+BLOB_SIZE_WORD_1] != 0) leds[2] = 1;
+						if (tracking_output_blob_sizes[BLOB_SIZE_WORD_3 : 1+BLOB_SIZE_WORD_2] != 0) leds[3] = 1;
+						if (tracking_output_blob_sizes[BLOB_SIZE_WORD_4: 1+BLOB_SIZE_WORD_3] != 0) leds[4] = 1;
+						if (tracking_output_blob_sizes[BLOB_SIZE_WORD_5: 1+BLOB_SIZE_WORD_4] != 0) leds[5] = 1;
 						
 						if (tracking_output_done == 0) begin		// Wait for the module to reset before continuing
 							current_main_processing_state = STATE_TRACKING_OUTPUT_TWO;
@@ -1408,28 +1465,28 @@ module main(
 									end
 											
 									if (serial_output_index_toggle == 2) begin
-										TxD_data = first_x_centroids_array[0];
+										TxD_data = first_x_centroids_array[X_CENTROIDS_WORD_0 : 0];
 									end
 											
 									if (serial_output_index_toggle == 3) begin
-										TxD_data = first_y_centroids_array[0];
+										TxD_data = first_y_centroids_array[Y_CENTROIDS_WORD_0 : 0];
 									end
 											
 									if (slide_switches[0] == 1) begin
 										if (serial_output_index_toggle == 4) begin
-											TxD_data = first_x_centroids_array[1];
+											TxD_data = first_x_centroids_array[X_CENTROIDS_WORD_1 : 1+X_CENTROIDS_WORD_0];
 										end
 											
 										if (serial_output_index_toggle == 5) begin
-											TxD_data = first_y_centroids_array[1];
+											TxD_data = first_y_centroids_array[Y_CENTROIDS_WORD_1 : 1+Y_CENTROIDS_WORD_0];
 										end
 												
 										if (serial_output_index_toggle == 6) begin
-											TxD_data = first_x_centroids_array[2];
+											TxD_data = first_x_centroids_array[X_CENTROIDS_WORD_2 : 1+X_CENTROIDS_WORD_1];
 										end
 											
 										if (serial_output_index_toggle == 7) begin
-											TxD_data = first_y_centroids_array[2];
+											TxD_data = first_y_centroids_array[Y_CENTROIDS_WORD_2 : 1+Y_CENTROIDS_WORD_1];
 										end
 									end else begin
 										if (serial_output_index_toggle == 4) begin
@@ -1438,19 +1495,19 @@ module main(
 									end
 											
 									if (serial_output_index_toggle == 8) begin
-										TxD_data = first_x_centroids_array[3];
+										TxD_data = first_x_centroids_array[X_CENTROIDS_WORD_3 : 1+X_CENTROIDS_WORD_2];
 									end
 											
 									if (serial_output_index_toggle == 9) begin
-										TxD_data = first_y_centroids_array[3];
+										TxD_data = first_y_centroids_array[X_CENTROIDS_WORD_3 : 1+X_CENTROIDS_WORD_2];
 									end
 											
 									if (serial_output_index_toggle == 10) begin
-										TxD_data = first_x_centroids_array[4];
+										TxD_data = first_x_centroids_array[X_CENTROIDS_WORD_4 : 1+X_CENTROIDS_WORD_3];
 									end
 									
 									if (serial_output_index_toggle == 11) begin
-										TxD_data = first_y_centroids_array[4];
+										TxD_data = first_y_centroids_array[Y_CENTROIDS_WORD_4 : 1+Y_CENTROIDS_WORD_3];
 									end
 											
 									if (slide_switches[0] == 1) begin
@@ -1459,7 +1516,7 @@ module main(
 										end
 										
 										if (serial_output_index_toggle == 13) begin
-											TxD_data = first_y_centroids_array[5];
+											TxD_data = first_y_centroids_array[Y_CENTROIDS_WORD_5 : 1+Y_CENTROIDS_WORD_4];
 										end
 									end else begin
 										if (serial_output_index_toggle == 12) begin
@@ -1470,28 +1527,28 @@ module main(
 									// ---  Second set of centroids
 											
 									if (serial_output_index_toggle == 14) begin
-										TxD_data = x_centroids_array[0];
+										TxD_data = x_centroids_array[X_CENTROIDS_WORD_0 : 0];
 									end
 											
 									if (serial_output_index_toggle == 15) begin
-										TxD_data = y_centroids_array[0];
+										TxD_data = y_centroids_array[Y_CENTROIDS_WORD_0 : 0];
 									end
 											
 									if (slide_switches[0] == 1) begin
 										if (serial_output_index_toggle == 16) begin
-											TxD_data = x_centroids_array[1];
+											TxD_data = x_centroids_array[X_CENTROIDS_WORD_1 : 1+X_CENTROIDS_WORD_0];
 										end
 												
 										if (serial_output_index_toggle == 17) begin
-											TxD_data = y_centroids_array[1];
+											TxD_data = y_centroids_array[Y_CENTROIDS_WORD_1 : 1+Y_CENTROIDS_WORD_0];
 										end
 												
 										if (serial_output_index_toggle == 18) begin
-											TxD_data = x_centroids_array[2];
+											TxD_data = x_centroids_array[X_CENTROIDS_WORD_2 : 1+X_CENTROIDS_WORD_1];
 										end
 												
 										if (serial_output_index_toggle == 19) begin
-											TxD_data = y_centroids_array[2];
+											TxD_data = y_centroids_array[Y_CENTROIDS_WORD_2 : 1+Y_CENTROIDS_WORD_1];
 										end
 									end else begin
 										if (serial_output_index_toggle == 16) begin
@@ -1500,28 +1557,28 @@ module main(
 									end
 											
 									if (serial_output_index_toggle == 20) begin
-										TxD_data = x_centroids_array[3];
+										TxD_data = x_centroids_array[X_CENTROIDS_WORD_3 : 1+X_CENTROIDS_WORD_2];
 									end
 											
 									if (serial_output_index_toggle == 21) begin
-										TxD_data = y_centroids_array[3];
+										TxD_data = y_centroids_array[Y_CENTROIDS_WORD_3 : 1+Y_CENTROIDS_WORD_2];
 									end
 											
 									if (serial_output_index_toggle == 22) begin
-										TxD_data = x_centroids_array[4];
+										TxD_data = x_centroids_array[X_CENTROIDS_WORD_4 : 1+X_CENTROIDS_WORD_3];
 									end
 											
 									if (serial_output_index_toggle == 23) begin
-										TxD_data = y_centroids_array[4];
+										TxD_data = y_centroids_array[Y_CENTROIDS_WORD_4 : 1+Y_CENTROIDS_WORD_3];
 									end
 											
 									if (slide_switches[0] == 1) begin
 										if (serial_output_index_toggle == 24) begin
-											TxD_data = x_centroids_array[5];
+											TxD_data = x_centroids_array[X_CENTROIDS_WORD_5 : 1+X_CENTROIDS_WORD_4];
 										end
 												
 										if (serial_output_index_toggle == 25) begin
-											TxD_data = y_centroids_array[5];
+											TxD_data = y_centroids_array[Y_CENTROIDS_WORD_5 : 1+Y_CENTROIDS_WORD_4];
 										end
 									end else begin
 										if (serial_output_index_toggle == 24) begin
@@ -1533,100 +1590,100 @@ module main(
 									// -- First ones
 									
 									if (serial_output_index_toggle == 26) begin
-										TxD_data = first_s_centroids_array[0][15:8];
+										TxD_data = first_s_centroids_array[S_CENTROIDS_WORD_0 : S_CENTROIDS_WORD_0 - 7];	//upper byte
 									end
 									
 									if (serial_output_index_toggle == 27) begin
-										TxD_data = first_s_centroids_array[0][7:0];
+										TxD_data = first_s_centroids_array[S_CENTROIDS_WORD_0 - 8 : S_CENTROIDS_WORD_0 - 15];		//lower byte
 									end
 									
 									if (serial_output_index_toggle == 28) begin
-										TxD_data = first_s_centroids_array[1][15:8];
+										TxD_data = first_s_centroids_array[S_CENTROIDS_WORD_1 : S_CENTROIDS_WORD_1 - 7];	//upper byte
 									end
 									
 									if (serial_output_index_toggle == 29) begin
-										TxD_data = first_s_centroids_array[1][7:0];
+										TxD_data = first_s_centroids_array[S_CENTROIDS_WORD_1 - 8 : S_CENTROIDS_WORD_1 - 15];		//lower byte
 									end
 									
 									if (serial_output_index_toggle == 30) begin
-										TxD_data = first_s_centroids_array[2][15:8];
+										TxD_data = first_s_centroids_array[S_CENTROIDS_WORD_2 : S_CENTROIDS_WORD_2 - 7];
 									end
 									
 									if (serial_output_index_toggle == 31) begin
-										TxD_data = first_s_centroids_array[2][7:0];
+										TxD_data = first_s_centroids_array[S_CENTROIDS_WORD_2 - 8 : S_CENTROIDS_WORD_2 - 15];
 									end
 									
 									if (serial_output_index_toggle == 32) begin
-										TxD_data = first_s_centroids_array[3][15:8];
+										TxD_data = first_s_centroids_array[S_CENTROIDS_WORD_3 : S_CENTROIDS_WORD_3 - 7];
 									end
 									
 									if (serial_output_index_toggle == 33) begin
-										TxD_data = first_s_centroids_array[3][7:0];
+										TxD_data = first_s_centroids_array[S_CENTROIDS_WORD_3 - 8 : S_CENTROIDS_WORD_3 - 15];
 									end
 									
 									if (serial_output_index_toggle == 34) begin
-										TxD_data = first_s_centroids_array[4][15:8];
+										TxD_data = first_s_centroids_array[S_CENTROIDS_WORD_4 : S_CENTROIDS_WORD_4 - 7];
 									end
 									
 									if (serial_output_index_toggle == 35) begin
-										TxD_data = first_s_centroids_array[4][7:0];
+										TxD_data = first_s_centroids_array[S_CENTROIDS_WORD_4 - 8 : S_CENTROIDS_WORD_4 - 15];
 									end
 									
 									if (serial_output_index_toggle == 36) begin
-										TxD_data = first_s_centroids_array[5][15:8];
+										TxD_data = first_s_centroids_array[S_CENTROIDS_WORD_5 : S_CENTROIDS_WORD_5 - 7];
 									end
 									
 									if (serial_output_index_toggle == 37) begin
-										TxD_data = first_s_centroids_array[5][7:0];
+										TxD_data = first_s_centroids_array[S_CENTROIDS_WORD_5 - 8 : S_CENTROIDS_WORD_5 - 15];
 									end
 									
 									// -- Last ones
 									if (serial_output_index_toggle == 38) begin
-										TxD_data = s_centroids_array[0][15:8];
+										TxD_data = s_centroids_array[S_CENTROIDS_WORD_0 : S_CENTROIDS_WORD_0 - 7];
 									end
 									
 									if (serial_output_index_toggle == 39) begin
-										TxD_data = s_centroids_array[0][7:0];
+										TxD_data = s_centroids_array[S_CENTROIDS_WORD_0 - 8 : S_CENTROIDS_WORD_0 - 15];
 									end
 									
 									if (serial_output_index_toggle == 40) begin
-										TxD_data = s_centroids_array[1][15:8];
+										TxD_data = s_centroids_array[S_CENTROIDS_WORD_1 : S_CENTROIDS_WORD_1 - 7];
 									end
 									
 									if (serial_output_index_toggle == 41) begin
-										TxD_data = s_centroids_array[1][7:0];
+										TxD_data = s_centroids_array[S_CENTROIDS_WORD_1 - 8 : S_CENTROIDS_WORD_1 - 15];
 									end
 									
 									if (serial_output_index_toggle == 42) begin
-										TxD_data = s_centroids_array[2][15:8];
+										TxD_data = s_centroids_array[S_CENTROIDS_WORD_2 : S_CENTROIDS_WORD_2 - 7];
 									end
 									
 									if (serial_output_index_toggle == 43) begin
-										TxD_data = s_centroids_array[2][7:0];
+										TxD_data = s_centroids_array[S_CENTROIDS_WORD_2 - 8 : S_CENTROIDS_WORD_2 - 15];
 									end
 									
 									if (serial_output_index_toggle == 44) begin
-										TxD_data = s_centroids_array[3][15:8];
+										TxD_data = s_centroids_array[S_CENTROIDS_WORD_3 : S_CENTROIDS_WORD_3 - 7];
 									end
 									
 									if (serial_output_index_toggle == 45) begin
-										TxD_data = s_centroids_array[3][7:0];
+										TxD_data = s_centroids_array[S_CENTROIDS_WORD_3 - 8 : S_CENTROIDS_WORD_3 - 15];
 									end
 									
 									if (serial_output_index_toggle == 46) begin
-										TxD_data = s_centroids_array[4][15:8];
+										TxD_data = s_centroids_array[S_CENTROIDS_WORD_4 : S_CENTROIDS_WORD_4 - 7];
 									end
 									
 									if (serial_output_index_toggle == 47) begin
-										TxD_data = s_centroids_array[4][7:0];
+										TxD_data = s_centroids_array[S_CENTROIDS_WORD_4 - 8 : S_CENTROIDS_WORD_4 - 15];
 									end
 									
 									if (serial_output_index_toggle == 48) begin
-										TxD_data = s_centroids_array[5][15:8];
+										TxD_data = s_centroids_array[S_CENTROIDS_WORD_5 : S_CENTROIDS_WORD_5 - 7];
 									end
 									
 									if (serial_output_index_toggle == 49) begin
-										TxD_data = s_centroids_array[5][7:0];
+										TxD_data = s_centroids_array[S_CENTROIDS_WORD_5 - 8 : S_CENTROIDS_WORD_5 - 15];
 									end
 									
 									// -- Done!
@@ -1676,16 +1733,17 @@ module main(
 					TxD_start = 1'bz;
 				end
 			end else begin
-				if ((processing_done_internal == 1) && (camera_transfer_done == 1)) begin
-					processing_done = 1;
-				end
-				if ((processing_done_internal == 1) && (camera_transfer_done == 0)) begin
-					processing_done_internal = 0;
+				if (processing_done_internal == 1) begin
+					processing_done = 1;				
 				end
 			end
 		end
 
+		//for the primary_color_slots array
+		localparam [5:0] PRIMARY_COLOR_SLOTS_WORD_SIZE = 24; 
 		
+		localparam [3:0] 	ARRAY_SPEC_1_MAX = 5, 	//don't actually know whether it's 5 or 3, just picked one.
+							ARRAY_SPEC_2_MAX = 3;	//fortunately, in the formula where it's used, it doesn't matter 		
 
 		always @* begin
 			camera_data_sda_rnw = camera_data_sda_sw;
@@ -1701,6 +1759,11 @@ module main(
 		reg [2:0] next_byte_is_command = 0;
 		reg [7:0] next_byte_is_command_pev_command = 0;
 		reg [15:0] special_i2c_command_timer = 0;
+		
+		reg [5:0] array_spec_1;
+		reg [5:0] array_spec_2;
+		reg [575:0] one_dim_array_spec;
+							
 		
 		// Receive serial commands
 		always @(posedge clk_div_by_two) begin
@@ -1815,12 +1878,28 @@ module main(
 								if ((serial_command_buffer > 90) && (serial_command_buffer < 140)) begin	
 									next_byte_is_command = 1;
 									next_byte_is_command_pev_command = serial_command_buffer;
+									
+									array_spec_1 = ((next_byte_is_command_pev_command / 8) - 11);
+									array_spec_2 = (next_byte_is_command_pev_command[2:0] - 3);	
+																	
+									one_dim_array_spec = (PRIMARY_COLOR_SLOTS_WORD_SIZE*(ARRAY_SPEC_1_MAX*array_spec_2 + array_spec_1 + array_spec_2 +1)) - 1;
+									//converts primary_color_slots[array_spec_1][array_spec_2] to
+									//primary_color_slots[one_dim_array_spec -: 8]
+									
+									//----WRONGOOO
+									// array_spec_3 = (array_spec_1+1)*(array_spec_2+1) - 1;
+									//equive to array_spec_3:
+									//  ((next_byte_is_command_pev_command / 8) - 10)*(next_byte_is_command_pev_command[2:0] - 2) - 1
+									
+									
+									
 								end
 							end else begin							
 								if (next_byte_is_command == 3) begin
 									if ((next_byte_is_command_pev_command > 90) && (next_byte_is_command_pev_command < 140)) begin
 										// Blue
-										primary_color_slots[((next_byte_is_command_pev_command / 8) - 11)][next_byte_is_command_pev_command[2:0] - 3][23:16] = serial_command_buffer;
+										primary_color_slots[one_dim_array_spec -: 8] 
+																	= serial_command_buffer;		//old syntax: [array_spec_1][array_spec_2][23:16]
 										next_byte_is_command = 0;
 									end
 								end
@@ -1829,7 +1908,8 @@ module main(
 									// Color slot modify requests
 									if ((next_byte_is_command_pev_command > 90) && (next_byte_is_command_pev_command < 140)) begin
 										// Green
-										primary_color_slots[((next_byte_is_command_pev_command / 8) - 11)][next_byte_is_command_pev_command[2:0] - 3][15:8] = serial_command_buffer;
+										primary_color_slots[(one_dim_array_spec - 8) -: 8] 
+																= serial_command_buffer;	// old syntax: [array_spec_1][array_spec_2][15:8]
 										next_byte_is_command = 3;
 									end
 									
@@ -1885,7 +1965,8 @@ module main(
 									// Color slot modify requests
 									if ((next_byte_is_command_pev_command > 90) && (next_byte_is_command_pev_command < 140)) begin
 										// Red
-										primary_color_slots[((next_byte_is_command_pev_command / 8) - 11)][next_byte_is_command_pev_command[2:0] - 3][7:0] = serial_command_buffer;
+										primary_color_slots[(one_dim_array_spec - 16) -: 8] 
+																= serial_command_buffer;	// old syntax: [array_spec_1][array_spec_2][7:0]
 										next_byte_is_command = 2;
 									end
 								end

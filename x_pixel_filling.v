@@ -30,6 +30,8 @@ module x_pixel_filling (
 	output reg [17:0] address,
 	output reg x_pixel_filling_done		
 	);
+		
+		initial x_pixel_filling_done = 0;
 
 		reg [17:0] x_pixel_filling_counter_tog = 0;
 		reg [17:0] x_pixel_filling_counter_togg = 0;

@@ -29,6 +29,8 @@ module color_pattern(
 	output reg done
     );
 	 
+	 initial done = 0;
+	 
 	 //colors
 	 localparam [23:0]	light_gray = 24'hc0c0c0,
 								yellow = 24'hc0c000,

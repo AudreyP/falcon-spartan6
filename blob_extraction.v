@@ -27,7 +27,7 @@ module blob_extraction(
 	input wire [17:0] divider_quotient,
 	input wire [17:0] divider_quotient_two,
 	input wire [7:0] color_similarity_threshold,
-	input wire [23:0] primary_color_slots [5:0][3:0],	
+	input wire [575:0] primary_color_slots,	
 
 	//output regs
 	output reg wren,
@@ -42,6 +42,8 @@ module blob_extraction(
 	output reg divider_dividend_two,
 	output reg divider_divisor_two
 	);
+	
+		initial blob_extraction_done = 0;
 		
 		reg [3:0] enable_blob_extraction_verified = 0;
 		reg [15:0] blob_extraction_blob_counter = 0;
@@ -113,7 +115,9 @@ module blob_extraction(
 		
 		reg ok_to_do_averaging = 0;
 		
-		
+		localparam [5:0] PRIMARY_COLOR_SLOTS_WORD_SIZE = 24;
+		localparam [3:0] ARRAY_SPEC_1_MAX = 5;
+		reg [575:0] array_spec;
 		
 		
 		// Now it's time to find and extract the blobs
@@ -569,6 +573,9 @@ module blob_extraction(
 									blob_extraction_blob_color_number = 0;		// Default to 'not found'
 								end
 								
+								//one_dim_array_spec = (PRIMARY_COLOR_SLOTS_WORD_SIZE*(ARRAY_SPEC_1_MAX*array_spec_2 + array_spec_1 + array_spec_2 +1)) - 1;
+								array_spec = (PRIMARY_COLOR_SLOTS_WORD_SIZE*(ARRAY_SPEC_1_MAX*blob_extraction_slot_loop + blob_extraction_color_loop + blob_extraction_slot_loop)) - 1;
+																
 								if (blob_extraction_toggler == 7) begin
 									// Before we can fill the last data slot, we need to find which color slot this is!
 									// We will be calculating the sum of the errors for each color, winner takes all and is then compared against the threshold
@@ -576,24 +583,35 @@ module blob_extraction(
 									//for (blob_extraction_color_loop = 0; blob_extraction_color_loop < 6; blob_extraction_color_loop = blob_extraction_color_loop + 1) begin
 										//for (blob_extraction_slot_loop = 0; blob_extraction_slot_loop < 8; blob_extraction_slot_loop = blob_extraction_slot_loop + 1) begin
 											// Red
-											if (blob_extraction_red_average_final > primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][7:0]) begin
-												blob_extraction_current_difference = blob_extraction_red_average_final - primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][7:0];
+											if (blob_extraction_red_average_final > primary_color_slots[(array_spec - 16) -: 8]) begin
+												//old syntax was primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][7:0] 
+												
+												blob_extraction_current_difference = blob_extraction_red_average_final - primary_color_slots[(array_spec - 16) -: 8];
 											end else begin
-												blob_extraction_current_difference = primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][7:0] - blob_extraction_red_average_final;
+												blob_extraction_current_difference = primary_color_slots[(array_spec - 16) -: 8] - blob_extraction_red_average_final;
 											end
 											
 											// Green
-											if (blob_extraction_green_average_final > primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][15:8]) begin
-												blob_extraction_current_difference = (blob_extraction_current_difference + (blob_extraction_green_average_final - primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][15:8]));
+											if (blob_extraction_green_average_final > primary_color_slots[(array_spec - 8) -: 8]) begin
+												//old syntax was primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][15:8]
+												 
+												blob_extraction_current_difference = 
+												(blob_extraction_current_difference + (blob_extraction_green_average_final - primary_color_slots[(array_spec - 8) -:8]));
 											end else begin
-												blob_extraction_current_difference = (blob_extraction_current_difference + (primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][15:8] - blob_extraction_green_average_final));
+												blob_extraction_current_difference = (blob_extraction_current_difference + (primary_color_slots[(array_spec - 8) -: 8] - blob_extraction_green_average_final));
 											end
 											
 											// Blue
-											if (blob_extraction_blue_average_final > primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][23:16]) begin
-												blob_extraction_current_difference = (blob_extraction_current_difference + (blob_extraction_blue_average_final - primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][23:16]));
+											if (blob_extraction_blue_average_final > primary_color_slots[array_spec -: 8]) begin
+												//old syntax was primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][23:16]
+												
+												blob_extraction_current_difference = 
+												(blob_extraction_current_difference + (blob_extraction_blue_average_final 
+													- primary_color_slots[array_spec -: 8]));
 											end else begin
-												blob_extraction_current_difference = (blob_extraction_current_difference + (primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][23:16] - blob_extraction_blue_average_final));
+												blob_extraction_current_difference = 
+												(blob_extraction_current_difference 
+													+ (primary_color_slots[array_spec -: 8] - blob_extraction_blue_average_final));
 											end
 											
 											// Compare...

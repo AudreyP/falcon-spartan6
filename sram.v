@@ -19,14 +19,13 @@
 **********************************************************************/
 module sram(
 	input wire clk,
-	input wire reset,
 	input wire wren,             	     // write enable
 	input wire [31:0] data_write,      // data being written to memory
 	output wire [31:0] data_read,       // data being read from memory
 	
 	//sram controls 
-	input wire [18:0] starting_address,
-	inout wire [31:0] SRAM_DQ,
+	input wire [17:0] starting_address,
+	inout wire [15:0] SRAM_DQ,
 	output wire SRAM_CE_N,
 	output wire SRAM_OE_N,
 	output wire SRAM_LB_N,
@@ -36,10 +35,10 @@ module sram(
 	output wire RamClk,
 	output wire RamAdv,
 	
-	//test 
+	/*//test 
 	input wire counter_done,
 	input wire start_read,
-	input wire start_write,
+	input wire start_write,*/
 	output reg done
 	 );
 
@@ -58,104 +57,122 @@ module sram(
 	
 	//localparam starting_address = 0;
 
-	//local wires
-	wire [15:0] data_write_ub,
-					data_write_lb,
-					data_read_ub,
-					data_read_lb;
-					
 	//for asynch r/w, these must be tied low
 	assign SRAM_CE_N = 0;	//chip enable
 	assign RamClk = 0;
 	assign RamAdv = 0;
 	assign SRAM_UB_N = 0;	//either low or don't-care for r/w
 	assign SRAM_LB_N = 0;	//either low or don't-care for r/w
+	//for a read, OE must be LOW. For write, don't care (keep HIGH)
+	//for a write, WE must be LOW. For read, must keep HIGH
+
 
 	
+	//registers
+	reg [15:0]     data_read_upper_byte,
+					data_read_lower_byte;
+	reg [6:0] state;
+	reg [15:0] data_to_ram;
+	reg wr, rd;
+	reg [18:0] addr;
 	
-	assign data_write_ub = data_write[31:16];
+	/*assign data_write_ub = data_write[31:16];
 	assign data_write_lb = data_write[15:0];
 	assign data_read = {data_read_ub, data_read_lb};
+	*/
 	
-	// assign wires = regs
+	
+	//
+	assign SRAM_DQ = (wr) ? 16'bz : data_to_ram;	//if zero, then write--meaning SRAM_DQ = data_to_ram.
 	assign SRAM_ADDR = addr;
-	assign SRAM_DQ = data;	
+	assign data_read = {data_read_upper_byte, data_read_lower_byte};
+	assign SRAM_WE_N = wr;
+	assign SRAM_OE_N = rd;
 
-	reg [6:0] state;
-	reg wr, rd;
-	reg [15:0] data;
-	reg [17:0] addr;
 
 	// SRAM read/write state machine
 	always @(posedge clk) begin
-		if (reset) begin
-			state = init_state;
-		end	//end if reset
-		else begin
 			case (state)
 			init_state: begin
-							addr = starting_address[18:1];	//starting address 17 bits--shove into upper 17b of 18b addr to leave room for 1 increment
-							data = 16'hzzzz;
-							wr = 0;
-							rd = 0;
+							addr[18:1] = starting_address;	//starting address 17 bits--shove into upper 17b of 18b addr to leave room for 1 increment
+							data_to_ram = 16'bz;
+							wr = 1;	//not write state
+							rd = 1;	//not read state
 							done = 0;
 							state= idle_state;
 						  end
 			idle_state: begin
-							wr = 0;
-							if (start_write) begin	//if a write signal is received, begin write	
-								data = data_write[31:16];	//write upper bytes first
+							wr = 1;	//not write state
+							rd = 1;	//not read state
+							if (wren==1) begin	//if a write signal is received, begin write	
+								data_to_ram = data_write[31:16];	//write upper bytes first
 								state = write_upper_byte_state;
 								end
-							else if (start_read) begin
+							else if (wren==0) begin
 								state = read1_state;
 								end
 							else begin
 								state = idle_state;
 								end
 							end
+			
+			//-----WRITE CYCLE
 			write_upper_byte_state: 
 							begin
-								wr = 1;
+								wr = 0;	//write state
+								rd = 1;
 								state = pulse_wr1;
 							 end
 			pulse_wr1: 
 							begin
-							wr = 0;
+							wr = 1;	//deactivate write
+							rd = 1;
+							data_to_ram = data_write[15:0];
 							addr = addr + 1;
 							state = write_lower_byte_state;
 						   end				   
 			write_lower_byte_state: 
 							begin
-								wr = 1;
+								wr = 0;	//write state
+								rd = 1;
 								state = pulse_wr2;
 							 end		
 			pulse_wr2:
 							begin
-							wr = 0;
+							wr = 1;	//deactivate write
+							rd = 1;
 							addr = addr + 1;
-							state = check_if_done;
+							state = idle_state;
 							end
+			
+			//----READ CYCLE				
+			read1_state: begin
+								wr = 1;
+								rd = 0;		//read state
+								state = pulse_rd1;
+							 end			
 			pulse_rd1: 
 							begin
-							rd = 0;
+							wr = 1;	
+							rd = 1;		//deactivate read
+							data_read_upper_byte = SRAM_DQ;
 							addr = addr + 1;
-							state = read1_state;
+							state = read2_state;
 						   end							 
-			read1_state: begin
-								rd = 1;
-								state = pulse_rd1;
-							 end							 
+										 
 			read2_state: begin
-								rd = 1;
+								wr = 1;
+								rd = 1;		//read state
 								state = pulse_rd2;
 							 end
 			pulse_rd2: begin
-							rd = 0;
+							wr = 1;	
+							rd = 1;		//deactivate read
+							data_read_lower_byte = SRAM_DQ;
 							addr = addr + 1;
-							state = check_if_done;
+							state = idle_state;
 						   end							 
-			check_if_done: begin
+			/*check_if_done: begin
 							wr = 0;
 							rd = 0;
 							//check if read done
@@ -165,9 +182,8 @@ module sram(
 								addr = addr + 1;
 								state = read1_state;
 								end	//end else
-						   end
+						   end*/
 			endcase		
-		end	//end else	
 	end	//end always
 	
 

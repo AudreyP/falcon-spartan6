@@ -33,7 +33,9 @@ module edge_detection(
 	output reg [17:0] address,
 	output reg edge_detection_done
 	);
-
+	
+		initial edge_detection_done = 0;
+		
 		reg edge_detection_holdoff = 0;	//here only
 		reg [17:0] edge_detection_counter_tog = 0;
 		reg [17:0] edge_detection_counter_togg = 0;

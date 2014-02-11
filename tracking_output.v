@@ -33,12 +33,65 @@ module tracking_output(
 	output reg wren,
 	output reg [31:0] data_write,
 	output reg [17:0] address,
-	output reg [7:0] x_centroids_array,   //assigned here--only used in main.
-	output reg [7:0] y_centroids_array,   //assigned here--only used in main.
-	output reg [15:0] s_centroids_array,   //assigned here--only used in main.
-	output reg [15:0] tracking_output_blob_sizes [17:0],	//assigned here--only used in main. 
+	output reg [63:0] x_centroids_array,   //assigned here--only used in main.
+	output reg [63:0] y_centroids_array,   //assigned here--only used in main.
+	output reg [127:0] s_centroids_array,   //assigned here--only used in main.
+	output reg [288:0] tracking_output_blob_sizes /*[17:0]*/,	//assigned here--only used in main. 
 	output reg tracking_output_done
 	);
+		
+	initial tracking_output_done = 0;
+
+	localparam  	BLOB_SIZE_WORD_SIZE = 16,
+					BLOB_SIZE_WORD_0 = 1*BLOB_SIZE_WORD_SIZE-1,
+					BLOB_SIZE_WORD_1 = 2*BLOB_SIZE_WORD_SIZE-1,
+					BLOB_SIZE_WORD_2 = 3*BLOB_SIZE_WORD_SIZE-1,
+					BLOB_SIZE_WORD_3 = 4*BLOB_SIZE_WORD_SIZE-1,
+					BLOB_SIZE_WORD_4 = 5*BLOB_SIZE_WORD_SIZE-1,
+					BLOB_SIZE_WORD_5 = 6*BLOB_SIZE_WORD_SIZE-1,
+					BLOB_SIZE_WORD_6 = 7*BLOB_SIZE_WORD_SIZE-1,
+					BLOB_SIZE_WORD_7 = 8*BLOB_SIZE_WORD_SIZE-1,
+					BLOB_SIZE_WORD_8 = 9*BLOB_SIZE_WORD_SIZE-1,
+					BLOB_SIZE_WORD_9 = 10*BLOB_SIZE_WORD_SIZE-1,
+					BLOB_SIZE_WORD_10 = 11*BLOB_SIZE_WORD_SIZE-1,
+					BLOB_SIZE_WORD_11 = 12*BLOB_SIZE_WORD_SIZE-1,
+					BLOB_SIZE_WORD_12 = 13*BLOB_SIZE_WORD_SIZE-1,
+					BLOB_SIZE_WORD_13 = 14*BLOB_SIZE_WORD_SIZE-1,
+					BLOB_SIZE_WORD_14 = 15*BLOB_SIZE_WORD_SIZE-1,
+					BLOB_SIZE_WORD_15 = 16*BLOB_SIZE_WORD_SIZE-1,
+					BLOB_SIZE_WORD_16 = 17*BLOB_SIZE_WORD_SIZE-1,
+					BLOB_SIZE_WORD_17 = 18*BLOB_SIZE_WORD_SIZE-1;
+	
+	localparam	S_CENTROIDS_WORD_SIZE = 16,
+					S_CENTROIDS_WORD_0 = 1*S_CENTROIDS_WORD_SIZE - 1,
+					S_CENTROIDS_WORD_1 = 2*S_CENTROIDS_WORD_SIZE - 1,
+					S_CENTROIDS_WORD_2 = 3*S_CENTROIDS_WORD_SIZE - 1,
+					S_CENTROIDS_WORD_3 = 4*S_CENTROIDS_WORD_SIZE - 1,
+					S_CENTROIDS_WORD_4 = 5*S_CENTROIDS_WORD_SIZE - 1,
+					S_CENTROIDS_WORD_5 = 6*S_CENTROIDS_WORD_SIZE - 1,
+					S_CENTROIDS_WORD_6 = 7*S_CENTROIDS_WORD_SIZE - 1,
+					S_CENTROIDS_WORD_7 = 8*S_CENTROIDS_WORD_SIZE - 1,
+					
+					X_CENTROIDS_WORD_SIZE = 8,
+					X_CENTROIDS_WORD_0 = 1*X_CENTROIDS_WORD_SIZE - 1,
+					X_CENTROIDS_WORD_1 = 2*X_CENTROIDS_WORD_SIZE - 1,
+					X_CENTROIDS_WORD_2 = 3*X_CENTROIDS_WORD_SIZE - 1,
+					X_CENTROIDS_WORD_3 = 4*X_CENTROIDS_WORD_SIZE - 1,
+					X_CENTROIDS_WORD_4 = 5*X_CENTROIDS_WORD_SIZE - 1,
+					X_CENTROIDS_WORD_5 = 6*X_CENTROIDS_WORD_SIZE - 1,
+					X_CENTROIDS_WORD_6 = 7*X_CENTROIDS_WORD_SIZE - 1,
+					X_CENTROIDS_WORD_7 = 8*X_CENTROIDS_WORD_SIZE - 1,
+					
+					Y_CENTROIDS_WORD_SIZE = 8,
+					Y_CENTROIDS_WORD_0 = 1*Y_CENTROIDS_WORD_SIZE - 1,
+					Y_CENTROIDS_WORD_1 = 2*Y_CENTROIDS_WORD_SIZE - 1,
+					Y_CENTROIDS_WORD_2 = 3*Y_CENTROIDS_WORD_SIZE - 1,
+					Y_CENTROIDS_WORD_3 = 4*Y_CENTROIDS_WORD_SIZE - 1,
+					Y_CENTROIDS_WORD_4 = 5*Y_CENTROIDS_WORD_SIZE - 1,
+					Y_CENTROIDS_WORD_5 = 6*Y_CENTROIDS_WORD_SIZE - 1,
+					Y_CENTROIDS_WORD_6 = 7*Y_CENTROIDS_WORD_SIZE - 1,
+					Y_CENTROIDS_WORD_7 = 8*Y_CENTROIDS_WORD_SIZE - 1;
+				
 	
 	//reg tracking_output_main_chunk_already_loaded = 0;   //UNUSED IN EITHER LOCATION!
 	//reg [7:0] tracking_output_counter_buffer_blue;   //UNUSED IN EITHER LOCATION!
@@ -96,40 +149,40 @@ module tracking_output(
 				tracking_output_pointer_counter = 0;
 				tracking_output_ok_to_send_data = 0;
 				tracking_output_pointer = 6;
-				x_centroids_array[0] = 0;
-				y_centroids_array[0] = 0;
-				x_centroids_array[1] = 0;
-				y_centroids_array[1] = 0;
-				x_centroids_array[2] = 0;
-				y_centroids_array[2] = 0;
-				x_centroids_array[3] = 0;
-				y_centroids_array[3] = 0;
-				x_centroids_array[4] = 0;
-				y_centroids_array[4] = 0;
-				x_centroids_array[5] = 0;
-				y_centroids_array[5] = 0;
+				x_centroids_array[X_CENTROIDS_WORD_0 : 0] = 0;
+				y_centroids_array[Y_CENTROIDS_WORD_0 : 0] = 0;
+				x_centroids_array[X_CENTROIDS_WORD_1 : 1+X_CENTROIDS_WORD_0] = 0;
+				y_centroids_array[Y_CENTROIDS_WORD_1 : 1+Y_CENTROIDS_WORD_0] = 0;
+				x_centroids_array[X_CENTROIDS_WORD_2 : 1+X_CENTROIDS_WORD_1] = 0;
+				y_centroids_array[Y_CENTROIDS_WORD_2 : 1+Y_CENTROIDS_WORD_1] = 0;
+				x_centroids_array[X_CENTROIDS_WORD_3 : 1+X_CENTROIDS_WORD_2] = 0;
+				y_centroids_array[Y_CENTROIDS_WORD_3 : 1+Y_CENTROIDS_WORD_2] = 0;
+				x_centroids_array[X_CENTROIDS_WORD_4 : 1+X_CENTROIDS_WORD_3] = 0;
+				y_centroids_array[Y_CENTROIDS_WORD_4 : 1+Y_CENTROIDS_WORD_3] = 0;
+				x_centroids_array[X_CENTROIDS_WORD_5 : 1+X_CENTROIDS_WORD_4] = 0;
+				y_centroids_array[Y_CENTROIDS_WORD_5 : 1+Y_CENTROIDS_WORD_4] = 0;
 				tracking_output_holdoff = 1;
 			end
 			
 			1:begin
-				tracking_output_blob_sizes[0] = 0;
-				tracking_output_blob_sizes[1] = 0;
-				tracking_output_blob_sizes[2] = 0;
-				tracking_output_blob_sizes[3] = 0;
-				tracking_output_blob_sizes[4] = 0;
-				tracking_output_blob_sizes[5] = 0;
-				tracking_output_blob_sizes[6] = 0;
-				tracking_output_blob_sizes[7] = 0;
-				tracking_output_blob_sizes[8] = 0;
-				tracking_output_blob_sizes[9] = 0;
-				tracking_output_blob_sizes[10] = 0;
-				tracking_output_blob_sizes[11] = 0;
-				tracking_output_blob_sizes[12] = 0;
-				tracking_output_blob_sizes[13] = 0;
-				tracking_output_blob_sizes[14] = 0;
-				tracking_output_blob_sizes[15] = 0;
-				tracking_output_blob_sizes[16] = 0;
-				tracking_output_blob_sizes[17] = 0;
+				tracking_output_blob_sizes[BLOB_SIZE_WORD_0 : 0] = 0;
+				tracking_output_blob_sizes[BLOB_SIZE_WORD_1 : 1+BLOB_SIZE_WORD_0] = 0;
+				tracking_output_blob_sizes[BLOB_SIZE_WORD_2 : 1+BLOB_SIZE_WORD_1] = 0;
+				tracking_output_blob_sizes[BLOB_SIZE_WORD_3 : 1+BLOB_SIZE_WORD_2] = 0;
+				tracking_output_blob_sizes[BLOB_SIZE_WORD_4 : 1+BLOB_SIZE_WORD_3] = 0;
+				tracking_output_blob_sizes[BLOB_SIZE_WORD_5 : 1+BLOB_SIZE_WORD_4] = 0;
+				tracking_output_blob_sizes[BLOB_SIZE_WORD_6 : 1+BLOB_SIZE_WORD_5] = 0;
+				tracking_output_blob_sizes[BLOB_SIZE_WORD_7 : 1+BLOB_SIZE_WORD_6] = 0;
+				tracking_output_blob_sizes[BLOB_SIZE_WORD_8 : 1+BLOB_SIZE_WORD_7] = 0;
+				tracking_output_blob_sizes[BLOB_SIZE_WORD_9 : 1+BLOB_SIZE_WORD_8] = 0;
+				tracking_output_blob_sizes[BLOB_SIZE_WORD_10 : 1+BLOB_SIZE_WORD_9] = 0;
+				tracking_output_blob_sizes[BLOB_SIZE_WORD_11 : 1+BLOB_SIZE_WORD_10] = 0;
+				tracking_output_blob_sizes[BLOB_SIZE_WORD_12 : 1+BLOB_SIZE_WORD_11] = 0;
+				tracking_output_blob_sizes[BLOB_SIZE_WORD_13 : 1+BLOB_SIZE_WORD_12] = 0;
+				tracking_output_blob_sizes[BLOB_SIZE_WORD_14 : 1+BLOB_SIZE_WORD_13] = 0;
+				tracking_output_blob_sizes[BLOB_SIZE_WORD_15 : 1+BLOB_SIZE_WORD_14] = 0;
+				tracking_output_blob_sizes[BLOB_SIZE_WORD_16 : 1+BLOB_SIZE_WORD_15] = 0;
+				tracking_output_blob_sizes[BLOB_SIZE_WORD_17 : 1+BLOB_SIZE_WORD_16] = 0;
 				tracking_output_holdoff = 2;
 			end
 			
@@ -260,9 +313,9 @@ module tracking_output(
 					
 					if ((tracking_output_counter_tog == 2) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
 						tracking_output_temp_data = data_read_sync_tracking_output;
-						x_centroids_array[0] = tracking_output_temp_data[31:24];
-						y_centroids_array[0] = tracking_output_temp_data[23:16];
-						s_centroids_array[0] = tracking_output_temp_data[15:0];
+						x_centroids_array[X_CENTROIDS_WORD_0 : 0] = tracking_output_temp_data[31:24];
+						y_centroids_array[Y_CENTROIDS_WORD_0 : 0] = tracking_output_temp_data[23:16];
+						s_centroids_array[S_CENTROIDS_WORD_0 : 0] = tracking_output_temp_data[15:0];
 						tracking_output_temp_data[15:0] = 0;
 						address = tracking_output_blob_location[location_to_extract];
 						data_write = tracking_output_temp_data;
@@ -276,9 +329,9 @@ module tracking_output(
 					
 					if ((tracking_output_counter_tog == 4) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
 						tracking_output_temp_data = data_read_sync_tracking_output;
-						x_centroids_array[1] = tracking_output_temp_data[31:24];
-						y_centroids_array[1] = tracking_output_temp_data[23:16];
-						s_centroids_array[1] = tracking_output_temp_data[15:0];
+						x_centroids_array[X_CENTROIDS_WORD_1 : 1+X_CENTROIDS_WORD_0] = tracking_output_temp_data[31:24];
+						y_centroids_array[Y_CENTROIDS_WORD_1 : 1+Y_CENTROIDS_WORD_0] = tracking_output_temp_data[23:16];
+						s_centroids_array[S_CENTROIDS_WORD_1 : 1+S_CENTROIDS_WORD_0] = tracking_output_temp_data[15:0];
 						tracking_output_temp_data[15:0] = 0;
 						address = tracking_output_blob_location[location_to_extract] + 199998;
 						data_write = tracking_output_temp_data;
@@ -292,9 +345,9 @@ module tracking_output(
 					
 					if ((tracking_output_counter_tog == 6) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
 						tracking_output_temp_data = data_read_sync_tracking_output;
-						x_centroids_array[2] = tracking_output_temp_data[31:24];
-						y_centroids_array[2] = tracking_output_temp_data[23:16];
-						s_centroids_array[2] = tracking_output_temp_data[15:0];
+						x_centroids_array[X_CENTROIDS_WORD_2 : 1+X_CENTROIDS_WORD_1] = tracking_output_temp_data[31:24];
+						y_centroids_array[Y_CENTROIDS_WORD_2 : 1+Y_CENTROIDS_WORD_1] = tracking_output_temp_data[23:16];
+						s_centroids_array[S_CENTROIDS_WORD_2 : 1+S_CENTROIDS_WORD_1] = tracking_output_temp_data[15:0];
 						tracking_output_temp_data[15:0] = 0;
 						address = tracking_output_blob_location[location_to_extract] + 199998;
 						data_write = tracking_output_temp_data;
@@ -308,9 +361,9 @@ module tracking_output(
 					
 					if ((tracking_output_counter_tog == 8) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
 						tracking_output_temp_data = data_read_sync_tracking_output;
-						x_centroids_array[3] = tracking_output_temp_data[31:24];
-						y_centroids_array[3] = tracking_output_temp_data[23:16];
-						s_centroids_array[3] = tracking_output_temp_data[15:0];
+						x_centroids_array[X_CENTROIDS_WORD_3 : 1+X_CENTROIDS_WORD_2] = tracking_output_temp_data[31:24];
+						y_centroids_array[Y_CENTROIDS_WORD_3 : 1+Y_CENTROIDS_WORD_2] = tracking_output_temp_data[23:16];
+						s_centroids_array[S_CENTROIDS_WORD_3 : 1+S_CENTROIDS_WORD_2] = tracking_output_temp_data[15:0];
 						tracking_output_temp_data[15:0] = 0;
 						address = tracking_output_blob_location[location_to_extract] + 199998;
 						data_write = tracking_output_temp_data;
@@ -324,9 +377,9 @@ module tracking_output(
 					
 					if ((tracking_output_counter_tog == 10) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
 						tracking_output_temp_data = data_read_sync_tracking_output;
-						x_centroids_array[4] = tracking_output_temp_data[31:24];
-						y_centroids_array[4] = tracking_output_temp_data[23:16];
-						s_centroids_array[4] = tracking_output_temp_data[15:0];
+						x_centroids_array[X_CENTROIDS_WORD_4 : 1+X_CENTROIDS_WORD_3] = tracking_output_temp_data[31:24];
+						y_centroids_array[Y_CENTROIDS_WORD_4 : 1+Y_CENTROIDS_WORD_3] = tracking_output_temp_data[23:16];
+						s_centroids_array[S_CENTROIDS_WORD_4 : 1+S_CENTROIDS_WORD_3] = tracking_output_temp_data[15:0];
 						tracking_output_temp_data[15:0] = 0;
 						address = tracking_output_blob_location[location_to_extract] + 199998;
 						data_write = tracking_output_temp_data;
@@ -340,9 +393,9 @@ module tracking_output(
 					
 					if ((tracking_output_counter_tog == 12) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
 						tracking_output_temp_data = data_read_sync_tracking_output;
-						x_centroids_array[5] = tracking_output_temp_data[31:24];
-						y_centroids_array[5] = tracking_output_temp_data[23:16];
-						s_centroids_array[5] = tracking_output_temp_data[15:0];
+						x_centroids_array[X_CENTROIDS_WORD_5 : 1+X_CENTROIDS_WORD_4] = tracking_output_temp_data[31:24];
+						y_centroids_array[Y_CENTROIDS_WORD_5 : 1+Y_CENTROIDS_WORD_4] = tracking_output_temp_data[23:16];
+						s_centroids_array[S_CENTROIDS_WORD_5 : 1+S_CENTROIDS_WORD_4] = tracking_output_temp_data[15:0];
 						tracking_output_temp_data[15:0] = 0;
 						address = tracking_output_blob_location[location_to_extract] + 199998;
 						data_write = tracking_output_temp_data;
