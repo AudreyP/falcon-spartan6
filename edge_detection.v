@@ -289,9 +289,9 @@ module edge_detection(
 				end
 			end else begin
 				edge_detection_done = 0;
-				address = 18'bz;
-				data_write = 32'bz;
-				wren = 1'bz;
+				address = 18'b0;
+				data_write = 32'b0;
+				wren = 1'b0;
 			end
 		end
 

@@ -51,8 +51,6 @@ module main(
 
 	input RxD,
 
-	input [3:0] buttons,
-
 	// sram i/o
 	inout wire [15:0] SRAM_DQ,
 	output wire SRAM_CE_N,
@@ -166,8 +164,8 @@ module main(
 								| address_y_pixel_filling | address_blob_extraction | address_color_pattern 
 								| address_frame_dump | address_single_shot /*| address_median_filtering*/;
 								
-		assign wren = ~(wren_edge_detection | wren_tracking_output | wren_x_pixel_filling | wren_y_pixel_filling 
-								| wren_blob_extraction | wren_color_pattern | wren_frame_dump | wren_single_shot /*| wren_median_filtering*/);
+		assign wren = wren_edge_detection | wren_tracking_output | wren_x_pixel_filling | wren_y_pixel_filling 
+								| wren_blob_extraction | wren_color_pattern | wren_frame_dump | wren_single_shot /*| wren_median_filtering*/;
 								
 		assign data_write = data_write_edge_detection | data_write_tracking_output | data_write_x_pixel_filling 
 									| data_write_y_pixel_filling | data_write_blob_extraction | data_write_color_pattern 
@@ -354,18 +352,16 @@ module main(
 		
 		reg modified_clock_two_div_by_two = 0;
 		
-		//also used in another module
-		wire [16:0] stack_ram_dina;	//set in blob_extraction. Sent to generated core stack_ram as an input wire. (Used to be a reg in original main.v)
-		wire [13:0] stack_ram_addra;	//set in blob_extraction. Sent to generated core stack_ram as an input wire. (Used to be a reg in original main.v)
-		wire stack_ram_wea;			//set in blob_extraction. Sent to generated core stack_ram as an input wire. (Used to be a reg in original main.v)
-		wire [16:0] stack_ram_douta;	//was always a wire
+		wire [15:0] debug0, debug1;
+		wire [3:0] debug2;
+		wire [4:0] debug3;
 		
 		blob_extraction blob_extraction(
 			//input wires
 			.modified_clock_two_div_by_two(modified_clock_two_div_by_two),
+			.modified_clock_two(modified_clock_two),	//for stack ram
 			.enable_blob_extraction(enable_blob_extraction),
 			.data_read(data_read),
-			.stack_ram_douta(stack_ram_douta),
 			.divider_quotient(divider_quotient),
 			.divider_quotient_two(divider_quotient_two),
 			.color_similarity_threshold(color_similarity_threshold),
@@ -375,13 +371,18 @@ module main(
 			.data_write(data_write_blob_extraction),
 			.address(address_blob_extraction),
 			.blob_extraction_done(blob_extraction_done),
-			.stack_ram_addra(stack_ram_addra),
-			.stack_ram_wea(stack_ram_wea),
-			.stack_ram_dina(stack_ram_dina),
 			.divider_dividend(divider_dividend),
 			.divider_divisor(divider_divisor),
 			.divider_dividend_two(divider_dividend_two),
 			.divider_divisor_two(divider_divisor_two)
+		/*	.debug0(debug0),
+			.debug1(debug1),
+			.debug2(debug2),
+			.debug3(debug3)*/
+			/*.stack_ram_douta(stack_ram_douta),
+			.stack_ram_addra(stack_ram_addra),
+			.stack_ram_wea(stack_ram_wea),
+			.stack_ram_dina(stack_ram_dina)*/
 			);
 		
 				 
@@ -536,9 +537,6 @@ module main(
 			.wren(wren_color_pattern),
 			.done(camera_capture_done));
 		
-
-		stack_ram stack_ram(.clka(modified_clock_two), .dina(stack_ram_dina), .addra(stack_ram_addra), .wea(stack_ram_wea), .douta(stack_ram_douta));
-		
 		
 		//always @(posedge modified_clock_two) begin
 		always @(negedge modified_clock_two) begin
@@ -643,6 +641,26 @@ module main(
 			
 			if (slide_switches[5] == 1) begin
 				display_value = display_value_user;
+			end
+			
+			if (slide_switches[4] == 1) begin
+				display_value = current_main_processing_state;
+			end
+			
+			if (slide_switches[3] == 1) begin
+				display_value = debug3;
+			end
+			
+			if (slide_switches[2] == 1) begin
+				display_value = debug2;
+			end
+			
+			if (slide_switches[1] == 1) begin
+				display_value = debug1;
+			end
+			
+			if (slide_switches[0] == 1) begin
+				display_value = debug0;
 			end
 			
 			processing_started_prior = processing_started;
@@ -1018,7 +1036,31 @@ module main(
 		reg wren_frame_dump;
 		reg [17:0] address_frame_dump;
 		reg [31:0] data_write_frame_dump;
-		
+
+		//debugging statements
+		assign debug0[0] = wren;
+		assign debug0[1] = wren_edge_detection;
+		assign debug0[2] = wren_tracking_output;
+		assign debug0[3] = wren_x_pixel_filling;
+		assign debug0[4] = wren_y_pixel_filling;
+		assign debug0[5] = wren_blob_extraction;
+		assign debug0[6] = wren_color_pattern;
+		assign debug0[7] = wren_frame_dump;
+		assign debug0[8] = wren_single_shot;
+		assign debug0[15:9] = 0;
+
+		assign debug1[0] = processing_done_internal;
+		assign debug1[1] = i_need_the_serial_transmitter_now;
+
+		assign debug2[0] = run_frame_dump_internal;
+		assign debug2[1] = run_single_shot_test_internal;
+		assign debug2[3:2] = 0;
+
+		assign debug3[0] = run_frame_dump;
+		assign debug3[1] = run_single_shot_test;
+		assign debug3[4:2] = 0;
+
+				
 		localparam
 		STATE_INITIAL = 0,
 		STATE_CAMERA_CAPTURE =1,
@@ -1042,7 +1084,8 @@ module main(
 		//always @(posedge camera_data_pclk) begin
 			data_read_sync = data_read;
 			
-			if ((processing_done_internal == 0)) begin
+					
+			//if ((processing_done_internal == 0)) begin
 			//if (camera_transfer_done == 1) begin
 				if (i_need_the_serial_transmitter_now == 0) begin
 					processing_done = 0;
@@ -1051,23 +1094,25 @@ module main(
 					
 					if(current_main_processing_state == STATE_INITIAL) begin
 						//camera controls -- these run once per loop
-							run_frame_dump_internal = 0;
-							run_single_shot_test_internal = 0;
-							run_online_recognition_internal = 0;
-							
-							if (run_frame_dump == 1) begin
-								run_frame_dump_internal = 1;
-							end
-							
-							if (run_single_shot_test == 1) begin
-								run_single_shot_test_internal = 1;
-							end
-							
-							if (run_online_recognition == 1) begin
-								run_online_recognition_internal = 1;
-							end
+						run_frame_dump_internal = 0;
+						run_single_shot_test_internal = 0;
+						run_online_recognition_internal = 0;
 						
-						current_main_processing_state = STATE_CAMERA_CAPTURE;
+						if (run_frame_dump == 1) begin
+							run_frame_dump_internal = 1;
+						end
+						
+						if (run_single_shot_test == 1) begin
+							run_single_shot_test_internal = 1;
+						end
+						
+						if (run_online_recognition == 1) begin
+							run_online_recognition_internal = 1;
+						end
+						
+						if ((run_frame_dump_internal == 1) || (run_single_shot_test_internal == 1) || (run_online_recognition_internal == 1)) begin
+							current_main_processing_state = STATE_CAMERA_CAPTURE;
+						end
 					end
 					
 					if (current_main_processing_state == STATE_CAMERA_CAPTURE) begin
@@ -1114,7 +1159,10 @@ module main(
 						if (y_pixel_filling_done == 1) begin
 							enable_y_pixel_filling = 0;
 							//SKIPS BORDER DRAWING STATE
-							current_main_processing_state = STATE_BLOB_EXTRACTION;
+							
+							//DEBUG - SKIP BLOB EXTRACTION
+							//current_main_processing_state = STATE_BLOB_EXTRACTION;
+							current_main_processing_state = STATE_TRACKING_OUTPUT;
 						end
 					end		
 					
@@ -1732,18 +1780,18 @@ module main(
 					TxD_data = 7'bz;
 					TxD_start = 1'bz;
 				end
-			end else begin
-				if (processing_done_internal == 1) begin
-					processing_done = 1;				
-				end
-			end
-		end
+			//end else begin
+			//	if (processing_done_internal == 1) begin
+			//		processing_done = 0;				
+			//	end	//end else
+			//end	//end if(processing_done_internal == 0)
+		end	//end of always 
 
 		//for the primary_color_slots array
 		localparam [5:0] PRIMARY_COLOR_SLOTS_WORD_SIZE = 24; 
 		
 		localparam [3:0] 	ARRAY_SPEC_1_MAX = 5, 	//don't actually know whether it's 5 or 3, just picked one.
-							ARRAY_SPEC_2_MAX = 3;	//fortunately, in the formula where it's used, it doesn't matter 		
+					ARRAY_SPEC_2_MAX = 3;	//fortunately, in the formula where it's used, it doesn't matter 		
 
 		always @* begin
 			camera_data_sda_rnw = camera_data_sda_sw;

@@ -644,9 +644,9 @@ module color_pattern(
 						state = bar27;
 						end
 			done_state: begin
-					data_write = 24'bz;
-					wren = 1'bz;
-					addr = 17'bz;
+					data_write = 24'b0;
+					wren = 1'b0;
+					addr = 17'b0;
 					done = 1;					
 					end
 			endcase

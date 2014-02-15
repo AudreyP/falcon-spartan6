@@ -114,9 +114,9 @@ module x_pixel_filling (
 				end
 			end else begin
 				x_pixel_filling_done = 0;
-				address = 18'bz;
-				data_write = 32'bz;
-				wren = 1'bz;
+				address = 18'b0;
+				data_write = 32'b0;
+				wren = 1'b0;
 			end
 		end
 endmodule

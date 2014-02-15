@@ -21,9 +21,9 @@
 module blob_extraction(
 	//input wires
 	input wire modified_clock_two_div_by_two,
+	input wire modified_clock_two,
 	input wire enable_blob_extraction,
 	input wire [31:0] data_read,
-	input wire [16:0] stack_ram_douta,
 	input wire [17:0] divider_quotient,
 	input wire [17:0] divider_quotient_two,
 	input wire [7:0] color_similarity_threshold,
@@ -34,17 +34,19 @@ module blob_extraction(
 	output reg [31:0] data_write,
 	output reg [17:0] address,
 	output reg blob_extraction_done,
-	output reg [13:0] stack_ram_addra,
-	output reg stack_ram_wea,
-	output reg [16:0] stack_ram_dina,
 	output reg divider_dividend,
 	output reg divider_divisor,
 	output reg divider_dividend_two,
-	output reg divider_divisor_two
-	);
+	output reg divider_divisor_two,
 	
+	output wire [15:0] debug0,
+	output wire [15:0] debug1,
+	output wire [3:0] debug2,
+	output wire [4:0] debug3
+	);
+
 		initial blob_extraction_done = 0;
-		
+
 		reg [3:0] enable_blob_extraction_verified = 0;
 		reg [15:0] blob_extraction_blob_counter = 0;
 		
@@ -86,6 +88,12 @@ module blob_extraction(
 
 		reg [4:0] blob_extraction_toggler = 0;		//here only
 		reg [3:0] blob_extraction_inner_toggler = 0;	//here only
+
+		assign debug0 = blob_extraction_x_temp;
+		assign debug1 = blob_extraction_y_temp_1;
+		assign debug2 = blob_extraction_inner_toggler;
+		assign debug3 = blob_extraction_toggler;
+		
 		
 		reg [24:0] blob_extraction_red_average = 0;	//here only
 		reg [24:0] blob_extraction_green_average = 0;	//here only
@@ -118,6 +126,21 @@ module blob_extraction(
 		localparam [5:0] PRIMARY_COLOR_SLOTS_WORD_SIZE = 24;
 		localparam [3:0] ARRAY_SPEC_1_MAX = 5;
 		reg [575:0] array_spec;
+		
+		
+		//-----Instantiate stack_ram
+		reg [16:0] stack_ram_dina;	
+		reg [13:0] stack_ram_addra;	
+		reg stack_ram_wea;			
+		wire [16:0] stack_ram_douta;
+		
+		stack_ram stack_ram(
+			.clka(modified_clock_two),
+			.dina(stack_ram_dina),
+			.addra(stack_ram_addra),
+			.wea(stack_ram_wea),
+			.douta(stack_ram_douta)
+			);
 		
 		
 		// Now it's time to find and extract the blobs
@@ -266,7 +289,9 @@ module blob_extraction(
 									// Read in the first pixel
 									// If the pixel is zero, write the current blob number in its place
 									if (blob_extraction_inner_toggler == 0) begin
-										if ((data_read_sync_blob_extraction == 0) && (blob_extraction_x_temp > 7) && (blob_extraction_x_temp < 313) && (blob_extraction_y_temp_1 > 7) && (blob_extraction_y_temp_1 < 233)) begin
+										if ((data_read_sync_blob_extraction == 0) 
+											&& (blob_extraction_x_temp > 7) && (blob_extraction_x_temp < 313) 
+											&& (blob_extraction_y_temp_1 > 7) && (blob_extraction_y_temp_1 < 233)) begin
 											// Write the data
 											address = ((blob_extraction_y_temp_1 * 320) + blob_extraction_x_temp);
 											data_write = blob_extraction_blob_counter;
@@ -274,6 +299,8 @@ module blob_extraction(
 											
 											blob_extraction_inner_toggler = 1;
 										end else begin
+										//Does not reach this point
+										
 											blob_extraction_toggler = 6;
 											blob_extraction_inner_toggler = 0;
 										end
@@ -729,9 +756,9 @@ module blob_extraction(
 				end
 			end else begin
 				blob_extraction_done = 0;
-				address = 18'bz;
-				data_write = 32'bz;
-				wren = 1'bz;
+				address = 18'b0;
+				data_write = 32'b0;
+				wren = 1'b0;
 			end
 		end
 		

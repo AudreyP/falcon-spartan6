@@ -422,9 +422,9 @@ module tracking_output(
 			tracking_output_counter_tog = 0;
 			tracking_output_holdoff = 0;
 			tracking_output_done = 0;
-			address = 18'bz;
-			data_write = 32'bz;
-			wren = 1'bz;
+			address = 18'b0;
+			data_write = 32'b0;
+			wren = 1'b0;
 		end
 	end
 

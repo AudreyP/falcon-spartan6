@@ -8,9 +8,10 @@ input clk, TxD_start;
 input [7:0] TxD_data;
 output TxD, TxD_busy;
 output [4:0] state;
+parameter ClkFrequency = 10000000;	// 10MHz
 //parameter ClkFrequency = 25000000;	// 25MHz
 //parameter ClkFrequency = 50000000;	// 50MHz
-parameter ClkFrequency = 66666666;	// 66MHz
+//parameter ClkFrequency = 66666666;	// 66MHz
 //parameter ClkFrequency = 70000000;	// 70MHz
 parameter Baud = 115200;
 parameter RegisterInputData = 1;	// in RegisterInputData mode, the input doesn't have to stay valid while the character is been transmitted

@@ -6,8 +6,9 @@ input clk, RxD;
 output RxD_data_ready;  // onc clock pulse when RxD_data is valid
 output [7:0] RxD_data;
 
+parameter ClkFrequency = 5000000;	// 5MHz
 //parameter ClkFrequency = 25000000;	// 25MHz
-parameter ClkFrequency = 33333333;	// 33MHz
+//parameter ClkFrequency = 33333333;	// 33MHz
 //parameter ClkFrequency = 35000000;	// 35MHz
 parameter Baud = 115200;
 

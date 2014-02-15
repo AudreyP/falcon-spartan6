@@ -83,7 +83,8 @@ module sram(
 	
 	
 	//
-	assign SRAM_DQ = (wr) ? 16'bz : data_to_ram;	//if zero, then write--meaning SRAM_DQ = data_to_ram.
+// 	assign SRAM_DQ = (wr) ? 16'bz : data_to_ram;	//if zero, then write--meaning SRAM_DQ = data_to_ram.
+	assign SRAM_DQ = (wr) ? 16'bz : 32'h80f02040;
 	assign SRAM_ADDR = addr;
 	assign data_read = {data_read_upper_byte, data_read_lower_byte};
 	assign SRAM_WE_N = wr;
@@ -95,7 +96,6 @@ module sram(
 			case (state)
 			init_state: begin
 							addr[18:1] = starting_address;	//starting address 17 bits--shove into upper 17b of 18b addr to leave room for 1 increment
-							data_to_ram = 16'bz;
 							wr = 1;	//not write state
 							rd = 1;	//not read state
 							done = 0;
@@ -108,11 +108,8 @@ module sram(
 								data_to_ram = data_write[31:16];	//write upper bytes first
 								state = write_upper_byte_state;
 								end
-							else if (wren==0) begin
+							else begin	//wren == 0
 								state = read1_state;
-								end
-							else begin
-								state = idle_state;
 								end
 							end
 			
