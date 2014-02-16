@@ -9,22 +9,22 @@ NET "crystal_clk" CLOCK_DEDICATED_ROUTE = FALSE;
 #NET "buttons<2>" LOC = "C9" | IOSTANDARD = "LVCMOS33";
 #NET "buttons<3>" LOC = "C4" | IOSTANDARD = "LVCMOS33";
 #NET "buttons<4>" LOC = "B8" | IOSTANDARD = "LVCMOS33";
-NET "camera_data_port<0>" LOC = "T12"  | IOSTANDARD = "LVCMOS33";
-NET "camera_data_port<1>" LOC = "V12" | IOSTANDARD = "LVCMOS33";
-NET "camera_data_port<2>" LOC = "N10" | IOSTANDARD = "LVCMOS33";
-NET "camera_data_port<3>" LOC = "P11" | IOSTANDARD = "LVCMOS33";
-NET "camera_data_port<4>" LOC = "M10" | IOSTANDARD = "LVCMOS33";
-NET "camera_data_port<5>" LOC = "N9" | IOSTANDARD = "LVCMOS33";
-NET "camera_data_port<6>" LOC = "U11" | IOSTANDARD = "LVCMOS33";
-NET "camera_data_port<7>" LOC = "V11" | IOSTANDARD = "LVCMOS33";
-NET "camera_data_port<8>" LOC = "K2" | IOSTANDARD = "LVCMOS33";
-NET "camera_data_port<9>" LOC = "K1" | IOSTANDARD = "LVCMOS33";
-NET "camera_data_port<10>" LOC = "L4" | IOSTANDARD = "LVCMOS33";
-NET "camera_data_port<11>" LOC = "L3" | IOSTANDARD = "LVCMOS33";
-NET "camera_data_port<12>" LOC = "J3" | IOSTANDARD = "LVCMOS33";
-NET "camera_data_port<13>" LOC = "J1" | IOSTANDARD = "LVCMOS33";
-NET "camera_data_port<14>" LOC = "K3" | IOSTANDARD = "LVCMOS33";
-NET "camera_data_port<15>" LOC = "K5" | IOSTANDARD = "LVCMOS33";
+#NET "camera_data_port<0>" LOC = "T12"  | IOSTANDARD = "LVCMOS33";
+#NET "camera_data_port<1>" LOC = "V12" | IOSTANDARD = "LVCMOS33";
+#NET "camera_data_port<2>" LOC = "N10" | IOSTANDARD = "LVCMOS33";
+#NET "camera_data_port<3>" LOC = "P11" | IOSTANDARD = "LVCMOS33";
+#NET "camera_data_port<4>" LOC = "M10" | IOSTANDARD = "LVCMOS33";
+#NET "camera_data_port<5>" LOC = "N9" | IOSTANDARD = "LVCMOS33";
+#NET "camera_data_port<6>" LOC = "U11" | IOSTANDARD = "LVCMOS33";
+#NET "camera_data_port<7>" LOC = "V11" | IOSTANDARD = "LVCMOS33";
+#NET "camera_data_port<8>" LOC = "K2" | IOSTANDARD = "LVCMOS33";
+#NET "camera_data_port<9>" LOC = "K1" | IOSTANDARD = "LVCMOS33";
+#NET "camera_data_port<10>" LOC = "L4" | IOSTANDARD = "LVCMOS33";
+#NET "camera_data_port<11>" LOC = "L3" | IOSTANDARD = "LVCMOS33";
+#NET "camera_data_port<12>" LOC = "J3" | IOSTANDARD = "LVCMOS33";
+#NET "camera_data_port<13>" LOC = "J1" | IOSTANDARD = "LVCMOS33";
+#NET "camera_data_port<14>" LOC = "K3" | IOSTANDARD = "LVCMOS33";
+#NET "camera_data_port<15>" LOC = "K5" | IOSTANDARD = "LVCMOS33";
 NET "slide_switches<0>" LOC = "T10" | IOSTANDARD = "LVCMOS33";
 NET "slide_switches<1>" LOC = "T9" | IOSTANDARD = "LVCMOS33";
 NET "slide_switches<2>" LOC = "V9" | IOSTANDARD = "LVCMOS33";
@@ -61,7 +61,7 @@ NET "SRAM_ADDR<18>"     LOC = "D18" | IOSTANDARD = "LVCMOS33";   #Bank = 1, Pin 
 #NET "SRAM_ADDR<25>"     LOC = "F15" | IOSTANDARD = "LVCMOS33";   #Bank = 1, Pin name = IO_L1P_A25,                        Sch name = P30-A25
 
 #SRAM data input ("SRAM_DQ") pins 0-15
-NET "SRAM_DQ<0>"       LOC = "D9" | IOSTANDARD = "LVCMOS33";   #Ram or Numonyx Paralell Flash DB<0>, or Dual/Quad SPI Flash DB<1>, Bank = MISC, Pin name = IO_L3P_D0_DIN_MISO_MISO1_2,     Sch name = P30-DQ0
+NET "SRAM_DQ<0>"       LOC = "R13" | IOSTANDARD = "LVCMOS33";   #Ram or Numonyx Paralell Flash DB<0>, or Dual/Quad SPI Flash DB<1>, Bank = MISC, Pin name = IO_L3P_D0_DIN_MISO_MISO1_2,     Sch name = P30-DQ0
 NET "SRAM_DQ<1>"       LOC = "T14" | IOSTANDARD = "LVCMOS33";   #Ram or Numonyx Paralell Flash DB<1>, or Quad SPI Flash DB<2>, Bank = MISC, Pin name = IO_L12P_D1_MISO2_2,                      Sch name = P30-DQ1
 NET "SRAM_DQ<2>"       LOC = "V14" | IOSTANDARD = "LVCMOS33";   #Ram or Numonyx Paralell Flash DB<2>, or Quad SPI Flash DB<3>, Bank = MISC, Pin name = IO_L12N_D2_MISO3_2,                      Sch name = P30-DQ2
 NET "SRAM_DQ<3>"       LOC = "U5"  | IOSTANDARD = "LVCMOS33";   #Bank = 2, Pin name = IO_49P_D3,                         Sch name = P30-DQ3

@@ -22,22 +22,28 @@ module clock_manager(
 	input wire crystal_clk,
 	output wire modified_clock,
 	output wire modified_clock_two,
-	output wire modified_clock_sram
+	output wire modified_clock_sram,
+
+	output wire dcm_locked,
+	output wire dcm_locked_two,
+	output wire dcm_locked_sram
     );
 
+	parameter MAIN_DCM_MULT = 2;
+	parameter MAIN_DCM_DIV = 30;
+	parameter SRAM_CLK_RATIO = 4;
 		
 		//-------------------------------
 		// MODIFIED CLOCK
 		//-------------------------------
 		reg dcm_reset = 0;
-		wire dcm_locked;
 		wire dcm_feedback;
 		
 			   DCM_SP #(
 				.CLKDV_DIVIDE(2.0),                   // CLKDV divide value
 										  // (1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,8,9,10,11,12,13,14,15,16).
-				.CLKFX_DIVIDE(20),                     // Divide value on CLKFX outputs - D - (1-32)
-				.CLKFX_MULTIPLY(2),                   // Multiply value on CLKFX outputs - M - (2-32)
+				.CLKFX_DIVIDE(MAIN_DCM_DIV),                     // Divide value on CLKFX outputs - D - (1-32)
+				.CLKFX_MULTIPLY(MAIN_DCM_MULT),                   // Multiply value on CLKFX outputs - M - (2-32)
 				.CLKIN_DIVIDE_BY_2("FALSE"),          // CLKIN divide by two (TRUE/FALSE)
 				.CLKIN_PERIOD(10.0),                  // Input clock period specified in nS
 				.CLKOUT_PHASE_SHIFT("NONE"),          // Output phase shift (NONE, FIXED, VARIABLE)
@@ -99,7 +105,6 @@ module clock_manager(
 		// MODIFIED CLOCK TWO
 		//-------------------------------
 		reg dcm_reset_two = 0;
-		wire dcm_locked_two;
 		wire dcm_feedback_two;
 		
 		DCM_SP #(
@@ -165,18 +170,18 @@ module clock_manager(
 		end
 
 		reg dcm_reset_sram = 0;
-		wire dcm_locked_sram;
 		wire dcm_feedback_sram;
 
 
 		//-------------------------------
 		// SRAM CLOCK
 		//-------------------------------
+		
 		DCM_SP #(
 				.CLKDV_DIVIDE(2.0),                   // CLKDV divide value
 										  // (1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,8,9,10,11,12,13,14,15,16).
-				.CLKFX_DIVIDE(1),                     // Divide value on CLKFX outputs - D - (1-32)
-				.CLKFX_MULTIPLY(2),                   // Multiply value on CLKFX outputs - M - (2-32)
+				.CLKFX_DIVIDE(MAIN_DCM_DIV),                     // Divide value on CLKFX outputs - D - (1-32)
+				.CLKFX_MULTIPLY(MAIN_DCM_MULT*SRAM_CLK_RATIO),                   // Multiply value on CLKFX outputs - M - (2-32)
 				.CLKIN_DIVIDE_BY_2("FALSE"),          // CLKIN divide by two (TRUE/FALSE)
 				.CLKIN_PERIOD(10.0),                  // Input clock period specified in nS
 				.CLKOUT_PHASE_SHIFT("NONE"),          // Output phase shift (NONE, FIXED, VARIABLE)
@@ -204,7 +209,7 @@ module clock_manager(
 				.PSDONE(),     // 1-bit output: Phase shift done output
 				.STATUS(),     // 8-bit output: DCM_SP status output
 				.CLKFB(dcm_feedback_sram),       // 1-bit input: Clock feedback input
-				.CLKIN(modified_clk),       // 1-bit input: Clock input
+				.CLKIN(crystal_clk),       // 1-bit input: Clock input
 				.DSSEN(),       // 1-bit input: Unsupported, specify to GND.
 				.PSCLK(),       // 1-bit input: Phase shift clock input
 				.PSEN(),         // 1-bit input: Phase shift enable

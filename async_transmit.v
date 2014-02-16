@@ -8,7 +8,9 @@ input clk, TxD_start;
 input [7:0] TxD_data;
 output TxD, TxD_busy;
 output [4:0] state;
-parameter ClkFrequency = 10000000;	// 10MHz
+
+parameter ClkFrequency = 6666666;	// 6.66MHz
+//parameter ClkFrequency = 10000000;	// 10MHz
 //parameter ClkFrequency = 25000000;	// 25MHz
 //parameter ClkFrequency = 50000000;	// 50MHz
 //parameter ClkFrequency = 66666666;	// 66MHz
