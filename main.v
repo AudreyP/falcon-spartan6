@@ -25,6 +25,7 @@
 
 module main(
 	input crystal_clk, 
+	input reset,
 	output LD0, 
 	output LD1, 
 	output LD2, 
@@ -167,7 +168,9 @@ module main(
 		wire [15:0] sram_debug0;
 
 		sram sram(
-			.clk(modified_clock_sram),
+			.clk(clk),
+			.reset(reset),
+			.modified_clock_sram(modified_clock_sram),
 			.starting_address(address), 
 			.wren(wren), 
 			.data_write(data_write), 
