@@ -22,6 +22,7 @@ module blob_extraction(
 	//input wires
 	input wire modified_clock_two_div_by_two,
 	input wire modified_clock_two,
+	input wire pause,
 	input wire enable_blob_extraction,
 	input wire [31:0] data_read,
 	input wire [17:0] divider_quotient,
@@ -151,6 +152,7 @@ module blob_extraction(
 		//always @(posedge clk) begin
 		//always @(posedge modified_clock_two) begin
 		always @(posedge modified_clock_two_div_by_two) begin
+		if (pause == 0) begin
 			data_read_sync_blob_extraction = data_read;
 			
 			//leds[5:0] = blob_extraction_toggler + 1;
@@ -760,6 +762,7 @@ module blob_extraction(
 				data_write = 32'b0;
 				wren = 1'b0;
 			end
+		end	//end if pause = 0
 		end
 		
 endmodule 

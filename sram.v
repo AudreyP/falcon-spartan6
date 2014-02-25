@@ -19,11 +19,15 @@
 **********************************************************************/
 module sram(
 	input wire clk,
+	input wire prev_clk,
+	input wire sram_clk,
 	input wire reset,
 	input wire modified_clock_sram,
 	input wire wren,             	     // write enable
 	input wire [31:0] data_write,      // data being written to memory
 	output wire [31:0] data_read,       // data being read from memory
+	
+	output reg pause,
 	
 	//sram controls 
 	input wire [17:0] starting_address,
@@ -55,8 +59,7 @@ module sram(
 	wire busy_q;
 	wire [15:0] data_out_q;
 	wire data_vld_q;
-	
-	
+
 	
 	//registers
 	reg [2:0] cmd;
@@ -111,12 +114,17 @@ module sram(
 	reg data_direction;
 	
 	//debugging
+	reg write_upper_timeout;
+	reg write_lower_timeout;
 	reg read_upper_timeout;
 	reg read_lower_timeout;
+	reg [3:0] wu_cnt;
+	reg [3:0] wl_cnt;
+	reg [4:0] write_counter_total;
 	reg [3:0] ru_cnt;
 	reg [3:0] rl_cnt;
+	reg [4:0] read_counter_total;
 	reg [4:0] count;
-	reg ddr_reset;
 	
 	//for asynch r/w, these must be tied low
 	assign SRAM_CE_N = 0;	//chip enable
@@ -142,9 +150,8 @@ module sram(
 	
 	//states
 	localparam	INIT_STATE = 0,
-			RESET_WAIT_STATE = 1,
-			IDLE_STATE = 2,
-			WRITE_UPPER_STATE = 3,
+			IDLE_STATE = 1,
+			WRITE_UPPER_STATE = 2,
 			WRITE_WAIT_1 = 4,
 			WRITE_WAIT_2 = 5,
 			WRITE_UPPER_DATA_VALID = 6,
@@ -154,7 +161,11 @@ module sram(
 			WRITE_LOWER_DATA_VALID = 10,
 			WRITE_WAIT_5 = 11,
 			READ_UPPER_STATE = 12,
-			READ_LOWER_STATE = 13;
+			READ_LOWER_STATE = 13,
+			EXTRA_WAIT_1 = 14,
+			EXTRA_WAIT_2 = 15,
+			EXTRA_WAIT_3 = 16,
+			EXTRA_WAIT_4 = 17;
 	//want write to take 10 clock cycles to complete
 	//idle - write_upper - wait1 - wait2 - upper_valid - write_lower - wait3 - wait4 - lower_valid - wait5. Done and back to idle.
 	//idle - read_upper (x4) - read_lower (x4) - read_wait. Done and back to idle. 
@@ -173,59 +184,48 @@ module sram(
 	// BEGIN STATE MACHINE
 	//----------------------------
 	always @(posedge modified_clock_sram) begin
+		if (main_clk == 1 && main_clk_prev == 0) begin
+			counter = 0
+		
 		case (state)
 		INIT_STATE:	begin	
-					ddr_reset = 0;
 					addr = 0;
 					cmd = NOP;
-					done = 0;
 					state = RESET_WAIT_STATE;
 				end
 		
-		RESET_WAIT_STATE: 	//wait for several clock cycles for clocks to stabilize. Then begin normal data processing. 
-				begin
-					if (count > 5) begin
-						state = IDLE_STATE;
-						ddr_reset = 0;
-					end
-					else begin
-						count = count + 1;
-						state = RESET_WAIT_STATE;
-					end
-				end
-				
-
 		IDLE_STATE:	begin
+				
+				end
+
+		LATCH_STATE:	begin
 					addr[18:1] = starting_address;	//starting address 17 bits--shove into upper 17b of 18b addr to leave room for 1 increment
 					addr[0] = 0;
 					cmd = NOP;
 					data_direction = 1;
 					
+					//reset counters
+					count = 0;
+					wu_cnt = 0;
+					wl_cnt = 0;
+					ru_cnt = 0;
+					rl_cnt = 0;
+					
+					
 					// look for refresh signal
 					if (reset == 1 && prev_reset == 0) begin		//edge detected
-						ddr_reset = 1;
-						state = RESET_WAIT_STATE;
+						state = INIT_STATE;
 					end
 					else begin	// no refresh command detected. Commence normal operations
 						//determine read or write operation
 						if (wren==1) begin	//if a write signal is received, begin write	
 							data_in = data_write[31:16];	//write upper word first
 							cmd = WRITE;
-							if (busy_q == 0) begin
-								state = WRITE_UPPER_STATE;
-							end
-							else begin
-								state = IDLE_STATE;
-							end
+							state = WRITE_UPPER_STATE;
 						end
 						else begin	//wren == 0
 							cmd = READ;
-							if (busy_q == 0) begin
-								state = READ_UPPER_STATE;
-							end
-							else begin
-								state = IDLE_STATE;
-							end
+							state = READ_UPPER_STATE;
 						end // end else
 					end //end else
 				end
@@ -233,26 +233,34 @@ module sram(
 		//-----WRITE CYCLE
 		WRITE_UPPER_STATE: 
 				begin
-					data_req_q = 1;
 					data_direction = 0;
-					state = WRITE_WAIT_1;
-				end
+					cmd = WRITE;
+					if (busy_q == 0 && data_req_q == 1 && write_upper_timeout == 0) begin
+						state = WRITE_WAIT_1;
+					end
+					else begin
+						if (wu_cnt <= 2) begin		//wait up to two clock cycles 
+							wu_cnt = wu_cnt + 1;
+							state = WRITE_UPPER_STATE;
+						end
+						else begin
+							write_upper_timeout = 1;	//error code--data_req_q took too long to go to 1
+						end //end else
+					end // end else	
+				end //end state
 
 		WRITE_WAIT_1: 	begin
-					data_req_q = 0;
 					data_direction = 0;
 					state = WRITE_WAIT_2;
 				end 
 		
 		WRITE_WAIT_2:	begin
-					data_req_q = 0;
 					data_direction = 0;
 					state = WRITE_UPPER_DATA_VALID;
 				end
 
 		WRITE_UPPER_DATA_VALID: 
 				begin
-					data_req_q = 0;
 					data_direction = 0;
 					data_in = data_write[15:0];
 					addr[0] = 1;
@@ -261,35 +269,73 @@ module sram(
 
 		WRITE_LOWER_STATE: 
 				begin
-					data_req_q = 1;
 					data_direction = 0;
-					state = WRITE_WAIT_3;
-				end		
+					wl_cnt = wl_cnt + 1;
+					if (data_req_q && write_lower_timeout == 0) begin
+						state = WRITE_WAIT_3;
+					end
+					else begin
+						if (wl_cnt <= 2) begin		//wait up to two clock cycles 
+							state = WRITE_LOWER_STATE;
+						end
+						else begin
+							write_lower_timeout = 1;	//error code--data_req_q took too long to go to 1
+						end
+					end
+				end	
 
 		WRITE_WAIT_3:	begin
-					data_req_q = 0;
 					data_direction = 0;
 					state = WRITE_WAIT_4;
 				end
 		
 		WRITE_WAIT_4:	begin
-					data_req_q = 0;
 					data_direction = 0;
 					state = WRITE_LOWER_DATA_VALID;
+					write_counter_total = wu_cnt + wl_cnt;
 				end
 		
 		WRITE_LOWER_DATA_VALID: 
 				begin
-					data_req_q = 0;
 					data_direction = 0;
-					state = IDLE_STATE;
+					if (write_counter_total == 0) begin
+						state = EXTRA_WAIT_1;	//wait for 4 more clock cycles before going to idle state
+					end
+					else if (write_counter_total == 1) begin
+						state = EXTRA_WAIT_2;
+					end
+					else if (write_counter_total == 2) begin
+						state = EXTRA_WAIT_3;
+					end
+					else if (write_counter_total == 3) begin
+						state = EXTRA_WAIT_4;
+					end
+					else  begin // write_counter_total == 4
+						state = IDLE_STATE;
+					end
 				end
 		
+		EXTRA_WAIT_1:	begin
+					state = EXTRA_WAIT_2;
+				end
+		
+		EXTRA_WAIT_2:	begin
+					state = EXTRA_WAIT_3;
+				end
+		
+		EXTRA_WAIT_3:	begin
+					state = EXTRA_WAIT_4;
+				end
+		
+		EXTRA_WAIT_4:	begin
+					state = IDLE_STATE;
+				end
+
 		//----READ CYCLE				
 		READ_UPPER_STATE:
 				begin
 					data_direction = 1;
-					if (data_vld_q) begin
+					if (busy_q == 0 && data_vld_q == 1 && read_upper_timeout == 0) begin
 						data_out_upper = data_out_q;
 						read_upper_timeout = 0;
 						state = READ_LOWER_STATE;
@@ -308,7 +354,7 @@ module sram(
 		READ_LOWER_STATE:
 				begin
 					data_direction = 1;
-					if (data_vld_q) begin
+					if (busy_q == 0 && data_vld_q == 1 && read_lower_timeout == 0) begin
 						data_out_lower = data_out_q;
 						read_lower_timeout = 0;
 						state = IDLE_STATE;

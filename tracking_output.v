@@ -21,6 +21,7 @@
 module tracking_output(
 	//input wires
 	input wire crystal_clk_div_by_two,
+	input wire pause,
 	input wire [15:0] blob_extraction_blob_counter,   //assigned in blob extraction module--only used in an if condition here.
 	input wire enable_tracking_output,	
 	input wire find_biggest,
@@ -130,6 +131,7 @@ module tracking_output(
 	//always @(posedge clk) begin
 	//always @(posedge clk_div_by_two) begin
 	always @(posedge crystal_clk_div_by_two) begin
+	if (pause == 0) begin
 		data_read_sync_tracking_output = data_read;
 		
 		if (enable_tracking_output == 1) begin
@@ -426,6 +428,7 @@ module tracking_output(
 			data_write = 32'b0;
 			wren = 1'b0;
 		end
+	end	//end if pause == 0
 	end
 
 endmodule

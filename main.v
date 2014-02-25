@@ -52,20 +52,24 @@ module main(
 
 	input RxD,
 
-	// sram i/o
-	inout wire [15:0] SRAM_DQ,
-	output wire SRAM_CE_N,
-	output wire SRAM_OE_N,
-	output wire SRAM_LB_N,
-	output wire SRAM_UB_N,
-	output wire SRAM_WE_N,
-	output wire [18:0] SRAM_ADDR,
-	output wire RamClk,
-	output wire RamAdv,
+	// ddr i/o
+	output wire sdr_clk,
+	output wire sdr_clk_n,
+	output wire cke_q,
+	output wire cs_qn,
+	output wire ras_qn,
+	output wire cas_qn,
+	output wire we_qn,
+	output wire [2:0] dm_q,
+	output wire [2:0] dqs_q,
+	output wire [2:0] ba_q,
+	output wire [12:0] a_q,
+	output wire [15:0] data,
 
 	input wire [7:0] slide_switches
 	);
 
+		
 		// '<=' is a nonblocking set operation (like '=') 
 
 		//parameter InternalClkFrequency = 50000000;	// 50MHz
@@ -78,6 +82,9 @@ module main(
 		//parameter I2ClkCyclesToWait = (InternalClkFrequency / 1);
 
 		wire clk;
+		
+		wire prev_clk;
+		assign prev_clk = clk;
 
 		//reg border_drawing_holdoff = 0;	//Not used anywhere??
 		
@@ -152,6 +159,8 @@ module main(
 		reg enable_serial_output = 0;
 		reg serial_output_done = 0;
 		
+		wire global_pause;	//comes from ddr memory, goes to ALL modules
+		
 		assign address = address_edge_detection | address_tracking_output | address_x_pixel_filling 
 								| address_y_pixel_filling | address_blob_extraction | address_color_pattern 
 								| address_frame_dump | address_single_shot /*| address_median_filtering*/;
@@ -167,23 +176,28 @@ module main(
 		//------------------SRAM module
 		wire [15:0] sram_debug0;
 
-		sram sram(
-			.clk(clk),
-			.reset(reset),
+		mem_manager mem_manager(
 			.modified_clock_sram(modified_clock_sram),
+			.clk(clk),
+			.prev_clk(prev_clk),
+			.pause(global_pause),
 			.starting_address(address), 
 			.wren(wren), 
 			.data_write(data_write), 
-			.data_read(data_read), 
-			.SRAM_DQ(SRAM_DQ),
-			.SRAM_CE_N(SRAM_CE_N),
-			.SRAM_OE_N(SRAM_OE_N), 
-			.SRAM_LB_N(SRAM_LB_N), 
-			.SRAM_UB_N(SRAM_UB_N), 
-			.SRAM_WE_N(SRAM_WE_N), 
-			.SRAM_ADDR(SRAM_ADDR),
-			.RamClk(RamClk),
-			.RamAdv(RamAdv),
+			.data_read(data_read),
+			// DDR SDRAM external signals
+			.sdr_clk(sdr_clk),	// |OUT|  DDR SDRAM Clock
+			.sdr_clk_n(sdr_clk_n),	// |OUT|  Inverted DDR SDRAM Clock
+			.cke_q(cke_q),		// |OUT|  DDR SDRAM clock enable
+			.cs_qn(cs_qn),		// |OUT|  DDR SDRAM /chip select
+			.ras_qn(ras_qn),	// |OUT|  DDR SDRAM /ras
+			.cas_qn(cas_qn),	// |OUT|  DDR SDRAM /cas
+			.we_qn(we_qn),		// |OUT|  DDR SDRAM /write enable
+			.dm_q(dm_q),		// |OUT|  DDR SDRAM data mask bits, all set to "0"
+			.dqs_q(dqs_q),		// |OUT|  DDR SDRAM data strobe, used only for write operations
+			.ba_q(ba_q),		// |OUT|  DDR SDRAM bank select
+			.a_q(a_q),		// |OUT|  DDR SDRAM address bus 
+			.data(data),		// |INOUT|  DDR SDRAM bidirectional data bus
 			.debug0(sram_debug0)
 			);
 				
@@ -201,6 +215,7 @@ module main(
 		edge_detection edge_detection(
 			//input wires (as seen by module)
 			.clk_div_by_two(clk_div_by_two),
+			.pause(global_pause),
 			.data_read(data_read),
 			.enable_edge_detection(enable_edge_detection),
 			.edge_detection_threshold_red(edge_detection_threshold_red),
@@ -290,6 +305,7 @@ module main(
 		tracking_output tracking_output(
 			//input wires (as seen by module)
 			.crystal_clk_div_by_two(crystal_clk_div_by_two),
+			.pause(global_pause),
 			.blob_extraction_blob_counter(blob_extraction_blob_counter),
 			.enable_tracking_output(enable_tracking_output),
 			.find_biggest(find_biggest),
@@ -316,6 +332,7 @@ module main(
 		x_pixel_filling x_pixel_filling(
 			//input wires
 			.clk_div_by_two(clk_div_by_two),
+			.pause(global_pause),
 			.enable_x_pixel_filling(enable_x_pixel_filling),
 			.data_read(data_read),	
 			//output regs
@@ -333,6 +350,7 @@ module main(
 		y_pixel_filling y_pixel_filling(
 			//input wires
 			.clk_div_by_two(clk_div_by_two),
+			.pause(global_pause),
 			.enable_y_pixel_filling(enable_y_pixel_filling),
 			.data_read(data_read),
 			//output regs
@@ -357,6 +375,7 @@ module main(
 			//input wires
 			.modified_clock_two_div_by_two(modified_clock_two_div_by_two),
 			.modified_clock_two(modified_clock_two),	//for stack ram
+			.pause(global_pause),
 			.enable_blob_extraction(enable_blob_extraction),
 			.data_read(data_read),
 			.divider_quotient(divider_quotient),

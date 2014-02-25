@@ -21,6 +21,7 @@
 module x_pixel_filling (
 	//input wires
 	input wire clk_div_by_two,
+	input wire pause,
 	input wire enable_x_pixel_filling,
 	input wire [31:0] data_read,
 	
@@ -53,6 +54,7 @@ module x_pixel_filling (
 		//always @(posedge clk) begin
 		always @(posedge clk_div_by_two) begin
 		//always @(posedge modified_clock) begin
+		if (pause == 0) begin
 			data_read_sync_x_pixel_filling = data_read;
 			
 			if (enable_x_pixel_filling == 1) begin
@@ -118,5 +120,6 @@ module x_pixel_filling (
 				data_write = 32'b0;
 				wren = 1'b0;
 			end
+		end // end if pause == 0
 		end
 endmodule

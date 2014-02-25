@@ -20,6 +20,7 @@
 **********************************************************************/
 module color_pattern(
 	input wire clk,
+	input wire pause,
 	input wire reset,
 	input wire enable,
 	input wire [17:0] starting_address,
@@ -113,6 +114,7 @@ module color_pattern(
 	reg [17:0] hcount, vcount, state;
 		
 	always @ (posedge clk) begin
+	if (pause == 0) begin
 		if (reset)
 			state = initial_state;
 		else begin
@@ -651,5 +653,6 @@ module color_pattern(
 					end
 			endcase
 		end //else
+	end //end if pause == 0
 	end	//end always
 endmodule
