@@ -19,29 +19,37 @@
 **********************************************************************/
 module mem_manager(
 	input wire clk,
+	input wire crystal_clk,
 	input wire prev_clk,
-	input wire sram_clk,
 	input wire modified_clock_sram,
 	input wire wren,             	     // write enable
 	input wire [31:0] data_write,      // data being written to memory
-	output wire [31:0] data_read,       // data being read from memory
+	output reg [31:0] data_read,       // data being read from memory
 	
 	output reg pause,
 	
 	input wire [17:0] starting_address,
 	
-	output wire sdr_clk,
-	output wire sdr_clk_n,
-	output wire cke_q,
+	output wire dram_ck,
+	output wire dram_ck_n,
+	output wire dram_cke,
 	output wire cs_qn,
-	output wire ras_qn,
-	output wire cas_qn,
-	output wire we_qn,
-	output wire [2:0] dm_q,
-	output wire [2:0] dqs_q,
-	output wire [2:0] ba_q,
-	output wire [12:0] a_q,
-	output wire [15:0] data,
+	output wire dram_ras_n,
+	output wire dram_cas_n,
+	output wire dram_we_n,
+	output wire dram_dm,
+	output wire dram_udm,
+	output wire dram_dqs,
+	output wire dram_udqs,
+	output wire [1:0] dram_ba,
+	output wire [12:0] dram_a,
+	output wire [15:0] dram_dq,
+	output wire c3_calib_done,
+	output wire c3_clk0,
+	output wire c3_rst0,
+	inout rzq,
+	
+	output main_system_clock,
 	
 	/*//test 
 	input wire counter_done,
@@ -63,49 +71,110 @@ module mem_manager(
 	wire data_vld_q;
 
 	
-	//registers
-	reg [2:0] cmd;
-	reg [18:0] addr;
-	reg [15:0] data_in;
+	//command connections
+	wire cmd_clk;
+	assign cmd_clk = modified_clock_sram;
+	reg cmd_en;
+	reg [2:0] cmd_instr;
+	reg [19:0] cmd_addr;
+	wire cmd_empty;
+	wire cmd_full;
 	
-	ddr_sdr(
-		// Clock and RESET signals |module POV|
-		.rst_n(1),		// |IN|external async reset, ACTIVE LOW (reset unused, so keep high)
-		.clk(clk),		// |IN| system clock (e.g. 100MHz)
-		.sys_rst_qn(),		// |OUT|  sync reset low active, released after DCMs are locked, may be used by other modules inside the FPGA
-		.sys_clk_out(),		// |OUT|  system clock, dcm output, may be used by other modules inside the FPGA as global clock
-		.clk_fb(clk_fb),	// |IN|  DCM feedback clock, must be external connected to ddr_sdr_clk !
-		// User Interface signals
-		.cmd(cmd),		// |IN|  User command: READ, WRITE, NOP
-		.cmd_vld(1),		// |IN|  User command valid (if '1')
-		.addr(addr),		// |IN|  User address, contains (ROW & BANK & COL), see Address Mapping 
-		.busy_q(busy_q),	// |OUT|  Controller busy flag, commands are ignored when active
-		// Data Interface
-		.data_in(data_in),	// |IN|  User input data (written to DDR SDRAM)
-		.data_req_q(data_req_q), // |OUT|  User data request, controls input data flow
-		.data_out_q(data_out_q), // |OUT|  User data output (read from DDR SDRAM)
-		.data_vld_q(data_vld_q), // |OUT|  data_out_q is valid when '1'
-		// DDR SDRAM external signals (route all these to main and then ucf)
-		.sdr_clk(sdr_clk),	// |OUT|  DDR SDRAM Clock
-		.sdr_clk_n(sdr_clk_n),		// |OUT|  Inverted DDR SDRAM Clock
-		.cke_q(cke_q),		// |OUT|  DDR SDRAM clock enable
-		.cs_qn(cs_qn),		// |OUT|  DDR SDRAM /chip select
-		.ras_qn(ras_qn),	// |OUT|  DDR SDRAM /ras
-		.cas_qn(cas_qn),	// |OUT|  DDR SDRAM /cas
-		.we_qn(we_qn),		// |OUT|  DDR SDRAM /write enable
-		.dm_q(dm_q),		// |OUT|  DDR SDRAM data mask bits, all set to "0"
-		.dqs_q(dqs_q),		// |OUT|  DDR SDRAM data strobe, used only for write operations
-		.ba_q(ba_q),		// |OUT|  DDR SDRAM bank select
-		.a_q(a_q),		// |OUT|  DDR SDRAM address bus 
-		.data(data),		// |INOUT|  DDR SDRAM bidirectional data bus
-		// Status signals
-		.dcm_error_q()        // |OUT|  Indicates DCM Errors
-		);
+	//write connections
+	wire wr_clk;
+	assign wr_clk = modified_clock_sram;
+	reg wr_en;
+	reg [3:0] wr_mask;
+	reg [31:0] wr_data;
+	wire wr_full;
+	wire wr_empty;
+	wire [6:0] wr_count;
+	wire wr_underrun;
+	wire wr_error;
+	
+	//read connections
+	wire rd_clk;
+	assign rd_clk = modified_clock_sram;
+	reg rd_en;
+	wire [31:0] rd_data;
+	wire rd_full;
+	wire rd_empty;
+	wire [6:0] rd_count;
+	wire rd_overflow;
+	wire rd_error;
 
-		//approximates an external connection between clk_fb and sdr_clk
-		BUFG BUFG_inst (
-		.O(clk_fb), // 1-bit output: Clock buffer output
-		.I(sdr_clk)  // 1-bit input: Clock buffer input
+	//in / out determined wrt module lpddr_s6
+	lpddr_s6 # (
+		.C3_P0_MASK_SIZE(4),
+		.C3_P0_DATA_PORT_SIZE(32),
+		.C3_P1_MASK_SIZE(4),
+		.C3_P1_DATA_PORT_SIZE(32),
+		.DEBUG_EN(0),
+		.C3_MEMCLK_PERIOD(10000),
+		.C3_CALIB_SOFT_IP("TRUE"),
+		.C3_SIMULATION("FALSE"),
+		.C3_RST_ACT_LOW(0),
+		.C3_INPUT_CLK_TYPE("SINGLE_ENDED"),
+		.C3_MEM_ADDR_ORDER("ROW_BANK_COLUMN"),
+		.C3_NUM_DQ_PINS(16),
+		.C3_MEM_ADDR_WIDTH(14),
+		.C3_MEM_BANKADDR_WIDTH(2)
+		)
+	u_lpddr_s6 (
+		.c3_sys_clk(crystal_clk),	// IN
+		.c3_sys_rst_i(0),	// IN
+		
+		.c3_clk0(c3_clk0),	// OUTPUT
+		.c3_rst0(c3_rst0),	// OUTPUT
+		.c3_calib_done(c3_calib_done),	// OUTPUT
+		.mcb3_rzq(rzq),	// INOUT
+
+		//dram connections
+		.mcb3_dram_dq(dram_dq),	// INOUT
+		.mcb3_dram_a(dram_a),  	// OUTPUT
+		.mcb3_dram_ba(dram_ba),	// OUTPUT
+		.mcb3_dram_ras_n(dram_ras_n),	// OUTPUT
+		.mcb3_dram_cas_n(dram_cas_n),	// OUTPUT
+		.mcb3_dram_we_n (dram_we_n), 	// OUTPUT
+		.mcb3_dram_cke(dram_cke), 		// OUTPUT
+		.mcb3_dram_ck(dram_ck), 		// OUTPUT
+		.mcb3_dram_ck_n (dram_ck_n),	// OUTPUT 
+		.mcb3_dram_dqs (dram_dqs),		// OUTPUT
+		.mcb3_dram_udqs(dram_udqs),    	// INOUT | for X16 parts
+		.mcb3_dram_udm(dram_udm),     	// OUTPUT | for X16 parts
+		.mcb3_dram_dm(dram_dm),		// OUTPUT
+		
+		// command connections
+		.c3_p0_cmd_clk(cmd_clk),	// INPUT
+		.c3_p0_cmd_en(cmd_en),	// INPUT
+		.c3_p0_cmd_instr(cmd_instr),	// INPUT [2:0]
+		.c3_p0_cmd_bl(1),		//INPUT [5:0] --keep burst length to 1 32-bit word
+		.c3_p0_cmd_byte_addr (cmd_byte_addr),	// INPUT [29:0]
+		.c3_p0_cmd_empty(cmd_empty),	// OUTPUT 
+		.c3_p0_cmd_full(cmd_full),	// OUTPUT
+		
+		 // write connections
+		.c3_p0_wr_clk(wr_clk),		// INPUT
+		.c3_p0_wr_en(wr_en),		// INPUT
+		.c3_p0_wr_mask(wr_mask),	// INPUT [3:0]
+		.c3_p0_wr_data (wr_data),	// INPUT [31:0]
+		.c3_p0_wr_full(wr_full),	// OUTPUT
+		.c3_p0_wr_empty(wr_empty),	// OUTPUT
+		.c3_p0_wr_count(wr_count),	// OUTPUT [6:0]
+		.c3_p0_wr_underrun(wr_underrun), //OUTPUT
+		.c3_p0_wr_error(wr_error),	// OUTPUT
+		
+		 // read connections
+		.c3_p0_rd_clk(rd_clk),
+		.c3_p0_rd_en(rd_en),
+		.c3_p0_rd_data (rd_data),
+		.c3_p0_rd_full (rd_full),
+		.c3_p0_rd_empty(rd_empty),
+		.c3_p0_rd_count(rd_count),
+		.c3_p0_rd_overflow(rd_overflow),
+		.c3_p0_rd_error(rd_error),
+		
+		.main_system_clock(main_system_clock)
 		);
 
 
@@ -135,8 +204,6 @@ module mem_manager(
 	//for a read, OE must be LOW. For write, don't care (keep HIGH)
 	//for a write, WE must be LOW. For read, must keep HIGH
 	
-	assign data_read = {data_out_upper, data_out_lower};
-	
 	assign debug0 = state;
 	
 	//states
@@ -144,24 +211,23 @@ module mem_manager(
 			IDLE_STATE = 1,
 			NOP_STATE = 2,
 			LATCH_STATE = 3,
-			WRITE_UPPER_STATE = 4,
+			
+			WRITE_STATE = 4,
 			WRITE_WAIT_1 = 5,
-			WRITE_WAIT_2 = 6,
-			WRITE_UPPER_DATA_VALID = 7,
-			WRITE_LOWER_STATE = 8,
-			WRITE_WAIT_3 = 9,
-			WRITE_WAIT_4 = 10,
-			WRITE_LOWER_DATA_VALID = 11,
-			WRITE_WAIT_5 = 12,
-			READ_UPPER_STATE = 13,
-			READ_LOWER_STATE = 14,
-			DDR_DATA_VALID_STATE = 15,
-			WAIT_STATE = 16;
+			SET_WRITE_COMMAND = 6,
+			SET_WRITE_WAIT = 7,
+			WRITE_DATA_VALID = 8,
+			
+			READ_COMMAND_STATE = 9,
+			READ_TRANSITION_STATE = 10,
+			READ_STATE = 11,
+			
+			DDR_DATA_VALID_STATE = 12,
+			WAIT_STATE = 13;
 
-	localparam	NOP = 0,
+	localparam	WRITE = 0,
 			READ = 1,
-			WRITE = 2,
-			REFRESH = 3;	//unused
+			REFRESH = 4;	
 	
 	localparam 	LATCH_TIME = 4,
 					NO_RETURN = 9;
@@ -186,8 +252,8 @@ module mem_manager(
 		
 		case (state)
 		INIT_STATE:	begin	
-					addr = 0;
-					cmd = NOP;
+					cmd_addr = 0;
+					//cmd = NOP;
 					state = IDLE_STATE;
 				end
 		
@@ -202,110 +268,89 @@ module mem_manager(
 				end
 
 		LATCH_STATE:	begin
-					addr[18:1] = starting_address;	//starting address 17 bits--shove into upper 17b of 18b addr to leave room for 1 increment
-					addr[0] = 0;
-					cmd = NOP;
+					cmd_addr[19:2] = starting_address;	//starting address 17 bits--shove into upper 17b of 19b addr to leave room for two 0's
+					cmd_addr[1] = 0;
+					cmd_addr[0] = 0;
 					data_direction = 1;					
 				
 					//determine read or write operation
 					if (wren==1) begin	//if a write signal is received, begin write	
-						data_in = data_write[31:16];	//write upper word first
-						cmd = WRITE;
-						state = WRITE_UPPER_STATE;
+						wr_data = data_write;	//write whole 32-bit word
+						state = WRITE_STATE;
 						ddr_op_in_progress = 1;
 					end
 					else begin	//wren == 0
-						cmd = READ;
-						state = READ_UPPER_STATE;
+						cmd_instr = READ;
+						//burst length set to constant 1
+						//address already set in LATCH STATE
+						state = READ_STATE;
 						ddr_op_in_progress = 1;
 					end // end else
 				end
 		
 		//-----WRITE CYCLE
-		WRITE_UPPER_STATE: 
+		WRITE_STATE: 
 				begin
 					data_direction = 0;
-					cmd = WRITE;
-					if (busy_q == 0 && data_req_q == 1) begin
-						state = WRITE_WAIT_1;
-					end
-					else begin
-						state = WRITE_UPPER_STATE;
-					end
-				end
+					wr_en = 1;	//now that data is in data path, assert write enable
+					state = WRITE_WAIT_1;
+				end 
 
 		WRITE_WAIT_1: 	begin
 					data_direction = 0;
-					state = WRITE_WAIT_2;
-				end 
-		
-		WRITE_WAIT_2:	begin
-					data_direction = 0;
-					state = WRITE_UPPER_DATA_VALID;
-				end
-
-		WRITE_UPPER_DATA_VALID: 
-				begin
-					data_direction = 0;
-					data_in = data_write[15:0];
-					addr[0] = 1;
-					state = WRITE_LOWER_STATE;
-				end
-
-		WRITE_LOWER_STATE: 
-				begin
-					data_direction = 0;
-					if (busy_q ==0 && data_req_q == 1) begin
-						state = WRITE_WAIT_3;
-					end
-					else begin
-						state = WRITE_LOWER_STATE;
-					end
-				end	
-
-		WRITE_WAIT_3:	begin
-					data_direction = 0;
-					state = WRITE_WAIT_4;
+					wr_en = 1;	//ensure that data is written 
+					state = SET_WRITE_COMMAND;
 				end
 		
-		WRITE_WAIT_4:	begin
-					data_direction = 0;
-					state = WRITE_LOWER_DATA_VALID;
-				end
-		
-		WRITE_LOWER_DATA_VALID: 
+		SET_WRITE_COMMAND:
 				begin
 					data_direction = 0;
+					cmd_instr = WRITE;
+					//burst length set to constant "1"
+					//address already set in LATCH STATE
+					state = WRITE_DATA_VALID;
+				end
+		SET_WRITE_WAIT: //wait state to ensure the data is valid
+				begin
+					cmd_en = 1;
+					state = WRITE_DATA_VALID;
+				end
+
+		WRITE_DATA_VALID: 
+				begin
+					data_direction = 0;
+					cmd_en = 0;
 					state = DDR_DATA_VALID_STATE;
 					ddr_op_in_progress = 0;
 				end
 
 		//----READ CYCLE				
-		READ_UPPER_STATE:
+		READ_COMMAND_STATE:
 				begin
-					data_direction = 1;
-					if (busy_q == 0 && data_vld_q == 1) begin
-						data_out_upper = data_out_q;
-						state = READ_LOWER_STATE;
-					end
-					else begin
-						state = READ_UPPER_STATE;
-					end
+					cmd_en = 1;	//enable read command with addr, burst length, and instruction data set in IDLE STATE
+					state = READ_TRANSITION_STATE;
 				end			
 
-		READ_LOWER_STATE:
+		READ_TRANSITION_STATE:
 				begin
 					data_direction = 1;
-					if (busy_q == 0 && data_vld_q == 1) begin
-						data_out_lower = data_out_q;
-						state = DDR_DATA_VALID_STATE;
-						ddr_op_in_progress = 0;  //entire data word has been read
-					end
-					else begin
-						state = READ_LOWER_STATE;
-					end
+					cmd_en = 0; 	//disable read command
+					rd_en = 1;
+					state = READ_STATE;
 				end
 		
+		READ_STATE: 	begin
+					data_direction = 1;
+					rd_en = 1;
+					if (rd_empty == 0) begin
+						data_read = rd_data;
+						state = DDR_DATA_VALID_STATE;
+					end
+					else begin
+						state = READ_STATE;
+					end
+				end
+
 		//-----occurs only when an entire data word has been written or read to/from DDR
 		DDR_DATA_VALID_STATE: begin
 					if (counter < NO_RETURN) begin

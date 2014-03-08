@@ -20,7 +20,7 @@
 
 module edge_detection(
 	//input wires
-	input wire clk_div_by_two,
+	input wire clk,
 	input wire pause,
 	input wire [31:0] data_read,
 	input wire enable_edge_detection,
@@ -65,10 +65,7 @@ module edge_detection(
 	//parameter edge_detector_averaging_window = 14;
 	
 	// For every pixel, see if it lies on an edge.
-	//always @(posedge modified_clock) begin
-	//always @(posedge camera_data_pclk) begin
-	always @(posedge clk_div_by_two) begin
-	//always @(posedge clk) begin
+	always @(posedge clk) begin
 	if (pause == 0) begin
 		if (enable_edge_detection == 1) begin
 			if (edge_detection_holdoff == 0) begin

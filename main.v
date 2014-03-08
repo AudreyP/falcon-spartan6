@@ -2,7 +2,7 @@
  
 /**********************************************************************
 
- Copyright (c) 2007 Timothy Pearson <kb9vqf@pearsoncomputing.net>
+ Copyright (c) 2007-2014 Timothy Pearson <kb9vqf@pearsoncomputing.net>
  Copyright (c) 2014 Audrey Pearson <aud.pearson@gmail.com> 
 
  This program is free software; you can redistribute it and/or modify
@@ -25,7 +25,6 @@
 
 module main(
 	input crystal_clk, 
-	input reset,
 	output LD0, 
 	output LD1, 
 	output LD2, 
@@ -53,22 +52,32 @@ module main(
 	input RxD,
 
 	// ddr i/o
-	output wire sdr_clk,
-	output wire sdr_clk_n,
-	output wire cke_q,
-	output wire cs_qn,
-	output wire ras_qn,
-	output wire cas_qn,
-	output wire we_qn,
-	output wire [2:0] dm_q,
-	output wire [2:0] dqs_q,
-	output wire [2:0] ba_q,
-	output wire [12:0] a_q,
-	output wire [15:0] data,
+	output wire dram_ck,
+	output wire dram_ck_n,
+	output wire dram_cke,
+	output wire dram_ras_n,
+	output wire dram_cas_n,
+	output wire dram_we_n,
+	output wire dram_dm,
+	output wire dram_udm,
+	output wire dram_dqs,
+	output wire dram_udqs,
+	output wire [1:0] dram_ba,
+	output wire [12:0] dram_a,
+	output wire [15:0] dram_dq,
+//	output wire c3_calib_done,
+//	output wire c3_clk0,
+//	output wire c3_rst0,
+	inout rzq,
 
 	input wire [7:0] slide_switches
 	);
 
+		wire c3_clk0;
+		wire c3_rst0;
+		wire c3_calib_done;
+		
+		wire main_system_clock;
 		
 		// '<=' is a nonblocking set operation (like '=') 
 
@@ -93,8 +102,8 @@ module main(
 		reg [23:0] cnt;
 		reg [24:0] cnt2;
 		reg [7:0] leds;		// Give myself an LED register
-		reg [7:0] sseg;		// Give myself a 7-segment display register
-		reg [3:0] cseg;		// Give myself a 7-segment control register
+		wire [7:0] sseg;
+		wire [3:0] cseg;
 		reg [7:0] temp1;		// Temporary data storage
 
 		
@@ -109,11 +118,31 @@ module main(
 
 		wire [18:0] camera_data_address;
 		
-
-		
 		reg processing_done = 1;
 
 		reg processing_done_internal = 0;
+
+		//--------------------------------------------------------------------------
+		// Auxiliary clock generation
+		//--------------------------------------------------------------------------
+		reg clk_div_by_two = 0;
+
+		assign clk = modified_clock;
+
+		//always @(posedge modified_clock_two) begin
+		always @(negedge modified_clock_two) begin
+			modified_clock_two_div_by_two = !modified_clock_two_div_by_two;
+		end
+		
+		always @(posedge clk) begin
+			clk_div_by_two = !clk_div_by_two;
+		end
+		
+		reg clk_div_by_four = 0;
+		
+		always @(posedge clk_div_by_two) begin
+			clk_div_by_four = !clk_div_by_four;
+		end
 
 		//--------------------------------------------------------------------------
 		// Module Instantiations
@@ -160,25 +189,27 @@ module main(
 		reg serial_output_done = 0;
 		
 		wire global_pause;	//comes from ddr memory, goes to ALL modules
+
+
+		//------------------7-segment display module
+		reg [13:0] display_value = 0;
+		reg show_decimal = 0;
+
+		seven_segment_output seven_segment_output(
+			.clk(clk_div_by_four),
+			.display_value(display_value),
+			.show_decimal(show_decimal),
+			.sseg(sseg),
+			.cseg(cseg)
+			);
 		
-		assign address = address_edge_detection | address_tracking_output | address_x_pixel_filling 
-								| address_y_pixel_filling | address_blob_extraction | address_color_pattern 
-								| address_frame_dump | address_single_shot /*| address_median_filtering*/;
-								
-		assign wren = wren_edge_detection | wren_tracking_output | wren_x_pixel_filling | wren_y_pixel_filling 
-								| wren_blob_extraction | wren_color_pattern | wren_frame_dump | wren_single_shot /*| wren_median_filtering*/;
-								
-		assign data_write = data_write_edge_detection | data_write_tracking_output | data_write_x_pixel_filling 
-									| data_write_y_pixel_filling | data_write_blob_extraction | data_write_color_pattern 
-									| data_write_frame_dump | data_write_single_shot /*| data_write_median_filtering*/;	
-		
-		
-		//------------------SRAM module
+		//------------------RAM module
 		wire [15:0] sram_debug0;
 
 		mem_manager mem_manager(
 			.modified_clock_sram(modified_clock_sram),
 			.clk(clk),
+			.crystal_clk(crystal_clk),
 			.prev_clk(prev_clk),
 			.pause(global_pause),
 			.starting_address(address), 
@@ -186,19 +217,22 @@ module main(
 			.data_write(data_write), 
 			.data_read(data_read),
 			// DDR SDRAM external signals
-			.sdr_clk(sdr_clk),	// |OUT|  DDR SDRAM Clock
-			.sdr_clk_n(sdr_clk_n),	// |OUT|  Inverted DDR SDRAM Clock
-			.cke_q(cke_q),		// |OUT|  DDR SDRAM clock enable
-			.cs_qn(cs_qn),		// |OUT|  DDR SDRAM /chip select
-			.ras_qn(ras_qn),	// |OUT|  DDR SDRAM /ras
-			.cas_qn(cas_qn),	// |OUT|  DDR SDRAM /cas
-			.we_qn(we_qn),		// |OUT|  DDR SDRAM /write enable
-			.dm_q(dm_q),		// |OUT|  DDR SDRAM data mask bits, all set to "0"
-			.dqs_q(dqs_q),		// |OUT|  DDR SDRAM data strobe, used only for write operations
-			.ba_q(ba_q),		// |OUT|  DDR SDRAM bank select
-			.a_q(a_q),		// |OUT|  DDR SDRAM address bus 
-			.data(data),		// |INOUT|  DDR SDRAM bidirectional data bus
-			.debug0(sram_debug0)
+			.dram_dq(dram_dq),	// INOUT
+			.dram_a(dram_a),  	// OUTPUT
+			.dram_ba(dram_ba),	// OUTPUT
+			.dram_ras_n(dram_ras_n),	// OUTPUT
+			.dram_cas_n(dram_cas_n),	// OUTPUT
+			.dram_we_n (dram_we_n), 	// OUTPUT
+			.dram_cke(dram_cke), 		// OUTPUT
+			.dram_ck(dram_ck), 		// OUTPUT
+			.dram_ck_n (dram_ck_n),	// OUTPUT 
+			.dram_dqs (dram_dqs),		// OUTPUT
+			.dram_udqs(dram_udqs),    	// INOUT | for X16 parts
+			.dram_udm(dram_udm),     	// OUTPUT | for X16 parts
+			.dram_dm(dram_dm),		// OUTPUT
+			.rzq(rzq),
+			.debug0(sram_debug0),
+			.main_system_clock(main_system_clock)
 			);
 				
 		//------------------EDGE DETECTION module
@@ -210,11 +244,9 @@ module main(
 		reg [7:0] edge_detection_threshold_green = 30;
 		reg [7:0] edge_detection_threshold_blue = 0;
 		
-		reg clk_div_by_two = 0;
-		
 		edge_detection edge_detection(
 			//input wires (as seen by module)
-			.clk_div_by_two(clk_div_by_two),
+			.clk(clk_div_by_two),
 			.pause(global_pause),
 			.data_read(data_read),
 			.enable_edge_detection(enable_edge_detection),
@@ -277,8 +309,6 @@ module main(
 		reg [575:0] primary_color_slots;
 		reg [7:0] color_similarity_threshold = 0;
 		reg [7:0] minimum_blob_size = 0;
-		
-		reg crystal_clk_div_by_two = 0;
 	
 		localparam  	BLOB_SIZE_WORD_SIZE = 16,
 						BLOB_SIZE_WORD_0 = 1*BLOB_SIZE_WORD_SIZE-1,
@@ -304,7 +334,7 @@ module main(
 	
 		tracking_output tracking_output(
 			//input wires (as seen by module)
-			.crystal_clk_div_by_two(crystal_clk_div_by_two),
+			.clk(clk_div_by_two),
 			.pause(global_pause),
 			.blob_extraction_blob_counter(blob_extraction_blob_counter),
 			.enable_tracking_output(enable_tracking_output),
@@ -518,22 +548,20 @@ module main(
 		
 		//instantiate clock manager (2014 edit)
 		clock_manager clock_manager(
-			.crystal_clk(crystal_clk),
+			.input_clk(main_system_clock),
 			.modified_clock(modified_clock),
 			.modified_clock_two(modified_clock_two),
 			.modified_clock_sram(modified_clock_sram),
 			.dcm_locked(dcm_locked),
 			.dcm_locked_two(dcm_locked_two),
 			.dcm_locked_sram(dcm_locked_sram)
-			);	
-			
-		assign clk = modified_clock;
+			);
 	
 		//instantiate color test pattern to replace camera feed during testing
 		// 2014 edit
 		color_pattern camera_capture(
 			.clk(clk),
-			.reset(reset),
+			.reset(0),
 			.enable(enable_camera_capture),
 			.starting_address(0),
 			.data_write(data_write_color_pattern),
@@ -541,44 +569,14 @@ module main(
 			.wren(wren_color_pattern),
 			.done(camera_capture_done));
 		
-		
-		//always @(posedge modified_clock_two) begin
-		always @(negedge modified_clock_two) begin
-			modified_clock_two_div_by_two = !modified_clock_two_div_by_two;
-		end
-		
-		
-		always @(posedge crystal_clk) begin
-			crystal_clk_div_by_two = !crystal_clk_div_by_two;
-		end
-		
-		
-		always @(posedge clk) begin
-			clk_div_by_two = !clk_div_by_two;
-		end
-		
-		reg clk_div_by_four = 0;
-		
-		always @(posedge clk_div_by_two) begin
-			clk_div_by_four = !clk_div_by_four;
-		end
-		
 		reg reset_system = 0;
 		
 		reg processing_started = 0;
 		reg processing_ended = 0;
 		
 		reg [13:0] timer_value = 0;
-		reg [13:0] display_value = 0;
 		reg [13:0] display_value_timer = 0;
 		reg [13:0] display_value_user = 0;
-		reg [7:0] sevenseg_multiplex = 0;
-		reg [7:0] digit1 = 0;
-		reg [7:0] digit2 = 0;
-		reg [7:0] digit3 = 0;
-		reg [7:0] digit4 = 0;
-		reg [7:0] nextseg = 0;
-		reg [15:0] sevenseg_delay = 0;
 		reg timer_running = 0;
 		reg [31:0] timer_divider = 0;
 		
@@ -607,11 +605,17 @@ module main(
 				timer_running = 0;
 				display_value_timer = timer_value;
 			end
+
+			if ((slide_switches[7:6] == 3) || (slide_switches[5] == 1)) begin
+				show_decimal = 0;
+			end else begin
+				show_decimal = 1;
+			end
 			
 			if (slide_switches[7] == 1) begin
 				if (slide_switches[6] == 0) begin
 					// Display the current version
-					display_value = 1002;		// v1.02
+					display_value = 1100;		// v1.100
 					//display_value = current_main_processing_state;
 				end else begin
 					display_value = RxD_data;
@@ -648,125 +652,10 @@ module main(
 			processing_ended_prior = processing_ended;
 		end
 		
-		reg [17:0] digit4_thousands;
-		reg [14:0] digit3_hundreds;
-		
-		
-		// Display the current contents of the display_value register on the 7seg display.
-		always @(posedge clk) begin		
-			if (display_value < 1000) digit4 = 0;
-			if ((display_value > 999) && (display_value < 2000)) digit4 = 1;
-			if ((display_value > 1999) && (display_value < 3000)) digit4 = 2;
-			if ((display_value > 2999) && (display_value < 4000)) digit4 = 3;
-			if ((display_value > 3999) && (display_value < 5000)) digit4 = 4;
-			if ((display_value > 4999) && (display_value < 6000)) digit4 = 5;
-			if ((display_value > 5999) && (display_value < 7000)) digit4 = 6;
-			if ((display_value > 6999) && (display_value < 8000)) digit4 = 7;
-			if ((display_value > 7999) && (display_value < 9000)) digit4 = 8;
-			if (display_value > 8999) digit4 = 9;
-			digit4_thousands = digit4 * 1000;
-
-			if ((display_value - digit4_thousands) < 100) digit3 = 0;
-			if (((display_value - digit4_thousands) > 99) && ((display_value - digit4_thousands) < 200)) digit3 = 1;
-			if (((display_value - digit4_thousands) > 199) && ((display_value - digit4_thousands) < 300)) digit3 = 2;
-			if (((display_value - digit4_thousands) > 299) && ((display_value - digit4_thousands) < 400)) digit3 = 3;
-			if (((display_value - digit4_thousands) > 399) && ((display_value - digit4_thousands) < 500)) digit3 = 4;
-			if (((display_value - digit4_thousands) > 499) && ((display_value - digit4_thousands) < 600)) digit3 = 5;
-			if (((display_value - digit4_thousands) > 599) && ((display_value - digit4_thousands) < 700)) digit3 = 6;
-			if (((display_value - digit4_thousands) > 699) && ((display_value - digit4_thousands) < 800)) digit3 = 7;
-			if (((display_value - digit4_thousands) > 799) && ((display_value - digit4_thousands) < 900)) digit3 = 8;
-			if ((display_value - digit4_thousands) > 899) digit3 = 9;
-			digit3_hundreds = digit3 * 100;
-
-			if ((display_value - digit4_thousands - digit3_hundreds) < 10) digit2 = 0;
-			if (((display_value - digit4_thousands - digit3_hundreds) > 9) && ((display_value - digit4_thousands - digit3_hundreds) < 20)) digit2 = 1;
-			if (((display_value - digit4_thousands - digit3_hundreds) > 19) && ((display_value - digit4_thousands - digit3_hundreds) < 30)) digit2 = 2;
-			if (((display_value - digit4_thousands - digit3_hundreds) > 29) && ((display_value - digit4_thousands - digit3_hundreds) < 40)) digit2 = 3;
-			if (((display_value - digit4_thousands - digit3_hundreds) > 39) && ((display_value - digit4_thousands - digit3_hundreds) < 50)) digit2 = 4;
-			if (((display_value - digit4_thousands - digit3_hundreds) > 49) && ((display_value - digit4_thousands - digit3_hundreds) < 60)) digit2 = 5;
-			if (((display_value - digit4_thousands - digit3_hundreds) > 59) && ((display_value - digit4_thousands - digit3_hundreds) < 70)) digit2 = 6;
-			if (((display_value - digit4_thousands - digit3_hundreds) > 69) && ((display_value - digit4_thousands - digit3_hundreds) < 80)) digit2 = 7;
-			if (((display_value - digit4_thousands - digit3_hundreds) > 79) && ((display_value - digit4_thousands - digit3_hundreds) < 90)) digit2 = 8;
-			if ((display_value - digit4_thousands - digit3_hundreds) > 89) digit2 = 9;
-
-			digit1 = display_value - digit4_thousands - digit3_hundreds - (digit2 * 10);
-			
-			if (sevenseg_multiplex == 0) begin
-				nextseg = digit4;
-				cseg = 14;
-			end
-			if (sevenseg_multiplex == 1) begin
-				nextseg = digit3;
-				cseg = 13;
-			end
-			if (sevenseg_multiplex == 2) begin
-				nextseg = digit2;
-				cseg = 11;
-			end
-			if (sevenseg_multiplex == 3) begin
-				nextseg = digit1;
-				cseg = 7;
-			end
-
-			if (nextseg == 0) begin
-				sseg = 64;
-			end
-			if (nextseg == 1) begin
-				sseg = 121;
-			end
-			if (nextseg == 2) begin
-				sseg = 36;
-			end
-			if (nextseg == 3) begin
-				sseg = 48;
-			end
-			if (nextseg == 4) begin
-				sseg = 25;
-			end
-			if (nextseg == 5) begin
-				sseg = 18;
-			end				
-			if (nextseg == 6) begin
-				sseg = 2;
-			end
-			if (nextseg == 7) begin
-				sseg = 120;
-			end
-			if (nextseg == 8) begin
-				sseg = 0;
-			end
-			if (nextseg == 9) begin
-				sseg = 16;
-			end
-			
-			if ((slide_switches[7:6] == 3) || (slide_switches[5] == 1)) begin
-				sseg[7] = 1;
-			end else begin
-				// Illuminate the correct decimal point
-				if (sevenseg_multiplex == 0) begin
-					sseg[7] = 0;
-				end else begin
-					sseg[7] = 1;
-				end
-			end
-			
-			// loop controller
-			sevenseg_delay = sevenseg_delay + 1;
-			if (sevenseg_delay > 6000) begin
-				sevenseg_delay = 0;
-				sevenseg_multiplex = sevenseg_multiplex + 1;
-				if (sevenseg_multiplex > 3) begin
-					sevenseg_multiplex = 0;
-				end
-			end
-		end
-		
 		reg [7:0] special_i2c_command_register = 0;
 		reg [7:0] special_i2c_command_data = 0;
 		reg send_special_i2c_command = 0;
 		reg only_init_this_once = 0;
-
-		
 
 		//always @(posedge clk) begin
 		//	datatimer = datatimer + 1;
@@ -823,6 +712,19 @@ module main(
 		assign debug3[3] = dcm_locked_two;
 		assign debug3[4] = dcm_locked_sram;
 
+
+		assign address = address_edge_detection | address_tracking_output | address_x_pixel_filling 
+								| address_y_pixel_filling | address_blob_extraction | address_color_pattern 
+								| address_frame_dump | address_single_shot /*| address_median_filtering*/;
+								
+		assign wren = wren_edge_detection | wren_tracking_output | wren_x_pixel_filling | wren_y_pixel_filling 
+								| wren_blob_extraction | wren_color_pattern | wren_frame_dump | wren_single_shot /*| wren_median_filtering*/;
+								
+		assign data_write = data_write_edge_detection | data_write_tracking_output | data_write_x_pixel_filling 
+									| data_write_y_pixel_filling | data_write_blob_extraction | data_write_color_pattern 
+									| data_write_frame_dump | data_write_single_shot /*| data_write_median_filtering*/;	
+
+
 				
 		localparam
 		STATE_INITIAL = 0,
@@ -839,15 +741,10 @@ module main(
 		STATE_DATA_OUTPUT_CTL = 11,
 		STATE_FRAME_DUMP = 12,
 		STATE_SINGLE_SHOT = 13,
-		STATE_ONLINE_RECOGNITION = 14;		
-		//always @(posedge modified_clock) begin
-		//always @(posedge clk) begin
-		//always @(posedge clk_div_by_two) begin
-		always @(negedge clk_div_by_two) begin
-		//always @(posedge camera_data_pclk) begin
+		STATE_ONLINE_RECOGNITION = 14;
+		always @(posedge clk_div_by_two) begin
 			data_read_sync = data_read;
-			
-					
+
 			//if ((processing_done_internal == 0)) begin
 			//if (camera_transfer_done == 1) begin
 				if (i_need_the_serial_transmitter_now == 0) begin

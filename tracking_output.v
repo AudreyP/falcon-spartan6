@@ -20,7 +20,7 @@
 
 module tracking_output(
 	//input wires
-	input wire crystal_clk_div_by_two,
+	input wire clk,
 	input wire pause,
 	input wire [15:0] blob_extraction_blob_counter,   //assigned in blob extraction module--only used in an if condition here.
 	input wire enable_tracking_output,	
@@ -128,9 +128,7 @@ module tracking_output(
 	
 	
 	// Output the tracking data
-	//always @(posedge clk) begin
-	//always @(posedge clk_div_by_two) begin
-	always @(posedge crystal_clk_div_by_two) begin
+	always @(posedge clk) begin
 	if (pause == 0) begin
 		data_read_sync_tracking_output = data_read;
 		
