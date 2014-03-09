@@ -9,30 +9,25 @@ input [7:0] TxD_data;
 output TxD, TxD_busy;
 output [4:0] state;
 
-parameter ClkFrequency = 6666666;	// 6.66MHz
-//parameter ClkFrequency = 10000000;	// 10MHz
-//parameter ClkFrequency = 25000000;	// 25MHz
-//parameter ClkFrequency = 50000000;	// 50MHz
-//parameter ClkFrequency = 66666666;	// 66MHz
-//parameter ClkFrequency = 70000000;	// 70MHz
+parameter ClkFrequency = 25000000;	// 25MHz
 parameter Baud = 115200;
 parameter RegisterInputData = 1;	// in RegisterInputData mode, the input doesn't have to stay valid while the character is been transmitted
 
 // Baud generator
 parameter BaudGeneratorAccWidth = 16;
 reg [BaudGeneratorAccWidth:0] BaudGeneratorAcc;
-`ifdef DEBUG
-wire [BaudGeneratorAccWidth:0] BaudGeneratorInc = 17'h10000;
-`else
+// `ifdef DEBUG
+// wire [BaudGeneratorAccWidth:0] BaudGeneratorInc = 17'h10000;
+// `else
 wire [BaudGeneratorAccWidth:0] BaudGeneratorInc = ((Baud<<(BaudGeneratorAccWidth-4))+(ClkFrequency>>5))/(ClkFrequency>>4);
-`endif
+// `endif
 
 wire BaudTick = BaudGeneratorAcc[BaudGeneratorAccWidth];
 wire TxD_busy;
 always @(posedge clk) if(TxD_busy) BaudGeneratorAcc <= BaudGeneratorAcc[BaudGeneratorAccWidth-1:0] + BaudGeneratorInc;
 
 // Transmitter state machine
-reg [4:0] state;
+reg [4:0] state = 5'b00000;
 wire TxD_ready = (state==0);
 assign TxD_busy = ~TxD_ready;
 

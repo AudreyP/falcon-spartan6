@@ -81,8 +81,9 @@ module main(
 		
 		// '<=' is a nonblocking set operation (like '=') 
 
+		parameter InternalClkFrequency = 6666666;	// 6.66MHz
 		//parameter InternalClkFrequency = 50000000;	// 50MHz
-		parameter InternalClkFrequency = 66666666;	// 66MHz
+		//parameter InternalClkFrequency = 66666666;	// 66MHz
 		//parameter InternalClkFrequency = 70000000;	// 70MHz
 		//parameter I2ClkCyclesToWait = (InternalClkFrequency / 100000);
 		parameter I2ClkCyclesToWait = (InternalClkFrequency / 10000);
@@ -90,8 +91,8 @@ module main(
 		//parameter I2ClkCyclesToWait = (InternalClkFrequency / 100);
 		//parameter I2ClkCyclesToWait = (InternalClkFrequency / 1);
 
-		wire clk;
-		
+
+		wire clk;		
 		wire prev_clk;
 		assign prev_clk = clk;
 
@@ -203,7 +204,7 @@ module main(
 			.cseg(cseg)
 			);
 		
-		//------------------RAM module
+		//------------------Memory module
 		wire [15:0] sram_debug0;
 
 		mem_manager mem_manager(
@@ -212,6 +213,7 @@ module main(
 			.crystal_clk(crystal_clk),
 			.prev_clk(prev_clk),
 			.pause(global_pause),
+			.counter(mem_counter),
 			.starting_address(address), 
 			.wren(wren), 
 			.data_write(data_write), 
@@ -398,20 +400,24 @@ module main(
 		reg modified_clock_two_div_by_two = 0;
 		
 		wire [15:0] debug0, debug1;
-		wire [3:0] debug2;
+		wire [4:0] debug2;
 		wire [4:0] debug3;
+		
+		wire primary_color_slots_clka;
+		assign primary_color_slots_clka = clk;
 		
 		blob_extraction blob_extraction(
 			//input wires
 			.modified_clock_two_div_by_two(modified_clock_two_div_by_two),
 			.modified_clock_two(modified_clock_two),	//for stack ram
+			.primary_color_slots_clka(primary_color_slots_clka),
 			.pause(global_pause),
 			.enable_blob_extraction(enable_blob_extraction),
 			.data_read(data_read),
 			.divider_quotient(divider_quotient),
 			.divider_quotient_two(divider_quotient_two),
 			.color_similarity_threshold(color_similarity_threshold),
-			.primary_color_slots(primary_color_slots),	//[23:0] by [5:0][3:0] ==> [575:0]
+			//.primary_color_slots(primary_color_slots),	//[23:0] by [5:0][3:0] ==> [575:0]
 			//output regs
 			.wren(wren_blob_extraction),
 			.data_write(data_write_blob_extraction),
@@ -420,7 +426,10 @@ module main(
 			.divider_dividend(divider_dividend),
 			.divider_divisor(divider_divisor),
 			.divider_dividend_two(divider_dividend_two),
-			.divider_divisor_two(divider_divisor_two)
+			.divider_divisor_two(divider_divisor_two),
+			.wren_primary_color_slots(wren_primary_color_slots),
+			.address_primary_color_slots(address_primary_color_slots),
+			.data_write_primary_color_slots(data_write_primary_color_slots)
 		/*	.debug0(debug0),
 			.debug1(debug1),
 			.debug2(debug2),
@@ -463,7 +472,7 @@ module main(
 		reg TxD_start;
 		reg [7:0] TxD_data;
 		wire TxD_busy;
-		wire [4:0] state;
+		wire [4:0] TxD_state;
 		
 		reg [7:0] tempdata;
 		
@@ -537,8 +546,6 @@ module main(
 		assign LD6 = leds[6];
 		assign LD7 = leds[7];
 		
-		reg i_need_the_serial_transmitter_now = 0;
-		
 		reg enable_rgb = 0;
 		reg enable_ycrcb = 1;
 				
@@ -559,6 +566,10 @@ module main(
 	
 		//instantiate color test pattern to replace camera feed during testing
 		// 2014 edit
+		wire wren_color_pattern;
+		wire [17:0] address_color_pattern;
+		wire [31:0] data_write_color_pattern;
+
 		color_pattern camera_capture(
 			.clk(clk),
 			.reset(0),
@@ -698,13 +709,14 @@ module main(
 		assign debug0[8] = wren_single_shot;
 		assign debug0[15:9] = 0;
 
-		assign debug1 = sram_debug0;
-// 		assign debug1[0] = processing_done_internal;
-// 		assign debug1[1] = i_need_the_serial_transmitter_now;
+		assign debug1[8:0] = sram_debug0;
+		assign debug1[15:9] = mem_counter;
 
 		assign debug2[0] = run_frame_dump_internal;
 		assign debug2[1] = run_single_shot_test_internal;
-		assign debug2[3:2] = 0;
+		assign debug2[2] = 0;
+		assign debug2[3] = processing_done_internal;
+		assign debug2[4] = global_pause;
 
 		assign debug3[0] = run_frame_dump;
 		assign debug3[1] = run_single_shot_test;
@@ -715,15 +727,15 @@ module main(
 
 		assign address = address_edge_detection | address_tracking_output | address_x_pixel_filling 
 								| address_y_pixel_filling | address_blob_extraction | address_color_pattern 
-								| address_frame_dump | address_single_shot /*| address_median_filtering*/;
+								| address_frame_dump | address_single_shot | address_primary_color_slots /*| address_median_filtering*/;
 								
 		assign wren = wren_edge_detection | wren_tracking_output | wren_x_pixel_filling | wren_y_pixel_filling 
-								| wren_blob_extraction | wren_color_pattern | wren_frame_dump | wren_single_shot /*| wren_median_filtering*/;
+								| wren_blob_extraction | wren_color_pattern | wren_frame_dump | wren_single_shot | wren_primary_color_slots 
+								/*| wren_median_filtering*/;
 								
 		assign data_write = data_write_edge_detection | data_write_tracking_output | data_write_x_pixel_filling 
 									| data_write_y_pixel_filling | data_write_blob_extraction | data_write_color_pattern 
-									| data_write_frame_dump | data_write_single_shot /*| data_write_median_filtering*/;	
-
+									| data_write_frame_dump | data_write_single_shot | data_write_primary_color_slots /*| data_write_median_filtering*/;	
 
 				
 		localparam
@@ -747,7 +759,6 @@ module main(
 
 			//if ((processing_done_internal == 0)) begin
 			//if (camera_transfer_done == 1) begin
-				if (i_need_the_serial_transmitter_now == 0) begin
 					processing_done = 0;
 					
 					//leds[5:0] = current_main_processing_state + 1;
@@ -780,7 +791,8 @@ module main(
 						enable_camera_capture = 1;
 						if (camera_capture_done == 1) begin
 							enable_camera_capture = 0;
-							current_main_processing_state = STATE_MEDIAN_FILTERING;
+							//current_main_processing_state = STATE_MEDIAN_FILTERING;
+							current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY**** (tpearson 03/09/14 01:41)
 						end		
 					end	
 		
@@ -987,7 +999,7 @@ module main(
 									//address_frame_dump = serial_output_index_mem + 153602;
 									//address_frame_dump = serial_output_index_mem + 230403;
 								end else begin
-									if (state == 5'b10000) begin	// Wait for transmission of byte to complete
+									if (TxD_state == 5'b10000) begin	// Wait for transmission of byte to complete
 										TxD_start = 0;
 										tx_toggle = 0;
 									end
@@ -996,7 +1008,7 @@ module main(
 								//if (serial_output_index >= 307200) begin
 								if (serial_output_index >= 230400) begin
 								//if (serial_output_index >= 76800) begin
-									if (state == 5'b10000) begin	// Wait for transmission of byte to complete
+									if (TxD_state == 5'b10000) begin	// Wait for transmission of byte to complete
 										processing_ended = 0;		// We only need to pulse this
 										leds[7] = 0;
 										TxD_start = 0;
@@ -1103,7 +1115,7 @@ module main(
 										//address_single_shot = serial_output_index_mem + 230403;
 									end
 								end else begin
-									if (state == 5'b10000) begin	// Wait for transmission of byte to complete
+									if (TxD_state == 5'b10000) begin	// Wait for transmission of byte to complete
 										TxD_start = 0;
 										tx_toggle = 0;
 									end
@@ -1111,7 +1123,7 @@ module main(
 			
 								//if (serial_output_index >= 307200) begin
 								if (serial_output_index >= 76800) begin
-									if (state == 5'b10000) begin	// Wait for transmission of byte to complete
+									if (TxD_state == 5'b10000) begin	// Wait for transmission of byte to complete
 										processing_ended = 0;		// We only need to pulse this
 										leds[7] = 0;
 										TxD_start = 0;
@@ -1404,7 +1416,7 @@ module main(
 									serial_output_index_toggle = serial_output_index_toggle + 1;
 									//leds[5:1] = serial_output_index_toggle;
 								end else begin
-									if (state == 5'b10000) begin	// Wait for transmission of byte to complete
+									if (TxD_state == 5'b10000) begin	// Wait for transmission of byte to complete
 										TxD_start = 0;
 										tx_toggle = 0;
 									end
@@ -1435,11 +1447,6 @@ module main(
 							end
 						end
 					end
-				end else begin
-					// All right, I guess the other routine really needs the serial transmitter, so give it up!
-					TxD_data = 7'bz;
-					TxD_start = 1'bz;
-				end
 			//end else begin
 			//	if (processing_done_internal == 1) begin
 			//		processing_done = 0;				
@@ -1454,8 +1461,8 @@ module main(
 					ARRAY_SPEC_2_MAX = 3;	//fortunately, in the formula where it's used, it doesn't matter 		
 
 
-		async_transmit asyncTX(.clk(clk), .TxD_start(TxD_start), .TxD_data(TxD_data), .TxD(TxD), .TxD_busy(TxD_busy), .state(state));
-		async_receiver asyncRX(.clk(clk_div_by_two), .RxD(RxD), .RxD_data_ready(RxD_data_ready), .RxD_data(RxD_data), .RxD_endofpacket(RxD_endofpacket), .RxD_idle(RxD_idle));
+		async_transmit #(.ClkFrequency(InternalClkFrequency/2)) asyncTX(.clk(clk_div_by_two), .TxD_start(TxD_start), .TxD_data(TxD_data), .TxD(TxD), .TxD_busy(TxD_busy), .state(TxD_state));
+		async_receiver #(.ClkFrequency(InternalClkFrequency/2)) asyncRX(.clk(clk_div_by_two), .RxD(RxD), .RxD_data_ready(RxD_data_ready), .RxD_data(RxD_data), .RxD_endofpacket(RxD_endofpacket), .RxD_idle(RxD_idle));
 
 		reg [7:0] serial_receiver_timer = 21;
 		reg serial_character_received = 0;

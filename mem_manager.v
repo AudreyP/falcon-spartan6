@@ -27,6 +27,7 @@ module mem_manager(
 	output reg [31:0] data_read,       // data being read from memory
 	
 	output reg pause,
+	output reg [6:0] counter,
 	
 	input wire [17:0] starting_address,
 	
@@ -185,7 +186,7 @@ module mem_manager(
 	//-------------------------------
 	//registers
 	reg [15:0] data_out_upper, data_out_lower;
-	reg [6:0] state;
+	reg [6:0] state = 0;
 	reg [15:0] data_to_ram;
 	reg wr, rd;
 	// reg [18:0] addr;	//already declared
@@ -193,7 +194,7 @@ module mem_manager(
 	reg ddr_op_in_progress;
 	
 	
-	reg [4:0] counter;
+	//reg [4:0] counter;
 	
 	//for asynch r/w, these must be tied low
 	assign SRAM_CE_N = 0;	//chip enable
@@ -283,7 +284,7 @@ module mem_manager(
 						cmd_instr = READ;
 						//burst length set to constant 1
 						//address already set in LATCH STATE
-						state = READ_STATE;
+						state = READ_COMMAND_STATE;
 						ddr_op_in_progress = 1;
 					end // end else
 				end
@@ -308,7 +309,7 @@ module mem_manager(
 					cmd_instr = WRITE;
 					//burst length set to constant "1"
 					//address already set in LATCH STATE
-					state = WRITE_DATA_VALID;
+					state = SET_WRITE_WAIT;
 				end
 		SET_WRITE_WAIT: //wait state to ensure the data is valid
 				begin
@@ -334,25 +335,26 @@ module mem_manager(
 		READ_TRANSITION_STATE:
 				begin
 					data_direction = 1;
-					cmd_en = 0; 	//disable read command
-					rd_en = 1;
-					state = READ_STATE;
+					if (rd_empty == 0) begin
+						cmd_en = 0; 	//disable read command
+						rd_en = 1;
+						state = READ_TRANSITION_STATE;
+					end
+					else
+						state = READ_STATE;
 				end
 		
 		READ_STATE: 	begin
 					data_direction = 1;
 					rd_en = 1;
-					if (rd_empty == 0) begin
-						data_read = rd_data;
-						state = DDR_DATA_VALID_STATE;
-					end
-					else begin
-						state = READ_STATE;
-					end
+					data_read = rd_data;
+					state = DDR_DATA_VALID_STATE;
 				end
 
 		//-----occurs only when an entire data word has been written or read to/from DDR
 		DDR_DATA_VALID_STATE: begin
+					rd_en = 0;
+					wr_en = 0;
 					if (counter < NO_RETURN) begin
 						pause = 0;
 						state = IDLE_STATE;

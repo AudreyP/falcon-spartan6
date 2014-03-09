@@ -22,13 +22,14 @@ module blob_extraction(
 	//input wires
 	input wire modified_clock_two_div_by_two,
 	input wire modified_clock_two,
+	input wire primary_color_slots_clka,
 	input wire pause,
 	input wire enable_blob_extraction,
 	input wire [31:0] data_read,
 	input wire [17:0] divider_quotient,
 	input wire [17:0] divider_quotient_two,
 	input wire [7:0] color_similarity_threshold,
-	input wire [575:0] primary_color_slots,	
+	//input wire [575:0] primary_color_slots,	
 
 	//output regs
 	output reg wren,
@@ -39,6 +40,10 @@ module blob_extraction(
 	output reg divider_divisor,
 	output reg divider_dividend_two,
 	output reg divider_divisor_two,
+	
+	output reg wren_primary_color_slots,
+	output reg [4:0] address_primary_color_slots,
+	output reg [23:0] data_write_primary_color_slots,
 	
 	output wire [15:0] debug0,
 	output wire [15:0] debug1,
@@ -124,9 +129,9 @@ module blob_extraction(
 		
 		reg ok_to_do_averaging = 0;
 		
-		localparam [5:0] PRIMARY_COLOR_SLOTS_WORD_SIZE = 24;
-		localparam [3:0] ARRAY_SPEC_1_MAX = 5;
-		reg [575:0] array_spec;
+//		localparam [5:0] PRIMARY_COLOR_SLOTS_WORD_SIZE = 24;
+//		localparam [3:0] ARRAY_SPEC_1_MAX = 5;
+//		reg [575:0] array_spec;
 		
 		
 		//-----Instantiate stack_ram
@@ -142,6 +147,23 @@ module blob_extraction(
 			.wea(stack_ram_wea),
 			.douta(stack_ram_douta)
 			);
+						
+		//-----Instantiate TDP block ram for primary_color_slots
+		reg [4:0] primary_color_slots_addrb;
+		wire [23:0] primary_color_slots_doutb;
+		
+		primary_color_slots primary_color_slots (
+		  .clka(primary_color_slots_clka), // input clka
+		  .wea(wren_primary_color_slots), // input [0 : 0] wea
+		  .addra(address_primary_color_slots), // input [4 : 0] addra
+		  .dina(data_write_primary_color_slots), // input [23 : 0] dina
+		  .douta(), // output [23 : 0] douta (--NOT USED--)
+		  .clkb(modified_clock_two_div_by_two), // input clkb
+		  .web(0), // input [0 : 0] web
+		  .addrb(primary_color_slots_addrb), // input [4 : 0] addrb
+		  .dinb(), // input [23 : 0] dinb (--NOT USED--)
+		  .doutb(primary_color_slots_doutb) // output [23 : 0] doutb
+		);
 		
 		
 		// Now it's time to find and extract the blobs
@@ -597,13 +619,13 @@ module blob_extraction(
 									
 									blob_extraction_color_loop = 0;
 									blob_extraction_slot_loop = 0;
+									primary_color_slots_addrb = 0;
 									
 									blob_extraction_minimum_difference = color_similarity_threshold;
 									blob_extraction_blob_color_number = 0;		// Default to 'not found'
 								end
-								
-								//one_dim_array_spec = (PRIMARY_COLOR_SLOTS_WORD_SIZE*(ARRAY_SPEC_1_MAX*array_spec_2 + array_spec_1 + array_spec_2 +1)) - 1;
-								array_spec = (PRIMARY_COLOR_SLOTS_WORD_SIZE*(ARRAY_SPEC_1_MAX*blob_extraction_slot_loop + blob_extraction_color_loop + blob_extraction_slot_loop)) - 1;
+																
+								//array_spec = (PRIMARY_COLOR_SLOTS_WORD_SIZE*(ARRAY_SPEC_1_MAX*blob_extraction_slot_loop + blob_extraction_color_loop + blob_extraction_slot_loop)) - 1;
 																
 								if (blob_extraction_toggler == 7) begin
 									// Before we can fill the last data slot, we need to find which color slot this is!
@@ -612,35 +634,35 @@ module blob_extraction(
 									//for (blob_extraction_color_loop = 0; blob_extraction_color_loop < 6; blob_extraction_color_loop = blob_extraction_color_loop + 1) begin
 										//for (blob_extraction_slot_loop = 0; blob_extraction_slot_loop < 8; blob_extraction_slot_loop = blob_extraction_slot_loop + 1) begin
 											// Red
-											if (blob_extraction_red_average_final > primary_color_slots[(array_spec - 16) -: 8]) begin
+											if (blob_extraction_red_average_final > primary_color_slots_doutb[7:0]) begin
 												//old syntax was primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][7:0] 
 												
-												blob_extraction_current_difference = blob_extraction_red_average_final - primary_color_slots[(array_spec - 16) -: 8];
+												blob_extraction_current_difference = blob_extraction_red_average_final - primary_color_slots_doutb[7:0];
 											end else begin
-												blob_extraction_current_difference = primary_color_slots[(array_spec - 16) -: 8] - blob_extraction_red_average_final;
+												blob_extraction_current_difference = primary_color_slots_doutb[7:0] - blob_extraction_red_average_final;
 											end
 											
 											// Green
-											if (blob_extraction_green_average_final > primary_color_slots[(array_spec - 8) -: 8]) begin
+											if (blob_extraction_green_average_final > primary_color_slots_doutb[15:8]) begin
 												//old syntax was primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][15:8]
 												 
 												blob_extraction_current_difference = 
-												(blob_extraction_current_difference + (blob_extraction_green_average_final - primary_color_slots[(array_spec - 8) -:8]));
+												(blob_extraction_current_difference + (blob_extraction_green_average_final - primary_color_slots_doutb[15:8]));
 											end else begin
-												blob_extraction_current_difference = (blob_extraction_current_difference + (primary_color_slots[(array_spec - 8) -: 8] - blob_extraction_green_average_final));
+												blob_extraction_current_difference = (blob_extraction_current_difference + (primary_color_slots_doutb[15:8] - blob_extraction_green_average_final));
 											end
 											
 											// Blue
-											if (blob_extraction_blue_average_final > primary_color_slots[array_spec -: 8]) begin
+											if (blob_extraction_blue_average_final > primary_color_slots_doutb[23:16]) begin
 												//old syntax was primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][23:16]
 												
 												blob_extraction_current_difference = 
 												(blob_extraction_current_difference + (blob_extraction_blue_average_final 
-													- primary_color_slots[array_spec -: 8]));
+													- primary_color_slots_doutb[23:16]));
 											end else begin
 												blob_extraction_current_difference = 
 												(blob_extraction_current_difference 
-													+ (primary_color_slots[array_spec -: 8] - blob_extraction_blue_average_final));
+													+ (primary_color_slots_doutb[23:16] - blob_extraction_blue_average_final));
 											end
 											
 											// Compare...
@@ -659,6 +681,9 @@ module blob_extraction(
 									if (blob_extraction_color_loop < 6) begin
 										blob_extraction_toggler = blob_extraction_toggler - 1;		// This will make us go again here
 									end
+									
+									//set read addr for primary color slots 
+									primary_color_slots_addrb = (blob_extraction_color_loop*4) + blob_extraction_slot_loop;
 									
 									// TESTING ONLY!!! ***FIXME***
 									/*blob_extraction_x_average_final = 160;
