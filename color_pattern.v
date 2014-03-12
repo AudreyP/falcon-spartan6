@@ -110,7 +110,8 @@ module color_pattern(
 				bar26_low = 52,
 				bar27 = 53,
 				bar27_low = 54,
-				done_state = 55;
+				done_state = 55,
+				CLEANUP = 56;
 								
 	reg [17:0] hcount, vcount, state;
 		
@@ -121,13 +122,21 @@ module color_pattern(
 			else begin
 				case (state)
 					initial_state: begin
-						addr = starting_address;
-						wren = 0;
-						hcount = 0;
-						vcount = 0;
-						done = 0;
-						state = bar1;
+						if (enable) begin
+							data_write = 32'h0;
+							addr = starting_address;
+							wren = 0;
+							hcount = 0;
+							vcount = 0;
+							done = 0;
+							state = bar1;
+						end else begin
+							wren = 0;
+							addr = 18'h0;
+							data_write = 32'h0;
+							done = 0;
 						end
+					end
 					bar1: begin
 						if (0 <= hcount && hcount < bar_width &&
 							0 <= vcount && vcount < bar_height) 
@@ -652,8 +661,18 @@ module color_pattern(
 					done_state: begin
 						data_write = 32'b0;
 						wren = 1'b0;
-						//addr = 17'b0;
+						addr = 18'b0;
 						done = 1;
+						state = CLEANUP;
+					end
+					CLEANUP: begin
+						if (enable) begin
+							state = CLEANUP;
+						end
+						else begin
+							done = 0;
+							state = initial_state;
+						end
 					end
 				endcase
 			end //else

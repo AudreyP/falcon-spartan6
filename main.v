@@ -576,9 +576,9 @@ module main(
 		wire [17:0] address_color_pattern;
 		wire [31:0] data_write_color_pattern;
 
-		gradient_color_pattern camera_capture(
+		color_pattern camera_capture(
 			.clk(clk_div_by_two),
-			//.reset(0),
+			.reset(0),
 			.pause(global_pause),
 			.enable(enable_camera_capture),
 			.starting_address(camera_memory_address),
@@ -666,6 +666,32 @@ module main(
 			if (slide_switches[0] == 1) begin
 				display_value = debug0;
 			end
+			if (slide_switches == 17) begin
+				display_value = address_edge_detection[17:5];
+			end
+			if (slide_switches == 18) begin
+				display_value = address_tracking_output[17:5];
+			end
+			if (slide_switches == 19) begin
+				display_value = address_x_pixel_filling[17:5];
+			end
+			if (slide_switches == 20) begin
+				display_value = address_y_pixel_filling[17:5];
+			end
+			if (slide_switches == 21) begin
+				display_value = address_blob_extraction[17:5];
+			end
+			if (slide_switches == 22) begin
+				display_value = address_color_pattern[17:5];
+			end
+			if (slide_switches == 23) begin
+				display_value = address_frame_dump[17:5];
+			end
+			if (slide_switches == 24) begin
+				display_value = address_single_shot[17:5];
+			end
+			
+			//switch values 1,2,4,8,16,32
 			
 			processing_started_prior = processing_started;
 			processing_ended_prior = processing_ended;
