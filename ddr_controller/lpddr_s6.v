@@ -66,7 +66,7 @@
 //*****************************************************************************
 `timescale 1ns/1ps
 
-(* X_CORE_INFO = "mig_v3_91_lpddr_lpddr_s6, Coregen 13.4" , CORE_GENERATION_INFO = "lpddr_lpddr_s6,mig_v3_91,{component_name=lpddr_s6, C3_MEM_INTERFACE_TYPE=LPDDR, C3_CLK_PERIOD=10000, C3_MEMORY_PART=mt46h128m16xxxx-5l-it, C3_MEMORY_DEVICE_WIDTH=16, C3_PA_SR=FULL, C3_OUTPUT_DRV=FULL, C3_PORT_CONFIG=Two 32-bit bi-directional and four 32-bit unidirectional ports, C3_MEM_ADDR_ORDER=ROW_BANK_COLUMN, C3_PORT_ENABLE=Port0, C3_INPUT_PIN_TERMINATION=EXTERN_TERM, C3_DATA_TERMINATION=25 Ohms, C3_CLKFBOUT_MULT_F=4, C3_CLKOUT_DIVIDE=2, C3_DEBUG_PORT=0, C3_INPUT_CLK_TYPE=Single-Ended, LANGUAGE=Verilog, SYNTHESIS_TOOL=Foundation_ISE, NO_OF_CONTROLLERS=1}" *)
+(* X_CORE_INFO = "mig_v3_91_lpddr_lpddr_s6, Coregen 13.4" , CORE_GENERATION_INFO = "lpddr_lpddr_s6,mig_v3_91,{component_name=lpddr_s6, C3_MEM_INTERFACE_TYPE=LPDDR, C3_CLK_PERIOD=10000, C3_MEMORY_PART=mt46h32m16xxxx-5, C3_MEMORY_DEVICE_WIDTH=16, C3_PA_SR=FULL, C3_OUTPUT_DRV=FULL, C3_PORT_CONFIG=Two 32-bit bi-directional and four 32-bit unidirectional ports, C3_MEM_ADDR_ORDER=ROW_BANK_COLUMN, C3_PORT_ENABLE=Port0, C3_INPUT_PIN_TERMINATION=EXTERN_TERM, C3_DATA_TERMINATION=25 Ohms, C3_CLKFBOUT_MULT_F=4, C3_CLKOUT_DIVIDE=2, C3_DEBUG_PORT=0, C3_INPUT_CLK_TYPE=Single-Ended, LANGUAGE=Verilog, SYNTHESIS_TOOL=Foundation_ISE, NO_OF_CONTROLLERS=1}" *)
 module lpddr_s6 #
 (
    parameter C3_P0_MASK_SIZE           = 4,
@@ -94,7 +94,7 @@ module lpddr_s6 #
                                        // ROW_BANK_COLUMN or BANK_ROW_COLUMN
    parameter C3_NUM_DQ_PINS          = 16,       
                                        // External memory data width
-   parameter C3_MEM_ADDR_WIDTH       = 14,       
+   parameter C3_MEM_ADDR_WIDTH       = 13,       
                                        // External memory address width
    parameter C3_MEM_BANKADDR_WIDTH   = 2        
                                        // External memory bank address width
@@ -145,7 +145,7 @@ module lpddr_s6 #
       output [6:0]	c3_p0_rd_count,
       output		c3_p0_rd_overflow,
       output		c3_p0_rd_error,
-	output main_system_clock
+	output 	main_system_clock
 );
 // The parameter CX_PORT_ENABLE shows all the active user ports in the design.
 // For example, the value 6'b111100 tells that only port-2, port-3, port-4
@@ -177,19 +177,19 @@ module lpddr_s6 #
    localparam C3_ARB_TIME_SLOT_9      = 3'o0;       
    localparam C3_ARB_TIME_SLOT_10     = 3'o0;       
    localparam C3_ARB_TIME_SLOT_11     = 3'o0;       
-   localparam C3_MEM_TRAS             = 38400;       
-   localparam C3_MEM_TRCD             = 14400;       
+   localparam C3_MEM_TRAS             = 40000;       
+   localparam C3_MEM_TRCD             = 15000;       
    localparam C3_MEM_TREFI            = 7800000;       
-   localparam C3_MEM_TRFC             = 72000;       
-   localparam C3_MEM_TRP              = 14400;       
-   localparam C3_MEM_TWR              = 14400;       
+   localparam C3_MEM_TRFC             = 97500;       
+   localparam C3_MEM_TRP              = 15000;       
+   localparam C3_MEM_TWR              = 15000;       
    localparam C3_MEM_TRTP             = 7500;       
    localparam C3_MEM_TWTR             = 2;       
    localparam C3_MEM_TYPE             = "MDDR";       
-   localparam C3_MEM_DENSITY          = "2Gb";       
+   localparam C3_MEM_DENSITY          = "512Mb";       
    localparam C3_MEM_BURST_LEN        = 4;       
    localparam C3_MEM_CAS_LATENCY      = 3;       
-   localparam C3_MEM_NUM_COL_BITS     = 11;       
+   localparam C3_MEM_NUM_COL_BITS     = 10;       
    localparam C3_MEM_DDR1_2_ODS       = "FULL";       
    localparam C3_MEM_DDR2_RTT         = "150OHMS";       
    localparam C3_MEM_DDR2_DIFF_DQS_EN  = "YES";       

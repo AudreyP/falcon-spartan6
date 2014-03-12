@@ -60,11 +60,11 @@ module main(
 	output wire dram_we_n,
 	output wire dram_dm,
 	output wire dram_udm,
-	output wire dram_dqs,
-	output wire dram_udqs,
+	inout dram_dqs,
+	inout dram_udqs,
 	output wire [1:0] dram_ba,
 	output wire [12:0] dram_a,
-	output wire [15:0] dram_dq,
+	inout [15:0] dram_dq,
 //	output wire c3_calib_done,
 //	output wire c3_clk0,
 //	output wire c3_rst0,
@@ -206,6 +206,8 @@ module main(
 		
 		//------------------Memory module
 		wire [15:0] sram_debug0;
+		wire mem_read_error;
+		wire controller_ready;
 
 		mem_manager mem_manager(
 			.modified_clock_sram(modified_clock_sram),
@@ -233,14 +235,16 @@ module main(
 			.dram_udm(dram_udm),     	// OUTPUT | for X16 parts
 			.dram_dm(dram_dm),		// OUTPUT
 			.rzq(rzq),
+			.controller_ready(controller_ready),
 			.debug0(sram_debug0),
-			.main_system_clock(main_system_clock)
+			.main_system_clock(main_system_clock),
+			.read_error(mem_read_error)
 			);
 				
 		//------------------EDGE DETECTION module
 		wire wren_edge_detection;
 		wire [17:0] address_edge_detection;
-		wire [31:0] data_out_edge_detection;
+		wire [31:0] data_write_edge_detection;
 		
 		reg [7:0] edge_detection_threshold_red = 30; 
 		reg [7:0] edge_detection_threshold_green = 30;
@@ -266,7 +270,7 @@ module main(
 		//------------------TRACKING OUTPUT module
 		wire wren_tracking_output;
 		wire [17:0] address_tracking_output;
-		wire [31:0] data_out_tracking_output;
+		wire [31:0] data_write_tracking_output;
 		
 		reg find_highest = 0;
 		reg find_biggest = 1;
@@ -308,7 +312,6 @@ module main(
 		wire [63:0] y_centroids_array;
 		wire [127:0] s_centroids_array;
 		
-		reg [575:0] primary_color_slots;
 		reg [7:0] color_similarity_threshold = 0;
 		reg [7:0] minimum_blob_size = 0;
 	
@@ -359,7 +362,7 @@ module main(
 		// X PIXEL FILLING module
 		wire wren_x_pixel_filling;
 		wire [17:0] address_x_pixel_filling;
-		wire [31:0] data_out_x_pixel_filling;
+		wire [31:0] data_write_x_pixel_filling;
 		
 		x_pixel_filling x_pixel_filling(
 			//input wires
@@ -377,7 +380,7 @@ module main(
 		//Y PIXEL FILLING module
 		wire wren_y_pixel_filling;
 		wire [17:0] address_y_pixel_filling;
-		wire [31:0] data_out_y_pixel_filling;
+		wire [31:0] data_write_y_pixel_filling;
 		
 		y_pixel_filling y_pixel_filling(
 			//input wires
@@ -395,7 +398,7 @@ module main(
 		// BLOB EXTRACTION module
 		wire wren_blob_extraction;
 		wire [17:0] address_blob_extraction;
-		wire [31:0] data_out_blob_extraction;
+		wire [31:0] data_write_blob_extraction;
 		
 		reg modified_clock_two_div_by_two = 0;
 		
@@ -403,6 +406,9 @@ module main(
 		wire [4:0] debug2;
 		wire [4:0] debug3;
 		
+		reg [4:0] address_primary_color_slots;
+		reg [23:0] data_write_primary_color_slots;
+		reg wren_primary_color_slots;
 		wire primary_color_slots_clka;
 		assign primary_color_slots_clka = clk;
 		
@@ -410,7 +416,6 @@ module main(
 			//input wires
 			.modified_clock_two_div_by_two(modified_clock_two_div_by_two),
 			.modified_clock_two(modified_clock_two),	//for stack ram
-			.primary_color_slots_clka(primary_color_slots_clka),
 			.pause(global_pause),
 			.enable_blob_extraction(enable_blob_extraction),
 			.data_read(data_read),
@@ -427,6 +432,7 @@ module main(
 			.divider_divisor(divider_divisor),
 			.divider_dividend_two(divider_dividend_two),
 			.divider_divisor_two(divider_divisor_two),
+			.primary_color_slots_clka(primary_color_slots_clka),
 			.wren_primary_color_slots(wren_primary_color_slots),
 			.address_primary_color_slots(address_primary_color_slots),
 			.data_write_primary_color_slots(data_write_primary_color_slots)
@@ -570,15 +576,17 @@ module main(
 		wire [17:0] address_color_pattern;
 		wire [31:0] data_write_color_pattern;
 
-		color_pattern camera_capture(
-			.clk(clk),
-			.reset(0),
+		gradient_color_pattern camera_capture(
+			.clk(clk_div_by_two),
+			//.reset(0),
+			.pause(global_pause),
 			.enable(enable_camera_capture),
-			.starting_address(0),
+			.starting_address(camera_memory_address),
 			.data_write(data_write_color_pattern),
 			.addr(address_color_pattern),
 			.wren(wren_color_pattern),
-			.done(camera_capture_done));
+			.done(camera_capture_done)
+			);
 		
 		reg reset_system = 0;
 		
@@ -709,12 +717,15 @@ module main(
 		assign debug0[8] = wren_single_shot;
 		assign debug0[15:9] = 0;
 
-		assign debug1[8:0] = sram_debug0;
-		assign debug1[15:9] = mem_counter;
+// 		assign debug1[8:0] = sram_debug0;
+// 		assign debug1[15] = mem_read_error;
+// 		assign debug1[15:1] = address_color_pattern[17:4];
+// 		assign debug1[0] = camera_capture_done;
+		assign debug1[12:0] = address[17:5];
 
 		assign debug2[0] = run_frame_dump_internal;
 		assign debug2[1] = run_single_shot_test_internal;
-		assign debug2[2] = 0;
+		assign debug2[2] = controller_ready;
 		assign debug2[3] = processing_done_internal;
 		assign debug2[4] = global_pause;
 
@@ -727,20 +738,20 @@ module main(
 
 		assign address = address_edge_detection | address_tracking_output | address_x_pixel_filling 
 								| address_y_pixel_filling | address_blob_extraction | address_color_pattern 
-								| address_frame_dump | address_single_shot | address_primary_color_slots /*| address_median_filtering*/;
+								| address_frame_dump | address_single_shot /*| address_median_filtering*/;
 								
 		assign wren = wren_edge_detection | wren_tracking_output | wren_x_pixel_filling | wren_y_pixel_filling 
-								| wren_blob_extraction | wren_color_pattern | wren_frame_dump | wren_single_shot | wren_primary_color_slots 
+								| wren_blob_extraction | wren_color_pattern | wren_frame_dump | wren_single_shot 
 								/*| wren_median_filtering*/;
 								
 		assign data_write = data_write_edge_detection | data_write_tracking_output | data_write_x_pixel_filling 
 									| data_write_y_pixel_filling | data_write_blob_extraction | data_write_color_pattern 
-									| data_write_frame_dump | data_write_single_shot | data_write_primary_color_slots /*| data_write_median_filtering*/;	
+									| data_write_frame_dump | data_write_single_shot /*| data_write_median_filtering*/;	
 
 				
 		localparam
 		STATE_INITIAL = 0,
-		STATE_CAMERA_CAPTURE =1,
+		STATE_CAMERA_CAPTURE = 1,
 		STATE_MEDIAN_FILTERING = 2,
 		STATE_EDGE_DETECTION = 3,
 		STATE_X_PIXEL_FILLING = 4,
@@ -793,7 +804,7 @@ module main(
 							enable_camera_capture = 0;
 							//current_main_processing_state = STATE_MEDIAN_FILTERING;
 							current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY**** (tpearson 03/09/14 01:41)
-						end		
+						end
 					end	
 		
 		
@@ -946,7 +957,7 @@ module main(
 							/*address = 18'b0;
 							data_write = 32'b0;
 							wren = 1'b0;*/
-														
+							
 							current_main_processing_state = STATE_INITIAL;
 							processing_done_internal = 1;
 							
@@ -968,7 +979,7 @@ module main(
 							serial_output_index_toggle = 0;
 							processing_ended = 1;
 						end else begin
-							if (serial_output_enabled == 1) begin
+							if ((serial_output_enabled == 1) && (global_pause == 0)) begin
 								// Transmit the entire contents of the image buffer to the serial port
 								if (tx_toggle == 0) begin
 									if (serial_output_index_toggle == 0) begin
@@ -1048,14 +1059,13 @@ module main(
 							thisiswhite = 0;
 							processing_ended = 1;
 						end else begin
-							if (serial_output_enabled == 1) begin
+							if ((serial_output_enabled == 1) && (global_pause == 0)) begin
 								// Transmit the entire contents of the image buffer to the serial port
 								if (tx_toggle == 0) begin
 									if (serial_output_index_toggle == 0) begin
 										wren_single_shot = 0;
 										address_single_shot = ((data_read_sync * 3) + 200000);
 										//address = address + 76801;
-										
 										if (data_read_sync == 1) begin
 											thisiswhite = 1;
 										end else begin
@@ -1114,7 +1124,8 @@ module main(
 										//address_single_shot = serial_output_index_mem + 153602;
 										//address_single_shot = serial_output_index_mem + 230403;
 									end
-								end else begin
+								end
+								else if (tx_toggle == 1) begin
 									if (TxD_state == 5'b10000) begin	// Wait for transmission of byte to complete
 										TxD_start = 0;
 										tx_toggle = 0;
@@ -1469,12 +1480,11 @@ module main(
 		reg [7:0] serial_receiver_toggler = 0;
 		reg [7:0] serial_command_buffer = 0;
 		reg [2:0] next_byte_is_command = 0;
-		reg [7:0] next_byte_is_command_pev_command = 0;
+		reg [7:0] next_byte_is_command_prev_command = 0;
 		reg [15:0] special_i2c_command_timer = 0;
 		
 		reg [5:0] array_spec_1;
 		reg [5:0] array_spec_2;
-		reg [575:0] one_dim_array_spec;
 							
 		
 		// Receive serial commands
@@ -1553,84 +1563,76 @@ module main(
 								
 								if (serial_command_buffer == 89) begin	
 									next_byte_is_command = 1;
-									next_byte_is_command_pev_command = 89;
+									next_byte_is_command_prev_command = 89;
 								end
 								
 								if (serial_command_buffer == 65) begin	
 									next_byte_is_command = 1;
-									next_byte_is_command_pev_command = 65;
+									next_byte_is_command_prev_command = 65;
 								end
 								
 								if (serial_command_buffer == 73) begin	
 									next_byte_is_command = 1;
-									next_byte_is_command_pev_command = 73;
+									next_byte_is_command_prev_command = 73;
 								end
 								
 								if (serial_command_buffer == 66) begin	
 									next_byte_is_command = 1;
-									next_byte_is_command_pev_command = 66;
+									next_byte_is_command_prev_command = 66;
 								end
 								
 								if (serial_command_buffer == 78) begin	
 									next_byte_is_command = 1;
-									next_byte_is_command_pev_command = 78;
+									next_byte_is_command_prev_command = 78;
 								end
 								
 								if (serial_command_buffer == 72) begin	
 									next_byte_is_command = 1;
-									next_byte_is_command_pev_command = 72;
+									next_byte_is_command_prev_command = 72;
 								end
 								
 								if (serial_command_buffer == 59) begin	
 									next_byte_is_command = 1;
-									next_byte_is_command_pev_command = 59;
+									next_byte_is_command_prev_command = 59;
 								end
 								
 								// Color slot modify requests
 								if ((serial_command_buffer > 90) && (serial_command_buffer < 140)) begin	
 									next_byte_is_command = 1;
-									next_byte_is_command_pev_command = serial_command_buffer;
+									next_byte_is_command_prev_command = serial_command_buffer;
 									
-									array_spec_1 = ((next_byte_is_command_pev_command / 8) - 11);
-									array_spec_2 = (next_byte_is_command_pev_command[2:0] - 3);	
-																	
-									one_dim_array_spec = (PRIMARY_COLOR_SLOTS_WORD_SIZE*(ARRAY_SPEC_1_MAX*array_spec_2 + array_spec_1 + array_spec_2 +1)) - 1;
-									//converts primary_color_slots[array_spec_1][array_spec_2] to
-									//primary_color_slots[one_dim_array_spec -: 8]
-									
-									//----WRONGOOO
-									// array_spec_3 = (array_spec_1+1)*(array_spec_2+1) - 1;
-									//equive to array_spec_3:
-									//  ((next_byte_is_command_pev_command / 8) - 10)*(next_byte_is_command_pev_command[2:0] - 2) - 1
-									
+									array_spec_1 = ((next_byte_is_command_prev_command / 8) - 11);
+									array_spec_2 = (next_byte_is_command_prev_command[2:0] - 3);
 									
 									
 								end
 							end else begin							
 								if (next_byte_is_command == 3) begin
-									if ((next_byte_is_command_pev_command > 90) && (next_byte_is_command_pev_command < 140)) begin
+									if ((next_byte_is_command_prev_command > 90) && (next_byte_is_command_prev_command < 140)) begin
 										// Blue
-										primary_color_slots[one_dim_array_spec -: 8] 
-																	= serial_command_buffer;		//old syntax: [array_spec_1][array_spec_2][23:16]
+										address_primary_color_slots = (array_spec_1*4) + array_spec_2;
+										data_write_primary_color_slots[23:16] = serial_command_buffer;		//old syntax: [array_spec_1][array_spec_2][23:16]
+										wren_primary_color_slots = 1'b1;
 										next_byte_is_command = 0;
 									end
 								end
 								
 								if (next_byte_is_command == 2) begin
 									// Color slot modify requests
-									if ((next_byte_is_command_pev_command > 90) && (next_byte_is_command_pev_command < 140)) begin
+									if ((next_byte_is_command_prev_command > 90) && (next_byte_is_command_prev_command < 140)) begin
 										// Green
-										primary_color_slots[(one_dim_array_spec - 8) -: 8] 
-																= serial_command_buffer;	// old syntax: [array_spec_1][array_spec_2][15:8]
+										address_primary_color_slots = (array_spec_1*4) + array_spec_2;
+										data_write_primary_color_slots[15:8] = serial_command_buffer;	// old syntax: [array_spec_1][array_spec_2][15:8]
+										wren_primary_color_slots = 1'b1;
 										next_byte_is_command = 3;
 									end
 									
-									if (next_byte_is_command_pev_command == 89) begin
+									if (next_byte_is_command_prev_command == 89) begin
 										display_value_user[13:8] = serial_command_buffer;
 										next_byte_is_command = 0;
 									end
 									
-									if (next_byte_is_command_pev_command == 59) begin
+									if (next_byte_is_command_prev_command == 59) begin
 										special_i2c_command_data = serial_command_buffer;
 										special_i2c_command_timer = 65535;
 										next_byte_is_command = 0;
@@ -1639,46 +1641,47 @@ module main(
 								
 								if (next_byte_is_command == 1) begin
 									// The previous byte was the command--now load in the number!
-									if (next_byte_is_command_pev_command == 65) begin
+									if (next_byte_is_command_prev_command == 65) begin
 										edge_detection_threshold_red = serial_command_buffer;
 										next_byte_is_command = 0;
 									end
 									
-									if (next_byte_is_command_pev_command == 73) begin
+									if (next_byte_is_command_prev_command == 73) begin
 										edge_detection_threshold_green = serial_command_buffer;
 										next_byte_is_command = 0;
 									end
 									
-									if (next_byte_is_command_pev_command == 66) begin
+									if (next_byte_is_command_prev_command == 66) begin
 										edge_detection_threshold_blue = serial_command_buffer;
 										next_byte_is_command = 0;
 									end
 									
-									if (next_byte_is_command_pev_command == 78) begin
+									if (next_byte_is_command_prev_command == 78) begin
 										minimum_blob_size = serial_command_buffer;
 										next_byte_is_command = 0;
 									end
 									
-									if (next_byte_is_command_pev_command == 72) begin
+									if (next_byte_is_command_prev_command == 72) begin
 										color_similarity_threshold = serial_command_buffer;
 										next_byte_is_command = 0;
 									end
 									
-									if (next_byte_is_command_pev_command == 89) begin
+									if (next_byte_is_command_prev_command == 89) begin
 										display_value_user = serial_command_buffer;
 										next_byte_is_command = 2;
 									end
 									
-									if (next_byte_is_command_pev_command == 59) begin
+									if (next_byte_is_command_prev_command == 59) begin
 										special_i2c_command_register = serial_command_buffer;
 										next_byte_is_command = 2;
 									end
 									
 									// Color slot modify requests
-									if ((next_byte_is_command_pev_command > 90) && (next_byte_is_command_pev_command < 140)) begin
+									if ((next_byte_is_command_prev_command > 90) && (next_byte_is_command_prev_command < 140)) begin
 										// Red
-										primary_color_slots[(one_dim_array_spec - 16) -: 8] 
-																= serial_command_buffer;	// old syntax: [array_spec_1][array_spec_2][7:0]
+										address_primary_color_slots = (array_spec_1*4) + array_spec_2;
+										data_write_primary_color_slots[7:0] = serial_command_buffer;	// old syntax: [array_spec_1][array_spec_2][7:0]
+										wren_primary_color_slots = 1'b1;
 										next_byte_is_command = 2;
 									end
 								end

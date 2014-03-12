@@ -22,7 +22,12 @@ module blob_extraction(
 	//input wires
 	input wire modified_clock_two_div_by_two,
 	input wire modified_clock_two,
+
 	input wire primary_color_slots_clka,
+	input wire wren_primary_color_slots,
+	input wire [4:0] address_primary_color_slots,
+	input wire [23:0] data_write_primary_color_slots,
+
 	input wire pause,
 	input wire enable_blob_extraction,
 	input wire [31:0] data_read,
@@ -36,14 +41,10 @@ module blob_extraction(
 	output reg [31:0] data_write,
 	output reg [17:0] address,
 	output reg blob_extraction_done,
-	output reg divider_dividend,
-	output reg divider_divisor,
-	output reg divider_dividend_two,
-	output reg divider_divisor_two,
-	
-	output reg wren_primary_color_slots,
-	output reg [4:0] address_primary_color_slots,
-	output reg [23:0] data_write_primary_color_slots,
+	output reg [17:0] divider_dividend,
+	output reg [17:0] divider_divisor,
+	output reg [17:0] divider_dividend_two,
+	output reg [17:0] divider_divisor_two,
 	
 	output wire [15:0] debug0,
 	output wire [15:0] debug1,

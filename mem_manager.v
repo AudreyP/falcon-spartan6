@@ -31,6 +31,7 @@ module mem_manager(
 	
 	input wire [17:0] starting_address,
 	
+	output wire read_error,
 	output wire dram_ck,
 	output wire dram_ck_n,
 	output wire dram_cke,
@@ -40,12 +41,12 @@ module mem_manager(
 	output wire dram_we_n,
 	output wire dram_dm,
 	output wire dram_udm,
-	output wire dram_dqs,
-	output wire dram_udqs,
+	inout dram_dqs,
+	inout dram_udqs,
 	output wire [1:0] dram_ba,
 	output wire [12:0] dram_a,
-	output wire [15:0] dram_dq,
-	output wire c3_calib_done,
+	inout [15:0] dram_dq,
+	output wire controller_ready,
 	output wire c3_clk0,
 	output wire c3_rst0,
 	inout rzq,
@@ -56,11 +57,12 @@ module mem_manager(
 	input wire counter_done,
 	input wire start_read,
 	input wire start_write,*/
-	output wire [15:0] debug0,
-	output reg done
+	output wire [15:0] debug0
 	 );
 
-	
+	wire calib_done;
+	assign controller_ready = calib_done;	
+
 	//--------------------------------------------
 	// INSTANTIATE DDR SDRAM CONTROLLER CORE
 	//--------------------------------------------	
@@ -77,7 +79,7 @@ module mem_manager(
 	assign cmd_clk = modified_clock_sram;
 	reg cmd_en;
 	reg [2:0] cmd_instr;
-	reg [19:0] cmd_addr;
+	reg [29:0] cmd_addr;
 	wire cmd_empty;
 	wire cmd_full;
 	
@@ -85,7 +87,7 @@ module mem_manager(
 	wire wr_clk;
 	assign wr_clk = modified_clock_sram;
 	reg wr_en;
-	reg [3:0] wr_mask;
+	reg [3:0] wr_mask = 4'b0;
 	reg [31:0] wr_data;
 	wire wr_full;
 	wire wr_empty;
@@ -103,31 +105,17 @@ module mem_manager(
 	wire [6:0] rd_count;
 	wire rd_overflow;
 	wire rd_error;
+	
+	assign read_error = rd_error | rd_overflow;
 
 	//in / out determined wrt module lpddr_s6
-	lpddr_s6 # (
-		.C3_P0_MASK_SIZE(4),
-		.C3_P0_DATA_PORT_SIZE(32),
-		.C3_P1_MASK_SIZE(4),
-		.C3_P1_DATA_PORT_SIZE(32),
-		.DEBUG_EN(0),
-		.C3_MEMCLK_PERIOD(10000),
-		.C3_CALIB_SOFT_IP("TRUE"),
-		.C3_SIMULATION("FALSE"),
-		.C3_RST_ACT_LOW(0),
-		.C3_INPUT_CLK_TYPE("SINGLE_ENDED"),
-		.C3_MEM_ADDR_ORDER("ROW_BANK_COLUMN"),
-		.C3_NUM_DQ_PINS(16),
-		.C3_MEM_ADDR_WIDTH(14),
-		.C3_MEM_BANKADDR_WIDTH(2)
-		)
-	u_lpddr_s6 (
+	lpddr_s6 u_lpddr_s6 (
 		.c3_sys_clk(crystal_clk),	// IN
 		.c3_sys_rst_i(0),	// IN
 		
 		.c3_clk0(c3_clk0),	// OUTPUT
 		.c3_rst0(c3_rst0),	// OUTPUT
-		.c3_calib_done(c3_calib_done),	// OUTPUT
+		.c3_calib_done(calib_done),	// OUTPUT
 		.mcb3_rzq(rzq),	// INOUT
 
 		//dram connections
@@ -150,12 +138,12 @@ module mem_manager(
 		.c3_p0_cmd_en(cmd_en),	// INPUT
 		.c3_p0_cmd_instr(cmd_instr),	// INPUT [2:0]
 		.c3_p0_cmd_bl(1),		//INPUT [5:0] --keep burst length to 1 32-bit word
-		.c3_p0_cmd_byte_addr (cmd_byte_addr),	// INPUT [29:0]
+		.c3_p0_cmd_byte_addr(cmd_addr),	// INPUT [29:0]
 		.c3_p0_cmd_empty(cmd_empty),	// OUTPUT 
 		.c3_p0_cmd_full(cmd_full),	// OUTPUT
 		
 		 // write connections
-		.c3_p0_wr_clk(wr_clk),		// INPUT
+		.c3_p0_wr_clk(wr_clk),		// INPUT 
 		.c3_p0_wr_en(wr_en),		// INPUT
 		.c3_p0_wr_mask(wr_mask),	// INPUT [3:0]
 		.c3_p0_wr_data (wr_data),	// INPUT [31:0]
@@ -190,7 +178,6 @@ module mem_manager(
 	reg [15:0] data_to_ram;
 	reg wr, rd;
 	// reg [18:0] addr;	//already declared
-	reg data_direction;
 	reg ddr_op_in_progress;
 	
 	
@@ -255,7 +242,10 @@ module mem_manager(
 		INIT_STATE:	begin	
 					cmd_addr = 0;
 					//cmd = NOP;
-					state = IDLE_STATE;
+					if (calib_done == 1)
+						state = IDLE_STATE;
+					else
+						state = INIT_STATE;
 				end
 		
 		IDLE_STATE:	begin
@@ -264,19 +254,18 @@ module mem_manager(
 					state = LATCH_STATE;
 				end
 				else begin
-					state = IDLE_STATE;				
+					state = IDLE_STATE;
 				end
 				end
 
 		LATCH_STATE:	begin
-					cmd_addr[19:2] = starting_address;	//starting address 17 bits--shove into upper 17b of 19b addr to leave room for two 0's
-					cmd_addr[1] = 0;
-					cmd_addr[0] = 0;
-					data_direction = 1;					
+					cmd_addr[29:2] = starting_address;	//starting address 17 bits--shove into upper 17b of 19b addr to leave room for two 0's
+					cmd_addr[1:0] = 0;
 				
 					//determine read or write operation
 					if (wren==1) begin	//if a write signal is received, begin write	
 						wr_data = data_write;	//write whole 32-bit word
+						//wr_data = 32'hf0806020;
 						state = WRITE_STATE;
 						ddr_op_in_progress = 1;
 					end
@@ -292,40 +281,42 @@ module mem_manager(
 		//-----WRITE CYCLE
 		WRITE_STATE: 
 				begin
-					data_direction = 0;
 					wr_en = 1;	//now that data is in data path, assert write enable
+					//wr_en = 0;
 					state = WRITE_WAIT_1;
 				end 
 
 		WRITE_WAIT_1: 	begin
-					data_direction = 0;
-					wr_en = 1;	//ensure that data is written 
-					state = SET_WRITE_COMMAND;
-				end
-		
-		SET_WRITE_COMMAND:
-				begin
-					data_direction = 0;
+					wr_en = 0;	//complete wr_en pulse, delay before setting cmd (necessary)?
 					cmd_instr = WRITE;
-					//burst length set to constant "1"
-					//address already set in LATCH STATE
 					state = SET_WRITE_WAIT;
 				end
+		
+// 		SET_WRITE_COMMAND:
+// 				begin
+// 					cmd_instr = WRITE;
+// 					//burst length set to constant "1"
+// 					//address already set in LATCH STATE
+// 					state = SET_WRITE_WAIT;
+// 				end
 		SET_WRITE_WAIT: //wait state to ensure the data is valid
 				begin
 					cmd_en = 1;
 					state = WRITE_DATA_VALID;
 				end
 
-		WRITE_DATA_VALID: 
+		WRITE_DATA_VALID:
 				begin
-					data_direction = 0;
 					cmd_en = 0;
-					state = DDR_DATA_VALID_STATE;
-					ddr_op_in_progress = 0;
+					if (wr_empty == 1) begin //write fifo empty--ie data is written to memory
+						state = DDR_DATA_VALID_STATE;
+					end
+					else begin
+						state = WRITE_DATA_VALID;
+					end
 				end
 
-		//----READ CYCLE				
+		//----READ CYCLE
 		READ_COMMAND_STATE:
 				begin
 					cmd_en = 1;	//enable read command with addr, burst length, and instruction data set in IDLE STATE
@@ -334,27 +325,28 @@ module mem_manager(
 
 		READ_TRANSITION_STATE:
 				begin
-					data_direction = 1;
+					cmd_en = 0;	//disable read command
 					if (rd_empty == 0) begin
-						cmd_en = 0; 	//disable read command
-						rd_en = 1;
-						state = READ_TRANSITION_STATE;
+						state = READ_STATE;
 					end
 					else
-						state = READ_STATE;
+						state = READ_TRANSITION_STATE;
 				end
 		
 		READ_STATE: 	begin
-					data_direction = 1;
 					rd_en = 1;
 					data_read = rd_data;
-					state = DDR_DATA_VALID_STATE;
+					if (rd_empty == 1)
+						state = DDR_DATA_VALID_STATE;
+					else
+						state = READ_STATE;
 				end
 
 		//-----occurs only when an entire data word has been written or read to/from DDR
 		DDR_DATA_VALID_STATE: begin
 					rd_en = 0;
 					wr_en = 0;
+					ddr_op_in_progress = 0;
 					if (counter < NO_RETURN) begin
 						pause = 0;
 						state = IDLE_STATE;
