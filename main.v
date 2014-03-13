@@ -126,18 +126,10 @@ module main(
 		//--------------------------------------------------------------------------
 		// Auxiliary clock generation
 		//--------------------------------------------------------------------------
-		reg clk_div_by_two = 0;
+		wire clk_div_by_two;
 
 		assign clk = modified_clock;
-
-		//always @(posedge modified_clock_two) begin
-		always @(negedge modified_clock_two) begin
-			modified_clock_two_div_by_two = !modified_clock_two_div_by_two;
-		end
-		
-		always @(posedge clk) begin
-			clk_div_by_two = !clk_div_by_two;
-		end
+		assign clk_div_by_two = modified_clock_div_by_two;
 		
 		reg clk_div_by_four = 0;
 		
@@ -400,7 +392,7 @@ module main(
 		wire [17:0] address_blob_extraction;
 		wire [31:0] data_write_blob_extraction;
 		
-		reg modified_clock_two_div_by_two = 0;
+		wire modified_clock_two_div_by_two;
 		
 		wire [15:0] debug0, debug1;
 		wire [4:0] debug2;
@@ -563,7 +555,9 @@ module main(
 		clock_manager clock_manager(
 			.input_clk(main_system_clock),
 			.modified_clock(modified_clock),
+			.modified_clock_div_by_two(modified_clock_div_by_two),
 			.modified_clock_two(modified_clock_two),
+			.modified_clock_two_div_by_two(modified_clock_two_div_by_two),
 			.modified_clock_sram(modified_clock_sram),
 			.dcm_locked(dcm_locked),
 			.dcm_locked_two(dcm_locked_two),
@@ -578,7 +572,6 @@ module main(
 
 		color_pattern camera_capture(
 			.clk(clk_div_by_two),
-			.reset(0),
 			.pause(global_pause),
 			.enable(enable_camera_capture),
 			.starting_address(camera_memory_address),

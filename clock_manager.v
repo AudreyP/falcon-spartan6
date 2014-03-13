@@ -22,7 +22,9 @@
 module clock_manager(
 		input wire input_clk,
 		output wire modified_clock,
+		output wire modified_clock_div_by_two,
 		output wire modified_clock_two,
+		output wire modified_clock_two_div_by_two,
 		output wire modified_clock_sram,
 	
 		output wire dcm_locked,
@@ -115,6 +117,22 @@ module clock_manager(
 
 
 	//-------------------------------
+	// MODIFIED CLOCK / 2
+	//-------------------------------
+
+	reg modified_clock_two_div_by_two_bufg_in = 0;
+	always @(posedge modified_clock_two) begin
+		modified_clock_two_div_by_two_bufg_in = !modified_clock_two_div_by_two_bufg_in;
+	end
+
+	BUFG U_BUFG_MODIFIED_CLOCK_TWO_DIV_BY_TWO
+	(
+		.O (modified_clock_two_div_by_two),
+		.I (modified_clock_two_div_by_two_bufg_in)
+	);
+
+
+	//-------------------------------
 	// MODIFIED CLOCK TWO
 	//-------------------------------
 	reg dcm_reset_two = 0;
@@ -184,13 +202,29 @@ module clock_manager(
 
 
 	//-------------------------------
+	// MODIFIED CLOCK TWO / 2
+	//-------------------------------
+
+	reg modified_clock_div_by_two_bufg_in = 0;
+	always @(posedge modified_clock) begin
+		modified_clock_div_by_two_bufg_in = !modified_clock_div_by_two_bufg_in;
+	end
+
+	BUFG U_BUFG_MODIFIED_CLOCK_DIV_BY_TWO
+	(
+		.O (modified_clock_div_by_two),
+		.I (modified_clock_div_by_two_bufg_in)
+	);
+
+
+	//-------------------------------
 	// SRAM CLOCK
 	//-------------------------------
 	reg dcm_reset_sram = 0;
 	wire dcm_feedback_sram;
 	
 	assign modified_clock_sram = input_clk;
-		
+
 // 	DCM_SP #(
 // 		.CLKDV_DIVIDE(2.0),                   // CLKDV divide value
 // 									// (1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,8,9,10,11,12,13,14,15,16).

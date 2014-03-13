@@ -181,17 +181,6 @@ module mem_manager(
 	reg ddr_op_in_progress;
 	
 	
-	//reg [4:0] counter;
-	
-	//for asynch r/w, these must be tied low
-	assign SRAM_CE_N = 0;	//chip enable
-	assign RamClk = 0;
-	assign RamAdv = 0;
-	assign SRAM_UB_N = 0;	//either low or don't-care for r/w
-	assign SRAM_LB_N = 0;	//either low or don't-care for r/w
-	//for a read, OE must be LOW. For write, don't care (keep HIGH)
-	//for a write, WE must be LOW. For read, must keep HIGH
-	
 	assign debug0 = state;
 	
 	//states

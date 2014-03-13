@@ -21,7 +21,7 @@
 module color_pattern(
 	input wire clk,
 	input wire pause,
-	input wire reset,
+	//input wire reset,
 	input wire enable,
 	input wire [17:0] starting_address,
 	output reg [31:0] data_write,
@@ -33,20 +33,51 @@ module color_pattern(
 	 initial done = 0;
 	 
 	 //colors
-	 localparam [31:0]	light_gray = 32'hc0c0c000,
-				yellow = 32'hc0c00000,
-				//yellow = 32'hffffffff,
-				light_blue = 32'h00c0c000,
-				green = 32'h00c00000,
-				purple = 32'hc000c000,
-				red = 32'hc0000000,
-				blue = 32'h0000c000,
-				gray = 32'h13131300,
-				dark_blue = 32'h00214c00,
-				white = 32'hffffff00,
-				dark_purple = 32'h32006a00,
-				mid_gray1 = 32'h09090900,
-				mid_gray2 = 32'h1d1d1d00;
+	 localparam [31:0]	
+// 		light_gray = 32'hc000c0c0,
+// 		yellow = 32'hc000c000,
+// 		light_blue = 32'h0000c0c0,
+// 		green = 32'h0000c000,
+// 		purple = 32'hc00000c0,
+// 		red = 32'hc000000000,
+// 		blue = 32'h000000c0,
+// 		gray = 32'h13001313,
+// 		dark_blue = 32'h0000214c,
+// 		white = 32'hff00ffff,
+// 		dark_purple = 32'h3200006a,
+// 		mid_gray1 = 32'h09000909,
+// 		mid_gray2 = 32'h1d001d1d;
+		
+		//original
+// 		light_gray = 32'hc0c0c0,
+// 		yellow = 32'hc0c000,
+// 		light_blue = 32'h00c0c0,
+// 		green = 32'h00c000,
+// 		purple = 32'hc000c0,
+// 		red = 32'hc0000000,
+// 		blue = 32'h0000c0,
+// 		gray = 32'h131313,
+// 		dark_blue = 32'h00214c,
+// 		white = 32'hffffff,
+// 		dark_purple = 32'h32006a,
+// 		mid_gray1 = 32'h090909,
+// 		mid_gray2 = 32'h1d1d1d;
+
+		light_gray = 32'hc000c0c0,
+		yellow = 32'h0000c0c0,
+		light_blue = 32'hc000c000,
+		green = 32'h0000c000,
+		purple = 32'hc00000c0,
+		red = 32'h00000000c0,
+		blue = 32'hc0000000,
+		gray = 32'h13001313,
+		dark_blue = 32'h4c002100,
+		white = 32'hff00ffff,
+		dark_purple = 32'h6a000032,
+		mid_gray1 = 32'h09000909,
+		mid_gray2 = 32'h1d001d1d;		
+
+
 								
 	localparam [15:0]	img_width = 320,
 				img_height = 240,
@@ -113,13 +144,10 @@ module color_pattern(
 				done_state = 55,
 				CLEANUP = 56;
 								
-	reg [17:0] hcount, vcount, state;
+	reg [17:0] hcount, vcount, state = 0;
 		
 	always @ (posedge clk) begin
 		if (pause == 0) begin
-			if (reset)
-				state = initial_state;
-			else begin
 				case (state)
 					initial_state: begin
 						if (enable) begin
@@ -675,7 +703,6 @@ module color_pattern(
 						end
 					end
 				endcase
-			end //else
 		end //end if pause == 0
 	end	//end always
 endmodule
