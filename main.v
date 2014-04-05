@@ -272,13 +272,15 @@ module main(
 	wire camera_fifo_empty;
 	wire [4:0] fifo_state;
 	wire stuck;
-	wire addr_count;
+	wire [19:0] addr_count;
+	wire [18:0] camera_memory_address_debug;
+	
+	wire all_dcms_locked;
 	
 	camera_module_v2 camera_capture( 
 		.clk(clk_div_by_two),
 		.pause(global_pause),
 		//.startup_sequencer(startup_sequencer),
-		.camera_grab_in_progress(),
 		.ddr_addr(address_camera_capture),
 		.ddr_data_write(data_write_camera_capture),
 		.ddr_wren(wren_camera_capture),
@@ -293,6 +295,7 @@ module main(
 		.fifo_full(camera_fifo_full),
 		.fifo_empty(camera_fifo_empty),
 		.data_write_offset(76800),
+		.all_dcms_locked(all_dcms_locked),
 		//.auxramclk_speed_select(),
 		.camera_module_detect(),
 		//debug signals
@@ -302,7 +305,8 @@ module main(
 		.altcol(altcol),
 		.altline(altline),
 		.pixel_valid(pixel_valid),
-		.addr_count(addr_count)
+		.addr_count(addr_count),
+		.camera_memory_address(camera_memory_address_debug)
 		);
 
 	
@@ -687,6 +691,8 @@ module main(
 	wire modified_clock;
 	
 	wire dcm_locked, dcm_locked_two, dcm_locked_sram;
+
+	assign all_dcms_locked = dcm_locked && dcm_locked_two && dcm_locked_sram && camera_dcm_locked;
 	
 	//instantiate clock manager (2014 edit)
 	clock_manager clock_manager(
@@ -697,8 +703,8 @@ module main(
 		.modified_clock_two_div_by_two(modified_clock_two_div_by_two),
 		.modified_clock_sram(modified_clock_sram),
 		.dcm_locked(dcm_locked),
-		.dcm_locked_two(dcm_locked_two)
-		//.dcm_locked_sram(dcm_locked_sram)
+		.dcm_locked_two(dcm_locked_two),
+		.dcm_locked_sram(dcm_locked_sram)
 		);
 
 	
@@ -814,7 +820,10 @@ module main(
 			display_value = camera_capture_done;
 		end
 		if (slide_switches == 16) begin
-			display_value = addr_count;
+			display_value = addr_count[17:4];
+		end
+		if (slide_switches == 17) begin
+			display_value = camera_memory_address_debug;
 		end
 
 		

@@ -32,7 +32,6 @@
 
 module camera_module_v2(
 	//input [7:0] startup_sequencer,
-	output reg camera_grab_in_progress,
 	output reg camera_module_detect,
 	input wire pause,
 	
@@ -42,8 +41,8 @@ module camera_module_v2(
 	input wire [31:0] data_read,
 	output reg ddr_wren,			// NOTE: 1 is read, 0 is write!
 	//debug:
-	output reg [31:0] data_write,
-	output wire [31:0] data_write_buffered,
+	output reg [23:0] data_write,
+	output reg [31:0] data_write_buffered,
 	wire [4:0] state_debug,
 	output reg altline,
 	output reg altcol,
@@ -61,6 +60,8 @@ module camera_module_v2(
 	// FIFO debug signals
 	output wire fifo_full,
 	output wire fifo_empty,
+	output reg [18:0] camera_memory_address,
+	input wire all_dcms_locked,
 	
 	output reg [19:0] addr_count,
 	
@@ -78,17 +79,19 @@ module camera_module_v2(
 	initial altline = 0;
 	initial altcol = 0;
 	initial pixel_valid = 0;
+	initial camera_memory_address = 76801;
 	
 	IBUFG CAMERA_CLOCK_BUF(
 		.O(camera_data_pclk),
 		.I(camera_data_pclk_unbuffered)
 		);
 	
-	reg [18:0] camera_memory_address = 0;
+	reg camera_grab_enable_prev;
+	//reg [18:0] camera_memory_address = 76801;
 	reg [19:0] address_buffer;
 	reg [15:0] databuffer;
 	reg [3:0] camera_toggle = 0;
-	reg [31:0] databuffer_mem;
+	reg [23:0] databuffer_mem;
 	
 	reg camera_data_href_prev = 0;
 	reg camera_data_vsync_prev = 0;
@@ -97,6 +100,7 @@ module camera_module_v2(
 	reg [31:0] data_read_sync;
 	reg [15:0] line_counter;
 	reg line_valid;
+	reg [1:0] pixel_counter;
 	
 	reg [30:0] ers_exposure_length = 1000;
 	reg [25:0] red_average;
@@ -107,29 +111,23 @@ module camera_module_v2(
 	reg [31:0] ers_exposure_timer;
 	reg [31:0] camera_not_present_timer;
 
-	reg final_process_counter;
+	reg final_process_counter = 1;
 
 	reg camera_agc_enable;
 	reg camera_agc_done;
 	
-	reg wren;
 	reg [19:0] address;
 	
 	//----------------FIFO--------
 	reg fifo_wren;
 	reg fifo_rden;
-	wire [23:0] data_write_fifo;
 	wire [23:0] data_write_buffered_fifo;
 	
-	// G2 (8 bits) is not used. To save on space, it will not be written to the fifo. 
-	// The G2 space of data_write is later trimmed in main, so it will be replaced with zeros for now.
-	assign data_write_buffered = {data_write_buffered_fifo[23:16], 8'h0, data_write_buffered_fifo[15:0]};
-	assign data_write_fifo = {data_write[31:24], data_write[23:0]};
-	
 	camera_fifo_buffer fifo_buffer (
+		.rst(!all_dcms_locked),
 		.wr_clk(camera_data_pclk), // input wr_clk	(needs to run camera clock speed)
 		.rd_clk(clk), // input rd_clk	(needs to run at speed of main system clk)
-		.din(data_write_fifo), // input [23:0] din  (data to be eventually be written to DDR mem)
+		.din(data_write), // input [23:0] din  (data to be eventually be written to DDR mem)
 		.wr_en(fifo_wren), // input wr_en
 		.rd_en(fifo_rden), // input rd_en
 		.dout(data_write_buffered_fifo), // output [23:0] dout
@@ -140,87 +138,52 @@ module camera_module_v2(
 	localparam	INIT_STATE = 0,
 			IDLE = 1,
 			WRITE = 2,
-			READ = 3,
-			INC_ADDR = 4;
+			READ = 3;
 	
-	reg [4:0] state1, state2;
-	reg [18:0] counter;
-	assign state_debug = state1;
+	reg [4:0] state;
+	assign state_debug = state;
 
-	//----begin FIFO write control
-	//----this runs at the pixel clock 
-	//----DOES NOT respect the pause signal
-	always @(posedge camera_data_pclk) begin
-		//debugging -- temp (FIX)
-		pixel_valid = 1;
-
-		case (state1) 
-			INIT_STATE: 
-				begin
-					fifo_wren = 0;
-					state1 = IDLE;
-				end
-			IDLE: 	begin
-					fifo_wren = 0;
-					if ((pixel_valid == 1) && (!fifo_full)) begin
-						state1 = WRITE;
-					end
-					else begin
-						state1 = IDLE;
-					end
-				end
-			WRITE: 	begin
-					fifo_wren = 1;
-					state1 = IDLE;
-				end
-		endcase
-	end	//end always
-	//----end FIFO write control
 	
 	//----begin FIFO read control
 	//----this runs at clk
 	//----MUST respect the pause signal from memory controller
 	always @(posedge clk) begin
+		// G2 (8 bits) is not used. To save on space, it will not be written to the fifo. 
+		// The G2 space of data_write is later trimmed in main, so it will be replaced with zeros for now.
+		data_write_buffered = {data_write_buffered_fifo[23:16], 8'h0, data_write_buffered_fifo[15:0]};
+
 		if (pause == 0) begin
 			if (camera_grab_enable == 1) begin
-					
-				//debugging -- temp (FIX)
-				counter = counter + 1;
 				
-				case (state2) 
+				case (state) 
 					INIT_STATE: 
 						begin
 							fifo_rden = 0;
 							ddr_addr = 0;
-							state2 = IDLE;
+							state = IDLE;
 						end
 					IDLE: 	begin
 							ddr_wren = 0;
 							fifo_rden = 0;
 							if (!fifo_empty) begin
-								state2 = READ;
+								state = READ;
 							end
 							else begin
-								state2 = IDLE;
+								state = IDLE;
 							end
 							//reset address counter after complete 320x240 frame written
-							if (addr_count >= 76800 - 1) begin
+							if (addr_count >= 76800) begin
 								addr_count = 0;
 								camera_grab_done = 1;
 							end
 						end
 					READ:	begin
 							fifo_rden = 1;
-							//ddr_data_write = data_write_buffered;
-							ddr_data_write = counter;
+							ddr_data_write = data_write_buffered;
 							ddr_addr = addr_count + data_write_offset;
 							ddr_wren = 1;
-							state2 = INC_ADDR;
-						end
-					INC_ADDR: 
-						begin
 							addr_count = addr_count + 1;
-							state2 = IDLE;
+							state = IDLE;
 						end
 				endcase
 				
@@ -234,7 +197,7 @@ module camera_module_v2(
 	end	//end always
 	//----end FIFO read control
 
-/*	// Shutter control
+	// Shutter control
 	always @(posedge clk) begin
 		if ((camera_grab_enable == 1) && (camera_grab_done == 0)) begin
 			if (exposed == 0) begin
@@ -255,7 +218,7 @@ module camera_module_v2(
 	end
 
 	// AGC
-	always @(posedge clk) begin
+	always @(posedge camera_data_pclk) begin
 		// Deal with the control signals...
 		if (camera_agc_enable == 0) begin
 			camera_agc_done = 0;
@@ -297,141 +260,125 @@ module camera_module_v2(
 		end
 	end
 	
+	reg [19:0] count = 0;
+	
 	// Camera data input processor
 	always @(posedge camera_data_pclk) begin
-		data_read_sync = data_read;
 		databuffer = camera_data_port;
-		
-		// Deal with the control signals...
-		if (camera_grab_enable == 0) begin
-			camera_grab_done = 0;
-		end
-		
 		// Capture a 320 x 240 image if enabled (8-bit tricolor)
 		// One line is G1-R-G1-R-G1-R...
 		// The next line is B-G2-B-G2-B-G2...
 		// This is the well known Bayer pattern
-		if ((camera_grab_enable == 1) && (camera_grab_done == 0)) begin
-			auxramclk_speed_select = 1;
-			camera_grab_in_progress = 1;
+		if (camera_memory_address < 76800) begin	//if complete 320x240 frame not yet written
 			if ((camera_data_href == 1) && (camera_data_vsync == 1) && (vsync_locked == 1) && (line_valid == 1)) begin
 				case (camera_toggle)
 					0: begin
- 						wren = 1;
-//						address = address_buffer;
 						case (altline)
 							0: databuffer_mem[7:0] = databuffer[11:4];		// G1
-							1: databuffer_mem[31:24] = databuffer[11:4];		// B
+							1: databuffer_mem[23:16] = databuffer[11:4];		// B
 						endcase
-						// Increment the address pointer
-						camera_memory_address = camera_memory_address + 1;
 						camera_toggle = 1;
+						fifo_wren = 0;
 					end
 					1: begin
 						case (altline)
 							0: databuffer_mem[15:8] = databuffer[11:4];		// R
 							1: begin
-								databuffer_mem[23:16] = databuffer[11:4];		// G2
-								databuffer_mem[15:0] = data_read_sync[15:0];
+								//databuffer[11:4]		// G2
 								red_average = red_average + databuffer_mem[15:8];
 								green_average = green_average + databuffer_mem[7:0];
-								blue_average = blue_average + databuffer_mem[31:24];
+								blue_average = blue_average + databuffer_mem[23:16];
 							end
 						endcase
-						//data_write = databuffer_mem;
-						data_write = camera_memory_address;
-						wren = 0;										// Commit the data to RAM
+						if ((pixel_valid == 1) && (!fifo_full)) begin
+							fifo_wren = 1;
+							//data_write = databuffer_mem;
+							data_write = count;
+							count = count + 1;
+							// Increment the address pointer
+							camera_memory_address = camera_memory_address + 1;
+							line_counter = line_counter + 1;
+						end
 						camera_toggle = 0;
 					end
 				endcase
-				if (camera_memory_address >= 76800) begin		// All done!
-					// Do a simple AGC function here
-					camera_toggle = 0;
-					case (final_process_counter)
-						0: begin
-							camera_agc_enable = 1;
-							if (camera_agc_done == 1) begin
-								camera_agc_enable = 0;
-								final_process_counter = 1;
-							end
-						end
-						1: begin
-							camera_grab_in_progress = 0;
-							camera_toggle = 0;
-							camera_grab_done = 1;
-							altline = 0;
-							vsync_locked = 0;
-							red_average = 0;
-							green_average = 0;
-							blue_average = 0;
-						end
-					endcase
-				end
-				line_counter = line_counter + 1;
 			end else begin
-				wren = 0;
+				fifo_wren = 0;
 			end
-			if ((camera_data_vsync_prev == 1) && (camera_data_vsync == 0)) begin
-				altcol = ~altcol;
-			end			
-			if ((camera_data_href_prev == 1) && (camera_data_href == 0)) begin
-				altline = ~altline;
- 				if (altline == 1) begin
- 					if (camera_memory_address > (320 - 1)) begin
- 						camera_memory_address = camera_memory_address - 320;
- 					end
- 				end
-				camera_module_detect = 1;
-				camera_not_present_timer = 0;
-			end
-			if ((altcol == 1) && (altline == 1)) begin
-				pixel_valid = 1;
-			end else begin
-				pixel_valid = 0;
-			end
-			if (camera_data_href == 0) begin
-				line_counter = 0;
-				camera_toggle = 0;
-			end
-			if (exposed == 1) begin
-				vsync_locked = 1;
-				if (camera_not_present_timer > 100000) begin
-					camera_module_detect = 0;
-					camera_grab_done = 1;
-				end
-				camera_not_present_timer = camera_not_present_timer + 1;
-			end
-			if (line_counter < 640) begin
-				line_valid = 1;
-			end else begin
-				line_valid = 0;
-			end
-		end else begin
-			camera_not_present_timer = 0;
-			camera_grab_in_progress = 0;
-			camera_memory_address = 0;
+		end else begin		// All done!
+			// Do a simple AGC function here
 			camera_toggle = 0;
-			altline = 0;
-			vsync_locked = 0;
-			red_average = 0;
-			green_average = 0;
-			blue_average = 0;
-			final_process_counter = 0;
-			
-			// Release the SRAM lines
-			address = 0;
-			data_write = 0;
-			wren = 1;
-			
-			// Reset the RAM to standard operation
-			auxramclk_speed_select = 0;
+			case (final_process_counter)
+				0: begin
+					camera_agc_enable = 1;
+					if (camera_agc_done == 1) begin
+						camera_agc_enable = 0;
+						final_process_counter = 1;
+					end
+				end
+				//reset
+				1: begin
+					camera_toggle = 0;
+					altline = 0;
+					altcol = 0;
+					vsync_locked = 0;
+					red_average = 0;
+					green_average = 0;
+					blue_average = 0;
+					camera_not_present_timer = 0;
+					final_process_counter = 0;
+					fifo_wren = 0;
+				end
+			endcase
+		end
+		
+		if ((camera_data_href_prev == 1) && (camera_data_href == 0)) begin
+			altline = ~altline;
+			pixel_counter = 0;
+
+			camera_module_detect = 1;
+			camera_not_present_timer = 0;
+		end
+		if (camera_data_href == 1) begin
+			//free-running 2-bit counter
+			pixel_counter = pixel_counter + 1;
+			if (pixel_counter <= 1) begin
+				altcol = 1;
+			end else begin
+				altcol = 0;
+			end
+		end		
+		if ((altcol == 1) && (altline == 1)) begin
+			pixel_valid = 1;
+		end else begin
+			pixel_valid = 0;
+		end
+		if (camera_data_href == 0) begin
+			line_counter = 0;
+			camera_toggle = 0;
+		end
+		if (exposed == 1) begin
+			vsync_locked = 1;
+			if (camera_not_present_timer > 100000) begin
+				camera_module_detect = 0;
+			end
+			camera_not_present_timer = camera_not_present_timer + 1;
+		end
+		if (line_counter < 320) begin
+			line_valid = 1;
+		end else begin
+			line_valid = 0;
 		end
 		
 //		address_buffer = camera_memory_address + data_write_offset;
 		
 		camera_data_href_prev = camera_data_href;
 		camera_data_vsync_prev = camera_data_vsync;
-
+		
+		if ((camera_grab_enable_prev == 0) && (camera_grab_enable == 1)) begin
+			camera_memory_address = 0;
+		end
+		camera_grab_enable_prev = camera_grab_enable;		
 	end
-*/
+
 endmodule

@@ -224,6 +224,7 @@ module clock_manager(
 	wire dcm_feedback_sram;
 	
 	assign modified_clock_sram = input_clk;
+	assign dcm_locked_sram = 1;
 
 // 	DCM_SP #(
 // 		.CLKDV_DIVIDE(2.0),                   // CLKDV divide value
