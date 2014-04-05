@@ -1,35 +1,38 @@
 # (c) 2007-2014 Timothy Pearson, Raptor Engineering
 # Released into the Public Domain
-# Modified for Spartan 6/Nexys 3 by Audrey Pearson (2014)
+# Modified for Spartan 6 by Audrey Pearson (2014)
 
 #NET "buttons<0>" LOC = "A8" | IOSTANDARD = "LVCMOS33";
 #NET "buttons<1>" LOC = "D9" | IOSTANDARD = "LVCMOS33";
 #NET "buttons<2>" LOC = "C9" | IOSTANDARD = "LVCMOS33";
 #NET "buttons<3>" LOC = "C4" | IOSTANDARD = "LVCMOS33";
 #NET "buttons<4>" LOC = "B8" | IOSTANDARD = "LVCMOS33";
-#NET "camera_data_port<0>" LOC = "T12"  | IOSTANDARD = "LVCMOS33";
-#NET "camera_data_port<1>" LOC = "V12" | IOSTANDARD = "LVCMOS33";
-#NET "camera_data_port<2>" LOC = "N10" | IOSTANDARD = "LVCMOS33";
-#NET "camera_data_port<3>" LOC = "P11" | IOSTANDARD = "LVCMOS33";
-#NET "camera_data_port<4>" LOC = "M10" | IOSTANDARD = "LVCMOS33";
-#NET "camera_data_port<5>" LOC = "N9" | IOSTANDARD = "LVCMOS33";
-#NET "camera_data_port<6>" LOC = "U11" | IOSTANDARD = "LVCMOS33";
-#NET "camera_data_port<7>" LOC = "V11" | IOSTANDARD = "LVCMOS33";
-#NET "camera_data_port<8>" LOC = "K2" | IOSTANDARD = "LVCMOS33";
-#NET "camera_data_port<9>" LOC = "K1" | IOSTANDARD = "LVCMOS33";
-#NET "camera_data_port<10>" LOC = "L4" | IOSTANDARD = "LVCMOS33";
-#NET "camera_data_port<11>" LOC = "L3" | IOSTANDARD = "LVCMOS33";
+NET "camera_data_port<0>" LOC = "P6"  | IOSTANDARD = "LVCMOS33";
+NET "camera_data_port<1>" LOC = "T5" | IOSTANDARD = "LVCMOS33";
+NET "camera_data_port<2>" LOC = "V13" | IOSTANDARD = "LVCMOS33";
+NET "camera_data_port<3>" LOC = "U17" | IOSTANDARD = "LVCMOS33";
+NET "camera_data_port<4>" LOC = "V15" | IOSTANDARD = "LVCMOS33";
+NET "camera_data_port<5>" LOC = "P15" | IOSTANDARD = "LVCMOS33";
+NET "camera_data_port<6>" LOC = "U18" | IOSTANDARD = "LVCMOS33";
+NET "camera_data_port<7>" LOC = "N15" | IOSTANDARD = "LVCMOS33";
+NET "camera_data_port<8>" LOC = "P16" | IOSTANDARD = "LVCMOS33";
+NET "camera_data_port<9>" LOC = "L15" | IOSTANDARD = "LVCMOS33";
+NET "camera_data_port<10>" LOC = "N16" | IOSTANDARD = "LVCMOS33";
+NET "camera_data_port<11>" LOC = "M14" | IOSTANDARD = "LVCMOS33";
 #NET "camera_data_port<12>" LOC = "J3" | IOSTANDARD = "LVCMOS33";
 #NET "camera_data_port<13>" LOC = "J1" | IOSTANDARD = "LVCMOS33";
 #NET "camera_data_port<14>" LOC = "K3" | IOSTANDARD = "LVCMOS33";
 #NET "camera_data_port<15>" LOC = "K5" | IOSTANDARD = "LVCMOS33";
-
-
-#NET "camera_data_href" LOC = #"A4";
-#NET "camera_data_pclk" LOC = #"B7"; 
-#NET "camera_data_scl" LOC = #"B4";
-#NET "camera_data_sda" LOC = #"D10";
-#NET "camera_data_vsync" LOC = #"A5";
+NET "camera_data_href" LOC = "V4";
+NET "camera_data_vsync" LOC = "T4";
+NET "camera_data_pclk" LOC = "T10"; 
+NET "camera_data_scl" LOC = "U13";
+NET "camera_data_sda" LOC = "U15";
+NET "camera_data_extclk" LOC = "R10";
+NET "camera_data_reset" LOC = "N6";
+NET "camera_data_strobe" LOC = "U5";
+#NET "camera_data_trigger" LOC = "V6";
+NET "camera_data_standby" LOC = "T6";
 
 NET "crystal_clk" LOC = "V10" | IOSTANDARD = "LVCMOS33";
 NET "crystal_clk" TNM_NET = crystal_clk;
@@ -66,6 +69,9 @@ NET "SEG4"         LOC = "C18" | IOSTANDARD = "LVCMOS33";   #Bank = 1, Pin name 
 NET "SEG5"         LOC = "C17" | IOSTANDARD = "LVCMOS33";   #Bank = 1, Pin name = IO_L53N_VREF,                      Sch name = CF
 NET "SEG6"         LOC = "A16" | IOSTANDARD = "LVCMOS33";   #Bank = 1, Pin name = IO_L61P,                           Sch name = CG
 NET "SEG7"         LOC = "B16" | IOSTANDARD = "LVCMOS33";   #Bank = 1, Pin name = IO_L61N,                           Sch name = DP
+
+#debug
+NET "global_pause"	LOC="B2" | IOSTANDARD = "LVCMOS33";
 
 NET "TxD" 				LOC = "A14" | IOSTANDARD = "LVCMOS33";	#serial output (from fpga)
 NET "RxD" 				LOC = "B14" | IOSTANDARD = "LVCMOS33";		#serial input (to fpga )
