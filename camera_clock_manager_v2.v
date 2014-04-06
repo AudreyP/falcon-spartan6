@@ -1,32 +1,22 @@
 module camera_clock_manager_v2(
 	input input_clk,
-	output wire main_camera_clk_unbuffered,
-	output wire main_camera_clk_oneeighty_unbuffered,
-	output wire camera_dcm_locked,
-	output wire camera_dcm_feedback_unbuff
+	output wire main_camera_clk,
+	output wire camera_dcm_locked
 	);
 
 	// generate 96MHz clock for the camera
 	
-	wire main_camera_clk;
 	reg dcm_reset = 1;
 
-	BUFG CAMERA_CLOCK_BUF(
-		.O(main_camera_clk),
-		.I(main_camera_clk_unbuffered)
-		);
-// 	BUFG LOOPBACK_CLOCK_CAMERA_BUF(
-// 		.O(camera_dcm_feedback),
-// 		.I(camera_dcm_feedback_unbuff)
-// 		);
+	wire camera_dcm_feedback;
 
 	DCM_SP #(
 		// NOTE: This must generate 96MHz, not 25MHz, for monochrome cameras
 		// For 96.8 MHz: CLKFX_DIVIDE = 32, CLKFX_MULTIPLY = 31
 		// For 25 MHz: CLKFX_DIVIDE = 8, CLKFX_MULTIPLY = 2
 		.CLKDV_DIVIDE(2.0), 			// divide the system clock by 2.0 to determine CLKDV (25 MHz)
-		.CLKFX_DIVIDE(32.0), 			// the denominator of the clock multiplier used to determine CLKFX
-		.CLKFX_MULTIPLY(31.0), 			// the numerator of the clock multiplier used to determine CLKFX
+		.CLKFX_DIVIDE(8.0), 			// the denominator of the clock multiplier used to determine CLKFX
+		.CLKFX_MULTIPLY(2.0), 			// the numerator of the clock multiplier used to determine CLKFX
 		//.CLKFX_MULTIPLY(16.0), 			// the numerator of the clock multiplier used to determine CLKFX
 		.CLKIN_DIVIDE_BY_2("FALSE"),		// create the internal clock signal
 		.CLKIN_PERIOD(10.0), 			// period of input clock in ns
@@ -41,15 +31,15 @@ module camera_clock_manager_v2(
 		.STARTUP_WAIT("FALSE") 			// Do not delay configuration DONE until DCM LOCK TRUE
 	)
 	SYSTEM_DCM_CAMERA(
-		.CLK0(camera_dcm_feedback),	//used to be camera_dcm_feedback_unbuff 
+		.CLK0(camera_dcm_feedback),
 		.CLK180(),
 		.CLK270(),
 		.CLK2X(),
 		.CLK2X180(),
 		.CLK90(),
 		.CLKDV(),
-		.CLKFX(main_camera_clk_unbuffered),
-		.CLKFX180(main_camera_clk_oneeighty_unbuffered),
+		.CLKFX(main_camera_clk),
+		.CLKFX180(),
 		.LOCKED(camera_dcm_locked),
 		.PSDONE(),
 		.STATUS(),		

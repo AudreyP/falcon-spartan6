@@ -23,20 +23,42 @@ NET "camera_data_port<11>" LOC = "M14" | IOSTANDARD = "LVCMOS33";
 #NET "camera_data_port<13>" LOC = "J1" | IOSTANDARD = "LVCMOS33";
 #NET "camera_data_port<14>" LOC = "K3" | IOSTANDARD = "LVCMOS33";
 #NET "camera_data_port<15>" LOC = "K5" | IOSTANDARD = "LVCMOS33";
-NET "camera_data_href" LOC = "V4";
-NET "camera_data_vsync" LOC = "T4";
-NET "camera_data_pclk" LOC = "T10"; 
-NET "camera_data_scl" LOC = "U13";
-NET "camera_data_sda" LOC = "U15";
-NET "camera_data_extclk" LOC = "R10";
-NET "camera_data_reset" LOC = "N6";
-NET "camera_data_strobe" LOC = "U5";
-#NET "camera_data_trigger" LOC = "V6";
-NET "camera_data_standby" LOC = "T6";
+NET "camera_data_href" LOC = "V4" | IOSTANDARD = "LVCMOS33" | PULLDOWN;
+NET "camera_data_vsync" LOC = "T4" | IOSTANDARD = "LVCMOS33" | PULLDOWN;
+NET "camera_data_scl" LOC = "U13" | IOSTANDARD = "LVCMOS33" | PULLUP;
+NET "camera_data_sda" LOC = "U15" | IOSTANDARD = "LVCMOS33" | PULLUP;
+NET "camera_data_extclk" LOC = "R10" | IOSTANDARD = "LVCMOS33";
+NET "camera_data_reset" LOC = "N6" | IOSTANDARD = "LVCMOS33";
+NET "camera_data_strobe" LOC = "U5" | IOSTANDARD = "LVCMOS33";
+NET "camera_data_trigger" LOC = "V6" | IOSTANDARD = "LVCMOS33";
+NET "camera_data_standby" LOC = "T6" | IOSTANDARD = "LVCMOS33";
+NET "camera_data_saddr" LOC = "V5" | IOSTANDARD = "LVCMOS33";
+NET "camera_data_oe" LOC = "P7" | IOSTANDARD = "LVCMOS33";
 
 NET "crystal_clk" LOC = "V10" | IOSTANDARD = "LVCMOS33";
 NET "crystal_clk" TNM_NET = crystal_clk;
 TIMESPEC TS_crystal_clk = PERIOD "crystal_clk" 10 ns HIGH 50%;
+
+NET "camera_data_pclk" LOC = "T10" | IOSTANDARD = "LVCMOS33";
+NET "camera_data_pclk" TNM_NET = camera_data_pclk;
+TIMESPEC TS_camera_data_pclk = PERIOD "camera_data_pclk" 20 ns HIGH 50%;
+
+NET "camera_data_port<0>" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
+NET "camera_data_port<1>" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
+NET "camera_data_port<2>" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
+NET "camera_data_port<3>" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
+NET "camera_data_port<4>" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
+NET "camera_data_port<5>" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
+NET "camera_data_port<6>" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
+NET "camera_data_port<7>" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
+NET "camera_data_port<8>" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
+NET "camera_data_port<9>" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
+NET "camera_data_port<10>" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
+NET "camera_data_port<11>" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
+NET "camera_data_href" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
+NET "camera_data_vsync" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
+NET "camera_data_strobe" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
+NET "camera_data_trigger" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
 
 #### User I/O on I/O Bank 1
 

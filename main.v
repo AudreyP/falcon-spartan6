@@ -79,7 +79,7 @@ module main(
 	input wire camera_data_pclk,	
 	output wire camera_data_extclk, 
 	input wire camera_data_strobe,
-	//output wire camera_data_trigger,
+	output wire camera_data_trigger,
 	output wire camera_data_standby,
 	//signals below were associated with I2C modue in FII design
 	output wire camera_data_scl,
@@ -256,9 +256,7 @@ module main(
 	
 	camera_clock_manager_v2 camera_clock_manager(
 		.input_clk(main_system_clock),		//CLKIN
-		.camera_dcm_feedback_unbuff(),	//CLK0
-		.main_camera_clk_unbuffered(),		//CLKFX
-		.main_camera_clk_oneeighty_unbuffered(camera_data_extclk),	//CLKFX180
+		.main_camera_clk(camera_data_extclk),		//CLKFX
 		.camera_dcm_locked(camera_dcm_locked)	//LOCKED
 		);
 	
@@ -274,6 +272,15 @@ module main(
 	wire stuck;
 	wire [19:0] addr_count;
 	wire [18:0] camera_memory_address_debug;
+	wire red_full;
+	wire green_full;
+	wire blue_full;
+	wire [31:0] href_active;
+	wire [31:0] vsync_active;
+	wire vsync_locked;
+	wire line_valid;
+	wire [1:0] col_count;
+	wire [1:0] row_count;
 	
 	wire all_dcms_locked;
 	
@@ -286,6 +293,7 @@ module main(
 		.ddr_wren(wren_camera_capture),
 		.data_read(data_read),
 		.camera_data_pclk_unbuffered(camera_data_pclk),
+		.camera_data_extclk(camera_data_extclk),
 		.camera_data_href(camera_data_href),
 		.camera_data_vsync(camera_data_vsync),
 		.camera_data_port(camera_data_port),
@@ -302,11 +310,17 @@ module main(
 		.data_write(data_write_camera_fifo_input),
 		.data_write_buffered(data_write_camera_fifo_output),
 		.state_debug(fifo_state),
-		.altcol(altcol),
-		.altline(altline),
-		.pixel_valid(pixel_valid),
 		.addr_count(addr_count),
-		.camera_memory_address(camera_memory_address_debug)
+		.camera_memory_address(camera_memory_address_debug),
+		.red_empty(red_full),
+		.green_empty(green_full),
+		.blue_empty(blue_full),
+		.href_active(href_active),
+		.vsync_active(vsync_active),
+		.vsync_locked(vsync_locked),
+		.line_valid(line_valid),
+		.col_count(col_count),
+		.row_count(row_count)
 		);
 
 	
@@ -823,9 +837,35 @@ module main(
 			display_value = addr_count[17:4];
 		end
 		if (slide_switches == 17) begin
-			display_value = camera_memory_address_debug;
+			display_value = camera_memory_address_debug[17:4];
 		end
-
+		if (slide_switches == 18) begin
+			display_value = red_full;
+		end
+		if (slide_switches == 19) begin
+			display_value = green_full;
+		end
+		if (slide_switches == 20) begin
+			display_value = blue_full;
+		end
+		if (slide_switches == 21) begin
+			display_value = href_active;
+		end
+		if (slide_switches == 22) begin
+			display_value = vsync_active[31:4];
+		end
+		if (slide_switches == 23) begin
+			display_value = vsync_locked;
+		end
+		if (slide_switches == 24) begin
+			display_value = line_valid;
+		end
+		if (slide_switches == 25) begin
+			display_value = row_count;
+		end
+		if (slide_switches == 26) begin
+			display_value = col_count;
+		end
 		
 		//switch values 1,2,4,8,16,32
 		
