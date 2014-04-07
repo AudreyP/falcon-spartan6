@@ -109,10 +109,9 @@ module main(
 	//parameter I2ClkCyclesToWait = (InternalClkFrequency / 100);
 	//parameter I2ClkCyclesToWait = (InternalClkFrequency / 1);
 
-
-	wire clk;		
-	wire prev_clk;
-	assign prev_clk = clk;
+	wire clk;
+	wire modified_clock;
+	wire modified_clock_nonglobal;
 
 	//reg border_drawing_holdoff = 0;	//Not used anywhere??
 	
@@ -218,12 +217,12 @@ module main(
 	wire [15:0] sram_debug0;
 	wire mem_read_error;
 	wire controller_ready;
+	wire [9:0] mem_counter;
 
 	mem_manager mem_manager(
 		.modified_clock_sram(modified_clock_sram),
-		.clk(clk),
+		.clk(modified_clock_nonglobal),
 		.crystal_clk(crystal_clk),
-		.prev_clk(prev_clk),
 		.pause(global_pause),
 		.counter(mem_counter),
 		.starting_address(address), 
@@ -701,8 +700,6 @@ module main(
 	
 //	reg enable_rgb = 0;
 //	reg enable_ycrcb = 1;
-			
-	wire modified_clock;
 	
 	wire dcm_locked, dcm_locked_two, dcm_locked_sram;
 
@@ -712,6 +709,7 @@ module main(
 	clock_manager clock_manager(
 		.input_clk(main_system_clock),
 		.modified_clock(modified_clock),
+		.modified_clock_nonglobal(modified_clock_nonglobal),
 		.modified_clock_div_by_two(modified_clock_div_by_two),
 		.modified_clock_two(modified_clock_two),
 		.modified_clock_two_div_by_two(modified_clock_two_div_by_two),
@@ -865,6 +863,9 @@ module main(
 		end
 		if (slide_switches == 26) begin
 			display_value = col_count;
+		end
+		if (slide_switches == 27) begin
+			display_value = mem_counter;
 		end
 		
 		//switch values 1,2,4,8,16,32

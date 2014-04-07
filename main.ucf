@@ -57,8 +57,6 @@ NET "camera_data_port<10>" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk
 NET "camera_data_port<11>" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
 NET "camera_data_href" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
 NET "camera_data_vsync" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
-NET "camera_data_strobe" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
-NET "camera_data_trigger" OFFSET = IN 8 ns VALID 10 ns BEFORE "camera_data_pclk";
 
 #### User I/O on I/O Bank 1
 

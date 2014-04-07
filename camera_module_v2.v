@@ -219,7 +219,7 @@ output reg row_count,
 		// The G2 space of data_write is later trimmed in main, so it will be replaced with zeros for now.
 	
 		if (camera_grab_enable == 1) begin
-			if (camera_grab_done == 0) begin
+			if ((camera_grab_done == 0) && (exposed == 1)) begin
 				case (state)
 					INIT_STATE: 
 						begin
@@ -228,7 +228,9 @@ output reg row_count,
 							state = IDLE;
 						end
 					IDLE: 	begin
-							ddr_wren = 0;
+							// Reading from certain memory types (LPDDR) involves a large latency that does not exist when writing
+							// Nothing is harmed by staying in write mode and writing the same data to the same address over and over
+							// Therefore, do not switch to read mode at any time during the frame transfer
 							if (!fifo_empty) begin
 								fifo_rden = 1;
 								state = READ;
@@ -268,7 +270,7 @@ output reg row_count,
 
 			fifo_rden = 0;
 			ddr_addr = 0;
-			state = IDLE;
+			state = INIT_STATE;
 		end
 	end	//end always
 	//----end FIFO read controls
@@ -342,28 +344,20 @@ output reg row_count,
 	reg [19:0] gcount = 0;
 	reg [19:0] bcount = 0;
 
-	reg camera_grab_enable_buffered;
-	reg camera_data_href_buffered;
-	reg camera_data_vsync_buffered;
-	
 	// Camera data input processor
 	always @(posedge camera_data_pclk) begin
 		databuffer = camera_data_port;
-
-		camera_grab_enable_buffered = camera_grab_enable;
-		camera_data_href_buffered = camera_data_href;
-		camera_data_vsync_buffered = camera_data_vsync;
 
 		// Capture a 320 x 240 image if enabled (8-bit tricolor)
 		// One line is G1-R-G1-R-G1-R...
 		// The next line is B-G2-B-G2-B-G2...
 		// This is the well known Bayer pattern
 		if (camera_memory_address < 76800) begin	//if complete 320x240 frame not yet written
-			if ((camera_data_href_prev == 1) && (camera_data_href_buffered == 0)) begin
+			if ((camera_data_href_prev == 1) && (camera_data_href == 0)) begin
 				//free-running 2-bit counter
 				row_count = row_count + 1;
 			end
-			if ((camera_data_href_buffered == 1) && (camera_data_vsync_buffered == 1) && (vsync_locked == 1) && (line_valid == 1)) begin
+			if ((camera_data_href == 1) && (camera_data_vsync == 1) && (vsync_locked == 1) && (line_valid == 1)) begin
 				//free-running 2-bit counter
 				col_count = col_count + 1;
 				
@@ -471,11 +465,11 @@ output reg row_count,
 		// These if blocks and assignments operate independently 
 		// of whether a 320*240 frame is being written.
 		// Run at pixel clock
-		if ((camera_data_href_prev == 1) && (camera_data_href_buffered == 0)) begin
+		if ((camera_data_href_prev == 1) && (camera_data_href == 0)) begin
 			camera_module_detect = 1;
 			camera_not_present_timer = 0;
 		end
-		if (camera_data_href_buffered == 0) begin
+		if (camera_data_href == 0) begin
 			line_counter = 0;
 			camera_toggle = 0;
 		end
@@ -493,7 +487,7 @@ output reg row_count,
 		end
 		
 		//debugging
-		if (camera_data_href_buffered == 1) begin
+		if (camera_data_href == 1) begin
 			if (camera_data_href_prev == 0) begin
 				//reset on rising edge
 				href_active = href_active_count;
@@ -512,16 +506,16 @@ output reg row_count,
 			end
 		end
 		
-		if ((camera_grab_enable_prev == 0) && (camera_grab_enable_buffered == 1)) begin
+		if ((camera_grab_enable_prev == 0) && (camera_grab_enable == 1)) begin
 			camera_memory_address = 0;
 			final_process_counter = 0;
 			href_active_count = 0;
 			vsync_active_count = 0;
 		end
-		camera_grab_enable_prev = camera_grab_enable_buffered;
+		camera_grab_enable_prev = camera_grab_enable;
 
-		camera_data_href_prev = camera_data_href_buffered;
-		camera_data_vsync_prev = camera_data_vsync_buffered;
+		camera_data_href_prev = camera_data_href;
+		camera_data_vsync_prev = camera_data_vsync;
 	end
 
 endmodule

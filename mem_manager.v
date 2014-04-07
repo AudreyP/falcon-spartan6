@@ -20,14 +20,13 @@
 module mem_manager(
 	input wire clk,
 	input wire crystal_clk,
-	input wire prev_clk,
 	input wire modified_clock_sram,
 	input wire wren,             	     // write enable
 	input wire [31:0] data_write,      // data being written to memory
 	output reg [31:0] data_read,       // data being read from memory
 	
 	output reg pause,
-	output reg [6:0] counter,
+	output reg [9:0] counter,
 	
 	input wire [17:0] starting_address,
 	
@@ -207,8 +206,12 @@ module mem_manager(
 			REFRESH = 4;	
 	
 	localparam 	LATCH_TIME = 4,
-					NO_RETURN = 9;
-			
+			NO_RETURN = 9;
+
+	reg wren_prev;
+	reg [17:0] starting_address_prev;
+
+	reg prev_clk;
 	//----------------------------
 	// BEGIN STATE MACHINE
 	//----------------------------
@@ -216,14 +219,14 @@ module mem_manager(
 		//counter resets on rising edge of main clock. 
 		//Divides one clock cycle into time slices determined by the modified clock rate (in this case, 10 slices per main clk cycle)
 		//(counter increments on posedge of modified clock)
-		if (clk == 1 && prev_clk == 0) begin	
+		if ((clk == 1) && (prev_clk == 0)) begin
 			counter = 0;
 		end
 		else begin
 			counter = counter + 1;
 		end
 		
-		if (counter > NO_RETURN && ddr_op_in_progress == 1) begin
+		if ((counter > NO_RETURN) && (ddr_op_in_progress == 1)) begin
 			pause = 1;
 		end
 		
@@ -248,23 +251,35 @@ module mem_manager(
 				end
 
 		LATCH_STATE:	begin
-					cmd_addr[29:2] = starting_address;	//starting address 17 bits--shove into upper 17b of 19b addr to leave room for two 0's
-					cmd_addr[1:0] = 0;
-				
-					//determine read or write operation
-					if (wren==1) begin	//if a write signal is received, begin write	
-						wr_data = data_write;	//write whole 32-bit word
-						//wr_data = 32'hf0806020;
-						state = WRITE_STATE;
-						ddr_op_in_progress = 1;
+					// Rudimentary single-word data cache
+					if (starting_address == starting_address_prev) begin
+						if ((wren == 0) || ((wren == 1) && (wren_prev == 1))) begin
+							// Do nothing!
+							state = DDR_DATA_VALID_STATE;
+						end
+					end else begin
+						cmd_addr[29:2] = starting_address;	//starting address 17 bits--shove into upper 17b of 19b addr to leave room for two 0's
+						cmd_addr[1:0] = 0;
+					
+						//determine read or write operation
+						if (wren==1) begin	//if a write signal is received, begin write	
+							wr_data = data_write;	//write whole 32-bit word
+							data_read = data_write;	// When writing, pass the write data through to the read port.  This allows proper operation of the same-address write-->read turnaround portion of the data cache above
+							//wr_data = 32'hf0806020;
+							state = WRITE_STATE;
+							ddr_op_in_progress = 1;
+						end
+						else begin	//wren == 0
+							cmd_instr = READ;
+							//burst length set to constant 1
+							//address already set in LATCH STATE
+							state = READ_COMMAND_STATE;
+							ddr_op_in_progress = 1;
+						end // end else
 					end
-					else begin	//wren == 0
-						cmd_instr = READ;
-						//burst length set to constant 1
-						//address already set in LATCH STATE
-						state = READ_COMMAND_STATE;
-						ddr_op_in_progress = 1;
-					end // end else
+
+					wren_prev = wren;
+					starting_address_prev = starting_address;
 				end
 		
 		//-----WRITE CYCLE
@@ -277,7 +292,25 @@ module mem_manager(
 
 		WRITE_WAIT_1: 	begin
 					wr_en = 0;	//complete wr_en pulse, delay before setting cmd (necessary)?
+
 					cmd_instr = WRITE;
+					cmd_en = 1;
+
+// 					// MODE 1
+// 					// Rely on the MCB to read correct data out of its own buffers
+// 					// This mode is much faster but relies on proper transaction coherency handling by the MCB
+// 					if (!wr_full) begin
+// 						state = DDR_DATA_VALID_STATE;
+// 					end else begin
+// 						// FIXME
+// 						// This implementation will likely lose the current data word
+// 						// Is there an "almost full" flag that can be used instead?
+// 						state = SET_WRITE_WAIT;
+// 					end
+
+					// MODE 2
+					// Ensure data is flushed to physical memory before resuming execution
+					// This mode is highly accurate even with broken MCB transaction coherency, but is extremely slow
 					state = SET_WRITE_WAIT;
 				end
 		
@@ -290,7 +323,8 @@ module mem_manager(
 // 				end
 		SET_WRITE_WAIT: //wait state to ensure the data is valid
 				begin
-					cmd_en = 1;
+					cmd_en = 0;
+
 					state = WRITE_DATA_VALID;
 				end
 
@@ -335,6 +369,7 @@ module mem_manager(
 		DDR_DATA_VALID_STATE: begin
 					rd_en = 0;
 					wr_en = 0;
+					cmd_en = 0;
 					ddr_op_in_progress = 0;
 					if (counter < NO_RETURN) begin
 						pause = 0;
@@ -354,7 +389,7 @@ module mem_manager(
 						state = WAIT_STATE;
 					end
 				end
-		endcase		
+		endcase
 	end	//end always
 	
 

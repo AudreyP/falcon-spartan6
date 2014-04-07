@@ -22,6 +22,7 @@
 module clock_manager(
 		input wire input_clk,
 		output wire modified_clock,
+		output wire modified_clock_nonglobal,
 		output wire modified_clock_div_by_two,
 		output wire modified_clock_two,
 		output wire modified_clock_two_div_by_two,
@@ -34,7 +35,7 @@ module clock_manager(
 
 	parameter MAIN_DCM_MULT = 2;
 	parameter MAIN_DCM_DIV = 30;
-	parameter SRAM_CLK_RATIO = 4;
+// 	parameter SRAM_CLK_RATIO = 4;
 
 	reg management_clock;
 	always @(posedge input_clk) begin
@@ -54,8 +55,10 @@ module clock_manager(
 		.I (modified_clock_bufg_in)
 	);
 
+	assign modified_clock_nonglobal = modified_clock_bufg_in;
+
 	DCM_SP #(
-		.CLKDV_DIVIDE(2.0),                   // CLKDV divide value
+		.CLKDV_DIVIDE(2),                   // CLKDV divide value
 									// (1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,8,9,10,11,12,13,14,15,16).
 		.CLKFX_DIVIDE(MAIN_DCM_DIV),                     // Divide value on CLKFX outputs - D - (1-32)
 		.CLKFX_MULTIPLY(MAIN_DCM_MULT),                   // Multiply value on CLKFX outputs - M - (2-32)
@@ -222,15 +225,17 @@ module clock_manager(
 	//-------------------------------
 	reg dcm_reset_sram = 0;
 	wire dcm_feedback_sram;
-	
+
 	assign modified_clock_sram = input_clk;
 	assign dcm_locked_sram = 1;
 
 // 	DCM_SP #(
 // 		.CLKDV_DIVIDE(2.0),                   // CLKDV divide value
 // 									// (1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,8,9,10,11,12,13,14,15,16).
-// 		.CLKFX_DIVIDE(MAIN_DCM_DIV),                     // Divide value on CLKFX outputs - D - (1-32)
-// 		.CLKFX_MULTIPLY(MAIN_DCM_MULT*SRAM_CLK_RATIO),                   // Multiply value on CLKFX outputs - M - (2-32)
+// // 		.CLKFX_DIVIDE(MAIN_DCM_DIV),                     // Divide value on CLKFX outputs - D - (1-32)
+// // 		.CLKFX_MULTIPLY(MAIN_DCM_MULT*SRAM_CLK_RATIO),                   // Multiply value on CLKFX outputs - M - (2-32)
+// 		.CLKFX_DIVIDE(2),                     // Divide value on CLKFX outputs - D - (1-32)
+// 		.CLKFX_MULTIPLY(4),                   // Multiply value on CLKFX outputs - M - (2-32)
 // 		.CLKIN_DIVIDE_BY_2("FALSE"),          // CLKIN divide by two (TRUE/FALSE)
 // 		.CLKIN_PERIOD(10.0),                  // Input clock period specified in nS
 // 		.CLKOUT_PHASE_SHIFT("NONE"),          // Output phase shift (NONE, FIXED, VARIABLE)
