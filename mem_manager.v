@@ -209,6 +209,7 @@ module mem_manager(
 			NO_RETURN = 9;
 
 	reg wren_prev;
+	reg [31:0] data_write_prev;
 	reg [17:0] starting_address_prev;
 
 	reg prev_clk;
@@ -253,7 +254,7 @@ module mem_manager(
 		LATCH_STATE:	begin
 					// Rudimentary single-word data cache
 					if (starting_address == starting_address_prev) begin
-						if ((wren == 0) || ((wren == 1) && (wren_prev == 1))) begin
+						if ((wren == 0) || ((wren == 1) && (wren_prev == 1) && (data_write == data_write_prev))) begin
 							// Do nothing!
 							state = DDR_DATA_VALID_STATE;
 						end
@@ -279,6 +280,7 @@ module mem_manager(
 					end
 
 					wren_prev = wren;
+					data_write_prev = data_write;
 					starting_address_prev = starting_address;
 				end
 		

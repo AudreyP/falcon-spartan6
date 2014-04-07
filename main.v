@@ -265,21 +265,6 @@ module main(
 	wire [17:0] address_camera_capture;
 	wire [31:0] data_write_camera_capture;
 	reg [15:0] startup_sequencer = 0;
-	wire camera_fifo_full;
-	wire camera_fifo_empty;
-	wire [4:0] fifo_state;
-	wire stuck;
-	wire [19:0] addr_count;
-	wire [18:0] camera_memory_address_debug;
-	wire red_full;
-	wire green_full;
-	wire blue_full;
-	wire [31:0] href_active;
-	wire [31:0] vsync_active;
-	wire vsync_locked;
-	wire line_valid;
-	wire [1:0] col_count;
-	wire [1:0] row_count;
 	
 	wire all_dcms_locked;
 	
@@ -299,27 +284,10 @@ module main(
 		.camera_grab_enable(enable_camera_capture),
 		.camera_grab_done(camera_capture_done),
 		.camera_data_trigger(camera_data_trigger),
-		.fifo_full(camera_fifo_full),
-		.fifo_empty(camera_fifo_empty),
 		.data_write_offset(76800),
 		.all_dcms_locked(all_dcms_locked),
 		//.auxramclk_speed_select(),
-		.camera_module_detect(),
-		//debug signals
-		.data_write(data_write_camera_fifo_input),
-		.data_write_buffered(data_write_camera_fifo_output),
-		.state_debug(fifo_state),
-		.addr_count(addr_count),
-		.camera_memory_address(camera_memory_address_debug),
-		.red_empty(red_full),
-		.green_empty(green_full),
-		.blue_empty(blue_full),
-		.href_active(href_active),
-		.vsync_active(vsync_active),
-		.vsync_locked(vsync_locked),
-		.line_valid(line_valid),
-		.col_count(col_count),
-		.row_count(row_count)
+		.camera_module_detect()
 		);
 
 	
@@ -798,29 +766,14 @@ module main(
 		if (slide_switches == 0) begin
 			display_value = debug0;
 		end
-		if (slide_switches == 5) begin
-			display_value = data_write_camera_fifo_input;
-		end
-		if (slide_switches == 6) begin
-			display_value = data_write_camera_fifo_output;
-		end
 		if (slide_switches == 7) begin
 			display_value = data_write_camera_capture[15:0];
-		end
-		if (slide_switches == 8) begin
-			display_value = camera_fifo_full;
-		end
-		if (slide_switches == 9) begin
-			display_value = camera_fifo_empty;
 		end
 		if (slide_switches == 10) begin
 			display_value = run_frame_dump_internal;
 		end
 		if (slide_switches == 11) begin
 			display_value = address;
-		end
-		if (slide_switches == 12) begin
-			display_value = fifo_state;
 		end
 		if (slide_switches == 13) begin
 			display_value = camera_data_href;
@@ -830,39 +783,6 @@ module main(
 		end
 		if (slide_switches == 15) begin
 			display_value = camera_capture_done;
-		end
-		if (slide_switches == 16) begin
-			display_value = addr_count[17:4];
-		end
-		if (slide_switches == 17) begin
-			display_value = camera_memory_address_debug[17:4];
-		end
-		if (slide_switches == 18) begin
-			display_value = red_full;
-		end
-		if (slide_switches == 19) begin
-			display_value = green_full;
-		end
-		if (slide_switches == 20) begin
-			display_value = blue_full;
-		end
-		if (slide_switches == 21) begin
-			display_value = href_active;
-		end
-		if (slide_switches == 22) begin
-			display_value = vsync_active[31:4];
-		end
-		if (slide_switches == 23) begin
-			display_value = vsync_locked;
-		end
-		if (slide_switches == 24) begin
-			display_value = line_valid;
-		end
-		if (slide_switches == 25) begin
-			display_value = row_count;
-		end
-		if (slide_switches == 26) begin
-			display_value = col_count;
 		end
 		if (slide_switches == 27) begin
 			display_value = mem_counter;
@@ -931,7 +851,6 @@ module main(
 	assign debug2[2] = controller_ready;
 	assign debug2[3] = processing_done_internal;
 	assign debug2[4] = global_pause;
-	assign debug2[5] = stuck;
 	
 	assign debug3[0] = run_frame_dump;
 	assign debug3[1] = run_single_shot_test;

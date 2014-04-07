@@ -76,12 +76,6 @@ module camera_module_v2(
 	input wire all_dcms_locked,
 	
 	output reg [19:0] addr_count,
-// 	output reg [1:0] col_count,
-// 	output reg [1:0] row_count,
-
-// FIXME 1-bit FOR DEBUG ONLY
-output reg col_count,
-output reg row_count,
 	
 	// RAM speed control signal
 	output reg auxramclk_speed_select,
@@ -99,8 +93,6 @@ output reg row_count,
 	initial pixel_valid = 0;
 	initial camera_memory_address = 76801;
 	initial vsync_locked = 0;
-	initial row_count = 0;
-	initial col_count = 0;
 	
 	BUFG CAMERA_CLOCK_BUF(
 		.O(camera_data_pclk),
@@ -114,8 +106,8 @@ output reg row_count,
 	reg [3:0] camera_toggle = 0;
 	reg [23:0] databuffer_mem;
 	//free-running 2-bit counters
-// 	reg [1:0] col_count = 0;
-// 	reg [1:0] row_count = 0;
+ 	reg col_count = 0;
+ 	reg row_count = 0;
 	
 	reg [31:0] vsync_active_count;
 	reg [31:0] href_active_count;
@@ -340,10 +332,6 @@ output reg row_count,
 		end
 	end
 	
-	reg [19:0] rcount = 0;
-	reg [19:0] gcount = 0;
-	reg [19:0] bcount = 0;
-
 	// Camera data input processor
 	always @(posedge camera_data_pclk) begin
 		databuffer = camera_data_port;
@@ -354,63 +342,46 @@ output reg row_count,
 		// This is the well known Bayer pattern
 		if (camera_memory_address < 76800) begin	//if complete 320x240 frame not yet written
 			if ((camera_data_href_prev == 1) && (camera_data_href == 0)) begin
-				//free-running 2-bit counter
-				row_count = row_count + 1;
+				row_count = !row_count;
 			end
 			if ((camera_data_href == 1) && (camera_data_vsync == 1) && (vsync_locked == 1) && (line_valid == 1)) begin
-				//free-running 2-bit counter
-				col_count = col_count + 1;
+				col_count = !col_count;
 				
 				case (row_count)
 					0: begin
 						case (col_count)
-							0: begin
+							1: begin
 								red_wren = 0;
 								blue_wren = 0;
 								if (!green_full) begin
 									green_in = databuffer[11:4];
-									//green_in = gcount;
-									gcount = gcount + 1;
 									green_wren = 1;
 									green_average = green_average + green_in;
-									line_counter = line_counter + 1;
 								end
 							end
-							1: begin
-								red_wren = 0;
-								green_wren = 0;
-								if (!blue_full) begin
-									blue_in = databuffer[11:4];
-									//blue_in = bcount;
-									bcount = bcount + 1;
-									blue_wren = 1;
-									blue_average = blue_average + blue_in;
-								end
-							end
-							2: begin
-								red_wren = 0;
-								green_wren = 0;
-								blue_wren = 0;
-							end
-							// columns 2 and 3 write nothing to fifos when row = 0
-						endcase		//column count
-					end
-					1: begin
-						case (col_count)
 							0: begin
 								green_wren = 0;
 								blue_wren = 0;
 								if (!red_full) begin
 									red_in = databuffer[11:4];
-									//red_in = rcount;
-									rcount = rcount + 1;
 									red_wren = 1;
 									red_average = red_average + red_in;
-									camera_memory_address = camera_memory_address + 1;
-									line_counter = line_counter + 1;
 								end
 							end
+						endcase		//column count
+					end
+					1: begin
+						case (col_count)
 							1: begin
+								red_wren = 0;
+								green_wren = 0;
+								if (!blue_full) begin
+									blue_in = databuffer[11:4];
+									blue_wren = 1;
+									blue_average = blue_average + blue_in;
+								end
+							end
+							0: begin
 								red_wren = 0;
 								green_wren = 0;
 								blue_wren = 0;
@@ -418,13 +389,13 @@ output reg row_count,
 							// columns 1, 2, and 3 write nothing to fifo when row = 1
 						endcase		//column count
 					end
-					2: begin
-						red_wren = 0;
-						green_wren = 0;
-						blue_wren = 0;
-					end
-					// row case 3 ignored
 				endcase	//end row case
+				if (col_count == 0) begin
+					line_counter = line_counter + 1;
+					if (row_count == 1) begin
+						camera_memory_address = camera_memory_address + 1;
+					end
+				end
 			end else begin
 				red_wren = 0;
 				green_wren = 0;
@@ -445,9 +416,6 @@ output reg row_count,
 				1: begin
 					row_count = 0;
 					col_count = 0;
-					rcount = 0;
-					gcount = 0;
-					bcount = 0;
 
 					camera_toggle = 0;
 					vsync_locked = 0;
