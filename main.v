@@ -158,14 +158,14 @@ module main(
 	// Module Instantiations
 	//--------------------------------------------------------------------------
 	
-	wire [17:0] divider_dividend;	//was originally a reg. Is it ok to make it a wire?
-	wire [17:0] divider_divisor;		//was originally a reg. Is it ok to make it a wire?
+	wire [17:0] divider_dividend;	
+	wire [17:0] divider_divisor;	
 	wire [17:0] divider_quotient;
 	wire [17:0] divider_remainder;
 	wire divider_zeroflag;
 	
-	wire [17:0] divider_dividend_two;	//connects blob_extraction (where it is is set) to serial_divide_uu (where quotient is assigned the value of this as an input wire)
-	wire [17:0] divider_divisor_two; //connects blob_extraction (where it is set) to serial_divide_uu (where div is assigned the value of this as an input wire)
+	wire [17:0] divider_dividend_two;
+	wire [17:0] divider_divisor_two; 
 	wire [17:0] divider_quotient_two;
 	wire [17:0] divider_remainder_two;
 	wire divider_zeroflag_two;
@@ -197,8 +197,6 @@ module main(
 	
 	reg enable_serial_output = 0;
 	reg serial_output_done = 0;
-	
-	//wire global_pause;	//comes from ddr memory, goes to ALL modules
 
 
 	//------------------7-segment display module
@@ -217,14 +215,12 @@ module main(
 	wire [15:0] sram_debug0;
 	wire mem_read_error;
 	wire controller_ready;
-	wire [9:0] mem_counter;
 
 	mem_manager mem_manager(
 		.modified_clock_sram(modified_clock_sram),
 		.clk(modified_clock_nonglobal),
 		.crystal_clk(crystal_clk),
 		.pause(global_pause),
-		.counter(mem_counter),
 		.starting_address(address), 
 		.wren(wren), 
 		.data_write(data_write), 
@@ -255,10 +251,9 @@ module main(
 	
 	camera_clock_manager_v2 camera_clock_manager(
 		.input_clk(main_system_clock),		//CLKIN
-		.main_camera_clk(camera_data_extclk),		//CLKFX
+		.main_camera_clk(camera_data_extclk),	//CLKFX
 		.camera_dcm_locked(camera_dcm_locked)	//LOCKED
 		);
-	
 	
 	//------CAMERA CAPTURE module
 	wire wren_camera_capture;
@@ -292,8 +287,7 @@ module main(
 
 	
 	//--------THE FOLLOWING IS A MODIFIED EXCERPT FROM THE FALCON II SYSTEM (www.raptorengineering.inc)
-	// I2C control line muxing
-	
+	// I2C control line muxing	
 	reg [23:0] startup_sequencer_timer = 0;
 	
 	assign camera_data_standby = 1;		// Camera awake
@@ -392,34 +386,34 @@ module main(
 	wire [15:0] blob_extraction_blob_counter;
 	
 	localparam	S_CENTROIDS_WORD_SIZE = 16,
-					S_CENTROIDS_WORD_0 = 1*S_CENTROIDS_WORD_SIZE - 1,
-					S_CENTROIDS_WORD_1 = 2*S_CENTROIDS_WORD_SIZE - 1,
-					S_CENTROIDS_WORD_2 = 3*S_CENTROIDS_WORD_SIZE - 1,
-					S_CENTROIDS_WORD_3 = 4*S_CENTROIDS_WORD_SIZE - 1,
-					S_CENTROIDS_WORD_4 = 5*S_CENTROIDS_WORD_SIZE - 1,
-					S_CENTROIDS_WORD_5 = 6*S_CENTROIDS_WORD_SIZE - 1,
-					S_CENTROIDS_WORD_6 = 7*S_CENTROIDS_WORD_SIZE - 1,
-					S_CENTROIDS_WORD_7 = 8*S_CENTROIDS_WORD_SIZE - 1,
-					
-					X_CENTROIDS_WORD_SIZE = 8,
-					X_CENTROIDS_WORD_0 = 1*X_CENTROIDS_WORD_SIZE - 1,
-					X_CENTROIDS_WORD_1 = 2*X_CENTROIDS_WORD_SIZE - 1,
-					X_CENTROIDS_WORD_2 = 3*X_CENTROIDS_WORD_SIZE - 1,
-					X_CENTROIDS_WORD_3 = 4*X_CENTROIDS_WORD_SIZE - 1,
-					X_CENTROIDS_WORD_4 = 5*X_CENTROIDS_WORD_SIZE - 1,
-					X_CENTROIDS_WORD_5 = 6*X_CENTROIDS_WORD_SIZE - 1,
-					X_CENTROIDS_WORD_6 = 7*X_CENTROIDS_WORD_SIZE - 1,
-					X_CENTROIDS_WORD_7 = 8*X_CENTROIDS_WORD_SIZE - 1,
-					
-					Y_CENTROIDS_WORD_SIZE = 8,
-					Y_CENTROIDS_WORD_0 = 1*Y_CENTROIDS_WORD_SIZE - 1,
-					Y_CENTROIDS_WORD_1 = 2*Y_CENTROIDS_WORD_SIZE - 1,
-					Y_CENTROIDS_WORD_2 = 3*Y_CENTROIDS_WORD_SIZE - 1,
-					Y_CENTROIDS_WORD_3 = 4*Y_CENTROIDS_WORD_SIZE - 1,
-					Y_CENTROIDS_WORD_4 = 5*Y_CENTROIDS_WORD_SIZE - 1,
-					Y_CENTROIDS_WORD_5 = 6*Y_CENTROIDS_WORD_SIZE - 1,
-					Y_CENTROIDS_WORD_6 = 7*Y_CENTROIDS_WORD_SIZE - 1,
-					Y_CENTROIDS_WORD_7 = 8*Y_CENTROIDS_WORD_SIZE - 1;
+			S_CENTROIDS_WORD_0 = 1*S_CENTROIDS_WORD_SIZE - 1,
+			S_CENTROIDS_WORD_1 = 2*S_CENTROIDS_WORD_SIZE - 1,
+			S_CENTROIDS_WORD_2 = 3*S_CENTROIDS_WORD_SIZE - 1,
+			S_CENTROIDS_WORD_3 = 4*S_CENTROIDS_WORD_SIZE - 1,
+			S_CENTROIDS_WORD_4 = 5*S_CENTROIDS_WORD_SIZE - 1,
+			S_CENTROIDS_WORD_5 = 6*S_CENTROIDS_WORD_SIZE - 1,
+			S_CENTROIDS_WORD_6 = 7*S_CENTROIDS_WORD_SIZE - 1,
+			S_CENTROIDS_WORD_7 = 8*S_CENTROIDS_WORD_SIZE - 1,
+			
+			X_CENTROIDS_WORD_SIZE = 8,
+			X_CENTROIDS_WORD_0 = 1*X_CENTROIDS_WORD_SIZE - 1,
+			X_CENTROIDS_WORD_1 = 2*X_CENTROIDS_WORD_SIZE - 1,
+			X_CENTROIDS_WORD_2 = 3*X_CENTROIDS_WORD_SIZE - 1,
+			X_CENTROIDS_WORD_3 = 4*X_CENTROIDS_WORD_SIZE - 1,
+			X_CENTROIDS_WORD_4 = 5*X_CENTROIDS_WORD_SIZE - 1,
+			X_CENTROIDS_WORD_5 = 6*X_CENTROIDS_WORD_SIZE - 1,
+			X_CENTROIDS_WORD_6 = 7*X_CENTROIDS_WORD_SIZE - 1,
+			X_CENTROIDS_WORD_7 = 8*X_CENTROIDS_WORD_SIZE - 1,
+			
+			Y_CENTROIDS_WORD_SIZE = 8,
+			Y_CENTROIDS_WORD_0 = 1*Y_CENTROIDS_WORD_SIZE - 1,
+			Y_CENTROIDS_WORD_1 = 2*Y_CENTROIDS_WORD_SIZE - 1,
+			Y_CENTROIDS_WORD_2 = 3*Y_CENTROIDS_WORD_SIZE - 1,
+			Y_CENTROIDS_WORD_3 = 4*Y_CENTROIDS_WORD_SIZE - 1,
+			Y_CENTROIDS_WORD_4 = 5*Y_CENTROIDS_WORD_SIZE - 1,
+			Y_CENTROIDS_WORD_5 = 6*Y_CENTROIDS_WORD_SIZE - 1,
+			Y_CENTROIDS_WORD_6 = 7*Y_CENTROIDS_WORD_SIZE - 1,
+			Y_CENTROIDS_WORD_7 = 8*Y_CENTROIDS_WORD_SIZE - 1;
 			
 	
 	wire [63:0] x_centroids_array;
@@ -430,24 +424,24 @@ module main(
 	reg [7:0] minimum_blob_size = 0;
 
 	localparam  	BLOB_SIZE_WORD_SIZE = 16,
-					BLOB_SIZE_WORD_0 = 1*BLOB_SIZE_WORD_SIZE-1,
-					BLOB_SIZE_WORD_1 = 2*BLOB_SIZE_WORD_SIZE-1,
-					BLOB_SIZE_WORD_2 = 3*BLOB_SIZE_WORD_SIZE-1,
-					BLOB_SIZE_WORD_3 = 4*BLOB_SIZE_WORD_SIZE-1,
-					BLOB_SIZE_WORD_4 = 5*BLOB_SIZE_WORD_SIZE-1,
-					BLOB_SIZE_WORD_5 = 6*BLOB_SIZE_WORD_SIZE-1,
-					BLOB_SIZE_WORD_6 = 7*BLOB_SIZE_WORD_SIZE-1,
-					BLOB_SIZE_WORD_7 = 8*BLOB_SIZE_WORD_SIZE-1,
-					BLOB_SIZE_WORD_8 = 9*BLOB_SIZE_WORD_SIZE-1,
-					BLOB_SIZE_WORD_9 = 10*BLOB_SIZE_WORD_SIZE-1,
-					BLOB_SIZE_WORD_10 = 11*BLOB_SIZE_WORD_SIZE-1,
-					BLOB_SIZE_WORD_11 = 12*BLOB_SIZE_WORD_SIZE-1,
-					BLOB_SIZE_WORD_12 = 13*BLOB_SIZE_WORD_SIZE-1,
-					BLOB_SIZE_WORD_13 = 14*BLOB_SIZE_WORD_SIZE-1,
-					BLOB_SIZE_WORD_14 = 15*BLOB_SIZE_WORD_SIZE-1,
-					BLOB_SIZE_WORD_15 = 16*BLOB_SIZE_WORD_SIZE-1,
-					BLOB_SIZE_WORD_16 = 17*BLOB_SIZE_WORD_SIZE-1,
-					BLOB_SIZE_WORD_17 = 18*BLOB_SIZE_WORD_SIZE-1;
+			BLOB_SIZE_WORD_0 = 1*BLOB_SIZE_WORD_SIZE-1,
+			BLOB_SIZE_WORD_1 = 2*BLOB_SIZE_WORD_SIZE-1,
+			BLOB_SIZE_WORD_2 = 3*BLOB_SIZE_WORD_SIZE-1,
+			BLOB_SIZE_WORD_3 = 4*BLOB_SIZE_WORD_SIZE-1,
+			BLOB_SIZE_WORD_4 = 5*BLOB_SIZE_WORD_SIZE-1,
+			BLOB_SIZE_WORD_5 = 6*BLOB_SIZE_WORD_SIZE-1,
+			BLOB_SIZE_WORD_6 = 7*BLOB_SIZE_WORD_SIZE-1,
+			BLOB_SIZE_WORD_7 = 8*BLOB_SIZE_WORD_SIZE-1,
+			BLOB_SIZE_WORD_8 = 9*BLOB_SIZE_WORD_SIZE-1,
+			BLOB_SIZE_WORD_9 = 10*BLOB_SIZE_WORD_SIZE-1,
+			BLOB_SIZE_WORD_10 = 11*BLOB_SIZE_WORD_SIZE-1,
+			BLOB_SIZE_WORD_11 = 12*BLOB_SIZE_WORD_SIZE-1,
+			BLOB_SIZE_WORD_12 = 13*BLOB_SIZE_WORD_SIZE-1,
+			BLOB_SIZE_WORD_13 = 14*BLOB_SIZE_WORD_SIZE-1,
+			BLOB_SIZE_WORD_14 = 15*BLOB_SIZE_WORD_SIZE-1,
+			BLOB_SIZE_WORD_15 = 16*BLOB_SIZE_WORD_SIZE-1,
+			BLOB_SIZE_WORD_16 = 17*BLOB_SIZE_WORD_SIZE-1,
+			BLOB_SIZE_WORD_17 = 18*BLOB_SIZE_WORD_SIZE-1;
 					
 	wire [288:0] tracking_output_blob_sizes /*[17:0]*/;
 
@@ -473,7 +467,7 @@ module main(
 		.tracking_output_done(tracking_output_done)
 		);			
 	
-	// X PIXEL FILLING module
+	//------------------X PIXEL FILLING module
 	wire wren_x_pixel_filling;
 	wire [17:0] address_x_pixel_filling;
 	wire [31:0] data_write_x_pixel_filling;
@@ -491,7 +485,7 @@ module main(
 		.x_pixel_filling_done(x_pixel_filling_done)
 		);
 		
-	//Y PIXEL FILLING module
+	//------------------Y PIXEL FILLING module
 	wire wren_y_pixel_filling;
 	wire [17:0] address_y_pixel_filling;
 	wire [31:0] data_write_y_pixel_filling;
@@ -509,7 +503,7 @@ module main(
 		.y_pixel_filling_done(y_pixel_filling_done)
 		);
 	
-	// BLOB EXTRACTION module
+	//------------------BLOB EXTRACTION module
 	wire wren_blob_extraction;
 	wire [17:0] address_blob_extraction;
 	wire [31:0] data_write_blob_extraction;
@@ -565,7 +559,6 @@ module main(
 
 			
 	serial_divide_uu serial_divide_uu_two (.dividend(divider_dividend_two), .divisor(divider_divisor_two), .quotient(divider_quotient_two), .remainder(divider_remainder_two), .zeroflag(divider_zeroflag_two));
-
 	
 
 	always @(posedge clk) cnt<=cnt+1;
@@ -743,70 +736,30 @@ module main(
 			display_value = display_value_timer;
 		end
 		
-// 		if (slide_switches == 0) begin
-// 			display_value = display_value_user;
-// 		end
-		
-		if (slide_switches == 4) begin
-			display_value = current_main_processing_state;
-		end
-		
-		if (slide_switches == 3) begin
-			display_value = debug3;
-		end
-		
-		if (slide_switches == 2) begin
-			display_value = debug2;
-		end
-		
-		if (slide_switches == 1) begin
-			display_value = debug1;
-		end
-		
 		if (slide_switches == 0) begin
 			display_value = debug0;
 		end
-		if (slide_switches == 7) begin
-			display_value = data_write_camera_capture[15:0];
+		if (slide_switches == 1) begin
+			display_value = debug1;
 		end
-		if (slide_switches == 10) begin
-			display_value = run_frame_dump_internal;
+		if (slide_switches == 2) begin
+			display_value = debug2;
 		end
-		if (slide_switches == 11) begin
-			display_value = address;
+		if (slide_switches == 3) begin
+			display_value = debug3;
 		end
-		if (slide_switches == 13) begin
-			display_value = camera_data_href;
+		if (slide_switches == 4) begin
+			display_value = current_main_processing_state;
 		end
-		if (slide_switches == 14) begin
-			display_value = enable_camera_capture;
-		end
-		if (slide_switches == 15) begin
-			display_value = camera_capture_done;
-		end
-		if (slide_switches == 27) begin
-			display_value = mem_counter;
-		end
-		
-		//switch values 1,2,4,8,16,32
+	
 		
 		processing_started_prior = processing_started;
 		processing_ended_prior = processing_ended;
 	end
 	
-	//reg [7:0] special_i2c_command_register = 0;
-	//reg [7:0] special_i2c_command_data = 0;
-	//reg send_special_i2c_command = 0;
+
 	reg only_init_this_once = 0;
 
-	//always @(posedge clk) begin
-	//	datatimer = datatimer + 1;
-	//	if (datatimer > 1) begin
-	//		datatimer = 0;
-	//	end
-	//end
-	
-	
 	
 	reg thisiswhite = 0;
 	reg pleasedelayhere = 0;
@@ -841,8 +794,6 @@ module main(
 	assign debug0[15:9] = 0;
 
 
-//	assign debug1[12:0] = address[17:5];
-	//assign debug1[2] = ;
 	assign debug1[1] = camera_dcm_locked;
 	assign debug1[0] = camera_capture_done;
 

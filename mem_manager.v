@@ -26,7 +26,6 @@ module mem_manager(
 	output reg [31:0] data_read,       // data being read from memory
 	
 	output reg pause,
-	output reg [9:0] counter,
 	
 	input wire [17:0] starting_address,
 	
@@ -104,6 +103,8 @@ module mem_manager(
 	wire [6:0] rd_count;
 	wire rd_overflow;
 	wire rd_error;
+	
+	reg [9:0] counter;
 	
 	assign read_error = rd_error | rd_overflow;
 
