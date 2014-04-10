@@ -31,8 +31,6 @@ module blob_extraction(
 	input wire pause,
 	input wire enable_blob_extraction,
 	input wire [31:0] data_read,
-	input wire [17:0] divider_quotient,
-	input wire [17:0] divider_quotient_two,
 	input wire [7:0] color_similarity_threshold,
 	//input wire [575:0] primary_color_slots,	
 
@@ -41,10 +39,6 @@ module blob_extraction(
 	output reg [31:0] data_write,
 	output reg [17:0] address,
 	output reg blob_extraction_done,
-	output reg [17:0] divider_dividend,
-	output reg [17:0] divider_divisor,
-	output reg [17:0] divider_dividend_two,
-	output reg [17:0] divider_divisor_two,
 	
 	output wire [15:0] debug0,
 	output wire [15:0] debug1,
@@ -101,7 +95,6 @@ module blob_extraction(
 		assign debug2 = blob_extraction_inner_toggler;
 		assign debug3 = blob_extraction_toggler;
 		
-		
 		reg [24:0] blob_extraction_red_average = 0;	//here only
 		reg [24:0] blob_extraction_green_average = 0;	//here only
 		reg [24:0] blob_extraction_blue_average = 0;	//here only
@@ -138,7 +131,7 @@ module blob_extraction(
 		//-----Instantiate stack_ram
 		reg [16:0] stack_ram_dina;	
 		reg [13:0] stack_ram_addra;	
-		reg stack_ram_wea;			
+		reg stack_ram_wea;
 		wire [16:0] stack_ram_douta;
 		
 		stack_ram stack_ram(
@@ -165,6 +158,22 @@ module blob_extraction(
 		  .dinb(), // input [23 : 0] dinb (--NOT USED--)
 		  .doutb(primary_color_slots_doutb) // output [23 : 0] doutb
 		);
+
+		// Instantiate division modules
+		reg [17:0] divider_dividend;
+		reg [17:0] divider_divisor;
+		wire [17:0] divider_quotient;
+		wire [17:0] divider_remainder;
+		wire divider_zeroflag;
+		
+		reg [17:0] divider_dividend_two;
+		reg [17:0] divider_divisor_two;
+		wire [17:0] divider_quotient_two;
+		wire [17:0] divider_remainder_two;
+		wire divider_zeroflag_two;
+
+		serial_divide_uu serial_divide_uu (.dividend(divider_dividend), .divisor(divider_divisor), .quotient(divider_quotient), .remainder(divider_remainder), .zeroflag(divider_zeroflag));
+		serial_divide_uu serial_divide_uu_two (.dividend(divider_dividend_two), .divisor(divider_divisor_two), .quotient(divider_quotient_two), .remainder(divider_remainder_two), .zeroflag(divider_zeroflag_two));
 		
 		
 		// Now it's time to find and extract the blobs
@@ -324,8 +333,7 @@ module blob_extraction(
 											
 											blob_extraction_inner_toggler = 1;
 										end else begin
-										//Does not reach this point
-										
+											//Does not reach this point
 											blob_extraction_toggler = 6;
 											blob_extraction_inner_toggler = 0;
 										end
@@ -413,7 +421,7 @@ module blob_extraction(
 											divider_divisor_two = (blob_extraction_blob_size / 128);
 										end
 										
-										// Set up the green averaging									
+										// Set up the green averaging
 										if (blob_extraction_green_average < 65535) begin
 											divider_dividend = blob_extraction_green_average;
 											divider_divisor = blob_extraction_blob_size;
@@ -598,9 +606,9 @@ module blob_extraction(
 										end
 										
 										blob_extraction_inner_toggler = 8;
-									end								
+									end
 									
-									if (blob_extraction_inner_toggler == 8) begin									
+									if (blob_extraction_inner_toggler == 8) begin
 										// Wait a clock cycle
 										wren = 0;
 										blob_extraction_y_temp_1 = blob_extraction_y_temp_1 + 1;

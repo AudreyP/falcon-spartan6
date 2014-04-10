@@ -47,18 +47,13 @@ module camera_module_v2(
 	output reg altline,
 	output reg altcol,
 	output reg pixel_valid,
-	output reg stuck,
-	output wire red_full,
-	output wire green_full,
-	output wire blue_full,
-	output wire red_empty,
-	output wire green_empty,
-	output wire blue_empty,
+
 	output reg [31:0] href_active,
 	output reg [31:0] vsync_active,
 	output reg vsync_locked,
 	output reg line_valid,
 
+	output wire [8:0] fifo_debug,
 	
 	// Camera signals
 	input camera_data_pclk_unbuffered,
@@ -98,8 +93,7 @@ module camera_module_v2(
 		.O(camera_data_pclk),
 		.I(~camera_data_pclk_unbuffered)
 		);
-	
-	reg camera_grab_enable_prev;
+
 	//reg [18:0] camera_memory_address = 76801;
 	reg [19:0] address_buffer;
 	reg [15:0] databuffer;
@@ -111,7 +105,7 @@ module camera_module_v2(
 	
 	reg [31:0] vsync_active_count;
 	reg [31:0] href_active_count;
-	
+
 	reg camera_data_href_prev = 0;
 	reg camera_data_vsync_prev = 0;
 //	reg vsync_locked = 0;
@@ -131,6 +125,7 @@ module camera_module_v2(
 	reg [31:0] camera_not_present_timer;
 
 	reg final_process_counter = 1;
+	reg camera_grab_enable_prev = 0;
 
 	reg camera_agc_enable;
 	reg camera_agc_done;
@@ -141,19 +136,36 @@ module camera_module_v2(
 	reg red_wren;
 	reg [7:0] red_in;
 	wire [7:0] red_out;
-	
+
 	reg green_wren;
 	reg [7:0] green_in;
 	wire [7:0] green_out;
-	
+
 	reg blue_wren;
 	reg [7:0] blue_in;
 	wire [7:0] blue_out;
-	
+
+	wire red_full;
+	wire green_full;
+	wire blue_full;
+	wire red_empty;
+	wire green_empty;
+	wire blue_empty;
+
+	assign fifo_debug[8] = camera_grab_enable;
+	assign fifo_debug[7] = exposed;
+	assign fifo_debug[6] = reset_fifos;
+	assign fifo_debug[5] = red_full;
+	assign fifo_debug[4] = green_full;
+	assign fifo_debug[3] = blue_full;
+	assign fifo_debug[2] = red_empty;
+	assign fifo_debug[1] = green_empty;
+	assign fifo_debug[0] = blue_empty;
+
 	reg fifo_rden;
 	wire [23:0] data_write_buffered_fifo;
 
-	reg reset_fifos = 0;
+	reg reset_fifos = 1;
 	
 	camera_fifo_buffer red_buffer (
 		.rst(!all_dcms_locked || reset_fifos),
@@ -259,6 +271,7 @@ module camera_module_v2(
 			addr_count = 0;
 			ddr_wren = 0;
 			ddr_addr = 0;
+			ddr_data_write = 0;
 
 			fifo_rden = 0;
 			ddr_addr = 0;
@@ -272,18 +285,18 @@ module camera_module_v2(
 		if ((camera_grab_enable == 1) && (camera_grab_done == 0)) begin
 			if (exposed == 0) begin
 				if (ers_exposure_timer < ((ers_exposure_length * ERS_CYCLES_PER_ROW) + ERS_EXPOSURE_MINIMUM)) begin
-					reset_fifos = 1;
 					camera_data_trigger = 0;		// Active low
 					ers_exposure_timer = ers_exposure_timer + 1;
 				end else begin
-					reset_fifos = 0;
 					camera_data_trigger = 1;		// Active low
 					ers_exposure_timer = 0;
 					exposed = 1;
 				end
 			end
+			reset_fifos = 0;
 		end else begin
 			exposed = 0;
+			reset_fifos = 1;
 			ers_exposure_timer = 0;
 			camera_data_trigger = 1;		// Active low
 		end
@@ -386,7 +399,6 @@ module camera_module_v2(
 								green_wren = 0;
 								blue_wren = 0;
 							end
-							// columns 1, 2, and 3 write nothing to fifo when row = 1
 						endcase		//column count
 					end
 				endcase	//end row case
@@ -480,10 +492,10 @@ module camera_module_v2(
 			href_active_count = 0;
 			vsync_active_count = 0;
 		end
-		camera_grab_enable_prev = camera_grab_enable;
 
-		camera_data_href_prev = camera_data_href;
-		camera_data_vsync_prev = camera_data_vsync;
+		camera_grab_enable_prev <= camera_grab_enable;
+		camera_data_href_prev <= camera_data_href;
+		camera_data_vsync_prev <= camera_data_vsync;
 	end
 
 endmodule

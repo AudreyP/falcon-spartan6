@@ -1,0 +1,57 @@
+##############################################################
+#
+# Xilinx Core Generator version J.30
+# Date: Wed Feb 07 20:24:57 2007
+#
+##############################################################
+#
+#  This file contains the customisation parameters for a
+#  Xilinx CORE Generator IP GUI. It is strongly recommended
+#  that you do not manually alter this file as it may cause
+#  unexpected and unsupported behavior.
+#
+##############################################################
+#
+# BEGIN Project Options
+SET addpads = False
+SET asysymbol = True
+SET busformat = BusFormatAngleBracketNotRipped
+SET createndf = False
+SET designentry = VHDL
+SET device = xc3s1000
+SET devicefamily = spartan3
+SET flowvendor = Foundation_iSE
+SET formalverification = False
+SET foundationsym = False
+SET implementationfiletype = Ngc
+SET package = ft256
+SET removerpms = False
+SET simulationfiles = Behavioral
+SET speedgrade = -5
+SET verilogsim = True
+SET vhdlsim = True
+# END Project Options
+# BEGIN Select
+SELECT Divider_Generator family Xilinx,_Inc. 1.0
+# END Select
+# BEGIN Parameters
+CSET aclr=false
+CSET algorithm_type=Fixed
+CSET ce=false
+CSET clocks_per_division=1
+CSET component_name=main_divider
+CSET dividend_width=25
+CSET divisor_width=17
+CSET exponent_bias=0
+CSET exponent_width=8
+CSET fractional_width=17
+CSET latency=1
+CSET mantissa_width=8
+CSET operand_sign=Unsigned
+CSET remainder_type=Remainder
+CSET sclr=false
+CSET sclrce_priority=SCLR_overrides_CE
+# END Parameters
+GENERATE
+# CRC: eba803d5
+

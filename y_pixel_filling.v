@@ -26,35 +26,49 @@ module y_pixel_filling (
 	input wire [31:0] data_read,
 	
 	//output regs
-	output reg wren,	
+	output reg wren,
 	output reg [31:0] data_write,
 	output reg [17:0] address,
 	output reg y_pixel_filling_done
 	);
 
-		initial y_pixel_filling_done = 0;
-		
-		reg y_pixel_filling_holdoff = 0;
+	initial y_pixel_filling_done = 0;
+	
+	reg y_pixel_filling_holdoff = 0;
 
-		reg [17:0] y_pixel_filling_counter_tog = 0;
-		reg [17:0] y_pixel_filling_counter_togg = 0;
-		reg [17:0] y_pixel_filling_counter_toggle = 0;
-		reg [31:0] y_pixel_filling_counter_temp = 0;	
+	reg [17:0] y_pixel_filling_counter_tog = 0;
+	reg [17:0] y_pixel_filling_counter_togg = 0;
+	reg [17:0] y_pixel_filling_counter_toggle = 0;
+	reg [31:0] y_pixel_filling_counter_temp = 0;
 
-		reg [31:0] data_read_sync_y_pixel_filling = 0;
-		reg y_pixel_filling_main_chunk_already_loaded = 0;
-		reg [7:0] y_pixel_filling_x_counter = 0;
-		reg [7:0] y_pixel_filling_y_counter = 0;
-		reg [31:0] y_pixel_filling_counter_buffer_red;
-		reg [31:0] y_pixel_filling_counter_buffer_green;
-		reg [31:0] y_pixel_filling_counter_buffer_blue;
-		
+	reg [31:0] data_read_sync_y_pixel_filling = 0;
+	reg [7:0] y_pixel_filling_x_counter = 0;
+	reg [7:0] y_pixel_filling_y_counter = 0;
+	reg [31:0] y_pixel_filling_counter_buffer_red;
+	reg [31:0] y_pixel_filling_counter_buffer_green;
+	reg [31:0] y_pixel_filling_counter_buffer_blue;
 
-		
-		// Fill in missing edge pixels in the Y direction.
-		//always @(posedge clk) begin
-		always @(posedge clk_div_by_two) begin
-		//always @(posedge modified_clock) begin
+	// Dominant scan pattern:
+	// ------------------------
+	// | . --> --> --> (row 1)
+	// | . -->         (row 2)
+	// | .
+	// | .
+	// | .
+
+	// Per-pixel scan pattern
+	// o: origin
+	// n: next pixel in dominant scan pattern
+	// x  x  x  x  x
+	// x  x  2  x  x
+	// x  x  o  n  x
+	// x  x  1  x  x
+	// x  x  x  x  x
+	
+	// Fill in missing edge pixels in the Y direction.
+	//always @(posedge clk) begin
+	always @(posedge clk_div_by_two) begin
+	//always @(posedge modified_clock) begin
 		if (pause == 0) begin
 			data_read_sync_y_pixel_filling = data_read;
 			
@@ -83,10 +97,11 @@ module y_pixel_filling (
 						
 						// OK, we have our data, now we can see if we need to fill this pixel or not!
 						y_pixel_filling_counter_temp = y_pixel_filling_counter_buffer_red;
-						
-						if ((y_pixel_filling_counter_buffer_blue == 1) && (y_pixel_filling_counter_buffer_green == 1)) begin
-							y_pixel_filling_counter_temp = 1;
-						end
+
+// commented out FOR DEBUG ONLY						
+// 						if ((y_pixel_filling_counter_buffer_blue == 1) && (y_pixel_filling_counter_buffer_green == 1)) begin
+// 							y_pixel_filling_counter_temp = 1;
+// 						end
 					end
 					
 					if (y_pixel_filling_counter_togg == 74561) begin		// All done!	It is 74561 because we don't need to process the last 7 lines of the image, as they are just garbage anyway!
@@ -121,6 +136,6 @@ module y_pixel_filling (
 				data_write = 32'b0;
 				wren = 1'b0;
 			end
-		end
-		end //end if pause = 0
+		end // end if pause = 0
+	end
 endmodule

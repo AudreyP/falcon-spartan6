@@ -89,6 +89,9 @@ module main(
 	output reg camera_data_reset,
 	
 	output wire global_pause	//comes from ddr memory, goes to all modules
+
+	, output reg modified_clock_sync_debug
+	, output reg modified_clock_sram_debug
 	);
 
 	wire c3_clk0;
@@ -99,7 +102,8 @@ module main(
 	
 	// '<=' is a nonblocking set operation (like '=') 
 
-	parameter InternalClkFrequency = 6666666;	// 6.66MHz
+	//parameter InternalClkFrequency = 6666666;	// 6.66MHz
+	parameter InternalClkFrequency = 10000000;	// 10MHz
 	//parameter InternalClkFrequency = 50000000;	// 50MHz
 	//parameter InternalClkFrequency = 66666666;	// 66MHz
 	//parameter InternalClkFrequency = 70000000;	// 70MHz
@@ -110,8 +114,18 @@ module main(
 	//parameter I2ClkCyclesToWait = (InternalClkFrequency / 1);
 
 	wire clk;
-	wire modified_clock;
-	wire modified_clock_nonglobal;
+	(* KEEP = "TRUE" *) wire modified_clock;
+	(* KEEP = "TRUE" *) reg modified_clock_sync;
+
+	(* KEEP = "TRUE" *) wire modified_clock_sram;
+
+	always @(posedge modified_clock_sync) begin
+		modified_clock_sync_debug = ~modified_clock_sync_debug;
+	end
+
+	always @(posedge modified_clock_sram) begin
+		modified_clock_sram_debug = ~modified_clock_sram_debug;
+	end
 
 	//reg border_drawing_holdoff = 0;	//Not used anywhere??
 	
@@ -124,11 +138,11 @@ module main(
 	wire [3:0] cseg;
 	reg [7:0] temp1;		// Temporary data storage
 
-	
+	wire all_dcms_locked;
 
-	wire wren;
-	wire [17:0] address;
-	wire [31:0] data_write;
+	reg wren = 0;
+	reg [17:0] address = 0;
+	reg [31:0] data_write = 0;
 	wire [31:0] data_read;
 	reg [31:0] data_read_sync;
 
@@ -143,6 +157,7 @@ module main(
 	//--------------------------------------------------------------------------
 	// Auxiliary clock generation
 	//--------------------------------------------------------------------------
+	(* KEEP = "TRUE" *) wire modified_clock_div_by_two;
 	wire clk_div_by_two;
 
 	assign clk = modified_clock;
@@ -158,19 +173,10 @@ module main(
 	// Module Instantiations
 	//--------------------------------------------------------------------------
 	
-	wire [17:0] divider_dividend;	
-	wire [17:0] divider_divisor;	
-	wire [17:0] divider_quotient;
-	wire [17:0] divider_remainder;
-	wire divider_zeroflag;
-	
-	wire [17:0] divider_dividend_two;
-	wire [17:0] divider_divisor_two; 
-	wire [17:0] divider_quotient_two;
-	wire [17:0] divider_remainder_two;
-	wire divider_zeroflag_two;
-	
 	//enable / dones
+	reg enable_memory_blanking = 0;
+	wire memory_blanking_done;
+
 	reg enable_camera_capture = 0;
 	wire camera_capture_done;
 
@@ -213,13 +219,15 @@ module main(
 	
 	//------------------Memory module
 	wire [15:0] sram_debug0;
+	wire [15:0] sram_debug1;
 	wire mem_read_error;
-	wire controller_ready;
+	wire memory_controller_ready;
 
 	mem_manager mem_manager(
 		.modified_clock_sram(modified_clock_sram),
-		.clk(modified_clock_nonglobal),
+		.clk(modified_clock_sync),
 		.crystal_clk(crystal_clk),
+		.all_dcms_locked(all_dcms_locked),
 		.pause(global_pause),
 		.starting_address(address), 
 		.wren(wren), 
@@ -240,10 +248,27 @@ module main(
 		.dram_udm(dram_udm),     	// OUTPUT | for X16 parts
 		.dram_dm(dram_dm),		// OUTPUT
 		.rzq(rzq),
-		.controller_ready(controller_ready),
+		.controller_ready(memory_controller_ready),
 		.debug0(sram_debug0),
+		.debug1(sram_debug1),
 		.main_system_clock(main_system_clock),
 		.read_error(mem_read_error)
+		);
+
+	//------MEMORY BLANKING module
+	wire wren_memory_blanking;
+	wire [17:0] address_memory_blanking;
+	wire [31:0] data_write_memory_blanking;
+	
+	memory_blanking memory_blanking(
+		.clk(clk_div_by_two),
+		.pause(global_pause),
+		.address(address_memory_blanking),
+		.data_write(data_write_memory_blanking),
+		.wren(wren_memory_blanking),
+		.data_read(data_read),
+		.enable(enable_memory_blanking),
+		.done(memory_blanking_done)
 		);
 	
 	//------CAMERA CLOCK MANAGER module
@@ -260,10 +285,12 @@ module main(
 	wire [17:0] address_camera_capture;
 	wire [31:0] data_write_camera_capture;
 	reg [15:0] startup_sequencer = 0;
+
+	wire [19:0] camera_debug_current_address;
+	wire [18:0] camera_debug_current_address_module;
+	wire [8:0] camera_fifo_debug;
 	
-	wire all_dcms_locked;
-	
-	camera_module_v2 camera_capture( 
+	camera_module_v2 camera_capture(
 		.clk(clk_div_by_two),
 		.pause(global_pause),
 		//.startup_sequencer(startup_sequencer),
@@ -282,11 +309,14 @@ module main(
 		.data_write_offset(76800),
 		.all_dcms_locked(all_dcms_locked),
 		//.auxramclk_speed_select(),
-		.camera_module_detect()
+		.camera_module_detect(),
+		.addr_count(camera_debug_current_address),
+		.camera_memory_address(camera_debug_current_address_module),
+		.fifo_debug(camera_fifo_debug)
 		);
 
 	
-	//--------THE FOLLOWING IS A MODIFIED EXCERPT FROM THE FALCON II SYSTEM (www.raptorengineering.inc)
+	//--------THE FOLLOWING IS A MODIFIED EXCERPT FROM THE FALCON II SYSTEM (http://www.raptorengineeringinc.com/)
 	// I2C control line muxing	
 	reg [23:0] startup_sequencer_timer = 0;
 	
@@ -477,7 +507,7 @@ module main(
 		.clk_div_by_two(clk_div_by_two),
 		.pause(global_pause),
 		.enable_x_pixel_filling(enable_x_pixel_filling),
-		.data_read(data_read),	
+		.data_read(data_read),
 		//output regs
 		.wren(wren_x_pixel_filling),
 		.data_write(data_write_x_pixel_filling),
@@ -512,7 +542,7 @@ module main(
 	
 	wire [15:0] debug0, debug1;
 	wire [5:0] debug2;
-	wire [4:0] debug3;
+	wire [6:0] debug3;
 	
 	reg [4:0] address_primary_color_slots;
 	reg [23:0] data_write_primary_color_slots;
@@ -527,8 +557,6 @@ module main(
 		.pause(global_pause),
 		.enable_blob_extraction(enable_blob_extraction),
 		.data_read(data_read),
-		.divider_quotient(divider_quotient),
-		.divider_quotient_two(divider_quotient_two),
 		.color_similarity_threshold(color_similarity_threshold),
 		//.primary_color_slots(primary_color_slots),	//[23:0] by [5:0][3:0] ==> [575:0]
 		//output regs
@@ -536,10 +564,6 @@ module main(
 		.data_write(data_write_blob_extraction),
 		.address(address_blob_extraction),
 		.blob_extraction_done(blob_extraction_done),
-		.divider_dividend(divider_dividend),
-		.divider_divisor(divider_divisor),
-		.divider_dividend_two(divider_dividend_two),
-		.divider_divisor_two(divider_divisor_two),
 		.primary_color_slots_clka(primary_color_slots_clka),
 		.wren_primary_color_slots(wren_primary_color_slots),
 		.address_primary_color_slots(address_primary_color_slots),
@@ -553,12 +577,6 @@ module main(
 		.stack_ram_wea(stack_ram_wea),
 		.stack_ram_dina(stack_ram_dina)*/
 		);
-	
-			
-	serial_divide_uu serial_divide_uu (.dividend(divider_dividend), .divisor(divider_divisor), .quotient(divider_quotient), .remainder(divider_remainder), .zeroflag(divider_zeroflag));
-
-			
-	serial_divide_uu serial_divide_uu_two (.dividend(divider_dividend_two), .divisor(divider_divisor_two), .quotient(divider_quotient_two), .remainder(divider_remainder_two), .zeroflag(divider_zeroflag_two));
 	
 
 	always @(posedge clk) cnt<=cnt+1;
@@ -670,7 +688,6 @@ module main(
 	clock_manager clock_manager(
 		.input_clk(main_system_clock),
 		.modified_clock(modified_clock),
-		.modified_clock_nonglobal(modified_clock_nonglobal),
 		.modified_clock_div_by_two(modified_clock_div_by_two),
 		.modified_clock_two(modified_clock_two),
 		.modified_clock_two_div_by_two(modified_clock_two_div_by_two),
@@ -680,7 +697,6 @@ module main(
 		.dcm_locked_sram(dcm_locked_sram)
 		);
 
-	
 	reg reset_system = 0;
 	
 	reg processing_started = 0;
@@ -751,7 +767,26 @@ module main(
 		if (slide_switches == 4) begin
 			display_value = current_main_processing_state;
 		end
-	
+		if (slide_switches == 5) begin
+			//display_value = address[17:4];
+			display_value = address[17:5];
+		end
+		if (slide_switches == 6) begin
+			display_value = camera_debug_current_address[19:4];
+		end
+		if (slide_switches == 7) begin
+			display_value = camera_debug_current_address_module[18:4];
+		end
+		if (slide_switches == 8) begin
+			display_value = camera_fifo_debug;
+		end
+		if (slide_switches == 9) begin
+			display_value = sram_debug0;
+		end
+		if (slide_switches == 10) begin
+			display_value = sram_debug1;
+		end
+
 		
 		processing_started_prior = processing_started;
 		processing_ended_prior = processing_ended;
@@ -769,13 +804,8 @@ module main(
 	reg [127:0] first_s_centroids_array;
 
 	// Main data processor
-	reg wren_single_shot;
-	reg [17:0] address_single_shot;
-	reg [31:0] data_write_single_shot;
-	
-	reg wren_frame_dump;
-	reg [17:0] address_frame_dump;
-	reg [31:0] data_write_frame_dump;
+	reg [17:0] address_single_shot = 0;
+	reg [17:0] address_frame_dump = 0;
 
 	//debugging statements
 	//debug 0 is 15:0
@@ -789,9 +819,7 @@ module main(
 	assign debug0[4] = wren_y_pixel_filling;
 	assign debug0[5] = wren_blob_extraction;
 	assign debug0[6] = wren_camera_capture;
-	assign debug0[7] = wren_frame_dump;
-	assign debug0[8] = wren_single_shot;
-	assign debug0[15:9] = 0;
+	assign debug0[15:7] = 0;
 
 
 	assign debug1[1] = camera_dcm_locked;
@@ -799,7 +827,7 @@ module main(
 
 	assign debug2[0] = run_frame_dump_internal;
 	assign debug2[1] = run_single_shot_test_internal;
-	assign debug2[2] = controller_ready;
+	assign debug2[2] = memory_controller_ready;
 	assign debug2[3] = processing_done_internal;
 	assign debug2[4] = global_pause;
 	
@@ -807,37 +835,46 @@ module main(
 	assign debug3[1] = run_single_shot_test;
 	assign debug3[2] = dcm_locked;
 	assign debug3[3] = dcm_locked_two;
-	//assign debug3[4] = dcm_locked_sram;
+	assign debug3[4] = dcm_locked_sram;
+	assign debug3[5] = camera_dcm_locked;
+	assign debug3[6] = all_dcms_locked;
 
+	reg [17:0] frame_dump_origin_address = 76801;
 
-	assign address = address_edge_detection | address_tracking_output | address_x_pixel_filling 
-							| address_y_pixel_filling | address_blob_extraction | address_camera_capture 
-							| address_frame_dump | address_single_shot /*| address_median_filtering*/;
+	always @(posedge modified_clock_sram) begin
+		address <= address_edge_detection | address_tracking_output | address_x_pixel_filling 
+								| address_y_pixel_filling | address_blob_extraction | address_camera_capture | address_memory_blanking 
+								| address_single_shot | address_frame_dump /*| address_median_filtering*/;
 							
-	assign wren = wren_edge_detection | wren_tracking_output | wren_x_pixel_filling | wren_y_pixel_filling 
-							| wren_blob_extraction | wren_camera_capture | wren_frame_dump | wren_single_shot 
-							/*| wren_median_filtering*/;
+		wren <= wren_edge_detection | wren_tracking_output | wren_x_pixel_filling | wren_y_pixel_filling 
+								| wren_blob_extraction | wren_camera_capture | wren_memory_blanking /*| wren_median_filtering*/;
 							
-	assign data_write = data_write_edge_detection | data_write_tracking_output | data_write_x_pixel_filling 
-								| data_write_y_pixel_filling | data_write_blob_extraction | data_write_camera_capture 
-								| data_write_frame_dump | data_write_single_shot /*| data_write_median_filtering*/;	
-			
+		data_write <= data_write_edge_detection | data_write_tracking_output | data_write_x_pixel_filling | data_write_y_pixel_filling 
+								| data_write_blob_extraction | data_write_camera_capture | data_write_memory_blanking /*| data_write_median_filtering*/;
+	end
+
+	always @(posedge modified_clock) begin
+		modified_clock_sync <= ~modified_clock_sync;
+	end
+
 	localparam
-	STATE_INITIAL = 0,
-	STATE_CAMERA_CAPTURE = 1,
-	STATE_MEDIAN_FILTERING = 2,
-	STATE_EDGE_DETECTION = 3,
-	STATE_X_PIXEL_FILLING = 4,
-	STATE_Y_PIXEL_FILLING = 5,
-	STATE_BORDER_DRAWING = 6,
-	STATE_BLOB_EXTRACTION = 7,
-	STATE_TRACKING_OUTPUT = 8,
-	STATE_ASSEMBLE_DATA = 9,
-	STATE_TRACKING_OUTPUT_TWO = 10,
-	STATE_DATA_OUTPUT_CTL = 11,
-	STATE_FRAME_DUMP = 12,
-	STATE_SINGLE_SHOT = 13,
-	STATE_ONLINE_RECOGNITION = 14;
+	STATE_POWERUP = 0,
+	STATE_INITIAL = 1,
+	STATE_MEMORY_BLANKING = 2,
+	STATE_CAMERA_CAPTURE = 3,
+	STATE_MEDIAN_FILTERING = 4,
+	STATE_EDGE_DETECTION = 5,
+	STATE_X_PIXEL_FILLING = 6,
+	STATE_Y_PIXEL_FILLING = 7,
+	STATE_BORDER_DRAWING = 8,
+	STATE_BLOB_EXTRACTION = 9,
+	STATE_TRACKING_OUTPUT = 10,
+	STATE_ASSEMBLE_DATA = 11,
+	STATE_TRACKING_OUTPUT_TWO = 12,
+	STATE_DATA_OUTPUT_CTL = 13,
+	STATE_FRAME_DUMP = 14,
+	STATE_SINGLE_SHOT = 15,
+	STATE_ONLINE_RECOGNITION = 16;
 	always @(posedge clk_div_by_two) begin
 		data_read_sync = data_read;
 
@@ -846,6 +883,12 @@ module main(
 				processing_done = 0;
 				
 				//leds[5:0] = current_main_processing_state + 1;
+
+				if(current_main_processing_state == STATE_POWERUP) begin
+					if ((all_dcms_locked == 1) && (memory_controller_ready == 1)) begin
+						current_main_processing_state = STATE_INITIAL;
+					end
+				end
 				
 				if(current_main_processing_state == STATE_INITIAL) begin
 					//camera controls -- these run once per loop
@@ -866,6 +909,15 @@ module main(
 					end
 					
 					if ((run_frame_dump_internal == 1) || (run_single_shot_test_internal == 1) || (run_online_recognition_internal == 1)) begin
+						current_main_processing_state = STATE_MEMORY_BLANKING;
+					end
+				end
+
+				if (current_main_processing_state == STATE_MEMORY_BLANKING) begin
+					//leds[5] = 1;
+					enable_memory_blanking = 1;
+					if (memory_blanking_done == 1) begin
+						enable_memory_blanking = 0;
 						current_main_processing_state = STATE_CAMERA_CAPTURE;
 					end
 				end
@@ -875,18 +927,21 @@ module main(
 					enable_camera_capture = 1;
 					if (camera_capture_done == 1) begin
 						enable_camera_capture = 0;
-						//current_main_processing_state = STATE_MEDIAN_FILTERING;
-						current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY**** (tpearson 03/09/14 01:41)
+						current_main_processing_state = STATE_MEDIAN_FILTERING;
+						//current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY**** (tpearson 03/09/14 01:41)
 					end
-				end	
-	
+				end
 	
 				if (current_main_processing_state == STATE_MEDIAN_FILTERING) begin
 					//leds[5] = 1;
 					//enable_median_filtering = 1;
 					//if (median_filtering_done == 1) begin
 					//	enable_median_filtering = 0;
-						current_main_processing_state = STATE_EDGE_DETECTION;
+						if (slide_switches[2] == 1) begin
+							current_main_processing_state = STATE_EDGE_DETECTION;
+						end else begin
+							current_main_processing_state = STATE_X_PIXEL_FILLING;	// skip edge detection
+						end
 					//end		
 					
 				end					
@@ -896,7 +951,11 @@ module main(
 					enable_edge_detection = 1;
 					if (edge_detection_done == 1) begin
 						enable_edge_detection = 0;
-						current_main_processing_state = STATE_X_PIXEL_FILLING;
+						if (slide_switches[3] == 1) begin
+ 							current_main_processing_state = STATE_X_PIXEL_FILLING;
+ 						end else begin
+							current_main_processing_state = STATE_Y_PIXEL_FILLING;	// skip x pixel filling
+						end
 					end
 				end
 				
@@ -905,7 +964,11 @@ module main(
 					enable_x_pixel_filling = 1;
 					if (x_pixel_filling_done == 1) begin
 						enable_x_pixel_filling = 0;
-						current_main_processing_state = STATE_Y_PIXEL_FILLING;
+						if (slide_switches[4] == 1) begin
+ 							current_main_processing_state = STATE_Y_PIXEL_FILLING;
+ 						end else begin
+							current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY****
+						end
 					end
 				end
 				
@@ -915,10 +978,11 @@ module main(
 					if (y_pixel_filling_done == 1) begin
 						enable_y_pixel_filling = 0;
 						//SKIPS BORDER DRAWING STATE
-						
-						//DEBUG - SKIP BLOB EXTRACTION
-						//current_main_processing_state = STATE_BLOB_EXTRACTION;
-						current_main_processing_state = STATE_TRACKING_OUTPUT;
+						if (slide_switches[5] == 1) begin
+							current_main_processing_state = STATE_BORDER_DRAWING;
+						end else begin
+ 							current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY****
+ 						end
 					end
 				end		
 				
@@ -940,7 +1004,8 @@ module main(
 					enable_blob_extraction = 1;
 					if (blob_extraction_done == 1) begin
 						enable_blob_extraction = 0;
-						current_main_processing_state = STATE_TRACKING_OUTPUT;
+// 						current_main_processing_state = STATE_TRACKING_OUTPUT;
+						current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY****
 					end
 				end
 				
@@ -954,14 +1019,14 @@ module main(
 					
 					leds[0] = 0;
 					leds[1] = 0;
-					leds[2] = 0;		
+					leds[2] = 0;
 					leds[3] = 0;
 					leds[4] = 0;
-					leds[5] = 0;					
+					leds[5] = 0;
 				end
 				
 				if (current_main_processing_state == STATE_ASSEMBLE_DATA) begin
-					first_x_centroids_array[X_CENTROIDS_WORD_0 : 0] = x_centroids_array[X_CENTROIDS_WORD_0 : 0];		
+					first_x_centroids_array[X_CENTROIDS_WORD_0 : 0] = x_centroids_array[X_CENTROIDS_WORD_0 : 0];
 					first_y_centroids_array[Y_CENTROIDS_WORD_0 : 0] = y_centroids_array[Y_CENTROIDS_WORD_0 : 0];
 					first_s_centroids_array[S_CENTROIDS_WORD_0 : 0] = s_centroids_array[S_CENTROIDS_WORD_0 : 0];
 					first_x_centroids_array[X_CENTROIDS_WORD_1 : 1+X_CENTROIDS_WORD_0] = x_centroids_array[X_CENTROIDS_WORD_1 : 1+X_CENTROIDS_WORD_0];
@@ -1044,10 +1109,22 @@ module main(
 					
 					if (serial_output_holdoff == 0) begin
 						serial_output_holdoff = 1;
-						//address_frame_dump = 0;
-						address_frame_dump = 76801;
-						//address_frame_dump = 153602;
-						//address_frame_dump = 230403;
+
+						// Debug
+						if (slide_switches[1:0] == 0) begin
+							frame_dump_origin_address = 0;
+						end else if (slide_switches[1:0] == 1) begin
+							frame_dump_origin_address = 76801;
+						end else if (slide_switches[1:0] == 2) begin
+							frame_dump_origin_address = 153602;
+						end else if (slide_switches[1:0] == 3) begin
+							frame_dump_origin_address = 230403;
+						end
+
+						// Normal operation
+						// frame_dump_origin_address = 76801;
+
+						address_frame_dump = frame_dump_origin_address;
 						serial_output_index = 0;
 						serial_output_index_toggle = 0;
 						processing_ended = 1;
@@ -1076,12 +1153,8 @@ module main(
 									serial_output_index_mem = serial_output_index_mem + 1;
 								end
 								serial_output_index = serial_output_index + 1;
-	
-								wren_frame_dump = 0;				// Read data from RAM
-								//address_frame_dump = serial_output_index_mem + 0;
-								address_frame_dump = serial_output_index_mem + 76801;
-								//address_frame_dump = serial_output_index_mem + 153602;
-								//address_frame_dump = serial_output_index_mem + 230403;
+
+								address_frame_dump = serial_output_index_mem + frame_dump_origin_address;
 							end else begin
 								if (TxD_state == 5'b10000) begin	// Wait for transmission of byte to complete
 									TxD_start = 0;
@@ -1107,8 +1180,6 @@ module main(
 									// 2014 edit
 									// used to be set to z
 									address_frame_dump = 18'b0;
-									data_write_frame_dump = 32'b0;
-									wren_frame_dump = 1'b0;
 									
 									processing_done_internal = 1;
 								end
@@ -1136,7 +1207,6 @@ module main(
 							// Transmit the entire contents of the image buffer to the serial port
 							if (tx_toggle == 0) begin
 								if (serial_output_index_toggle == 0) begin
-									wren_single_shot = 0;
 									address_single_shot = ((data_read_sync * 3) + 200000);
 									//address = address + 76801;
 									if (data_read_sync == 1) begin
@@ -1148,7 +1218,6 @@ module main(
 								
 								if (serial_output_index_toggle == 1) begin
 									// Do nothing
-									wren_single_shot = 0;
 								end
 								
 								if (serial_output_index_toggle == 2) begin
@@ -1191,7 +1260,6 @@ module main(
 								end
 	
 								if (serial_output_index_toggle == 0) begin
-									wren_single_shot = 0;				// Read data from RAM
 									address_single_shot = serial_output_index_mem + 0;
 									//address_single_shot = serial_output_index_mem + 76801;
 									//address_single_shot = serial_output_index_mem + 153602;
@@ -1220,8 +1288,6 @@ module main(
 									current_main_processing_state = STATE_INITIAL;
 									// 2014 edit
 									address_single_shot = 18'b0;
-									data_write_single_shot = 32'b0;
-									wren_single_shot = 1'b0;
 									processing_done_internal = 1;
 								end
 							end

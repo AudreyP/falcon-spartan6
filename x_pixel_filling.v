@@ -29,31 +29,46 @@ module x_pixel_filling (
 	output reg wren,
 	output reg [31:0] data_write,
 	output reg [17:0] address,
-	output reg x_pixel_filling_done		
+	output reg x_pixel_filling_done
 	);
-		
-		initial x_pixel_filling_done = 0;
 
-		reg [17:0] x_pixel_filling_counter_tog = 0;
-		reg [17:0] x_pixel_filling_counter_togg = 0;
-		reg [17:0] x_pixel_filling_counter_toggle = 0;
-		reg [31:0] x_pixel_filling_counter_temp = 0;	
+	initial x_pixel_filling_done = 0;
 
-		reg x_pixel_filling_holdoff = 0;
-		reg [31:0] data_read_sync_x_pixel_filling = 0;
-		reg x_pixel_filling_main_chunk_already_loaded = 0;
-		reg [7:0] x_pixel_filling_x_counter = 0;
-		reg [7:0] x_pixel_filling_y_counter = 0;
-		reg [31:0] x_pixel_filling_counter_buffer_red;
-		reg [31:0] x_pixel_filling_counter_buffer_green;
-		reg [31:0] x_pixel_filling_counter_buffer_blue;
-		
-		
-		
-		// Fill in missing edge pixels in the X direction.
-		//always @(posedge clk) begin
-		always @(posedge clk_div_by_two) begin
-		//always @(posedge modified_clock) begin
+	reg x_pixel_filling_holdoff = 0;
+
+	reg [17:0] x_pixel_filling_counter_tog = 0;
+	reg [17:0] x_pixel_filling_counter_togg = 0;
+	reg [17:0] x_pixel_filling_counter_toggle = 0;
+	reg [31:0] x_pixel_filling_counter_temp = 0;
+
+	reg [31:0] data_read_sync_x_pixel_filling = 0;
+	reg [7:0] x_pixel_filling_x_counter = 0;
+	reg [7:0] x_pixel_filling_y_counter = 0;
+	reg [31:0] x_pixel_filling_counter_buffer_red;
+	reg [31:0] x_pixel_filling_counter_buffer_green;
+	reg [31:0] x_pixel_filling_counter_buffer_blue;
+
+	// Dominant scan pattern:
+	// ------------------------
+	// | . --> --> --> (row 1)
+	// | . -->         (row 2)
+	// | .
+	// | .
+	// | .
+
+	// Per-pixel scan pattern
+	// o: origin
+	// n: next pixel in dominant scan pattern
+	// x  x  x  x  x
+	// x  x  x  x  x
+	// x  2  o  1n x
+	// x  x  x  x  x
+	// x  x  x  x  x
+	
+	// Fill in missing edge pixels in the X direction.
+	//always @(posedge clk) begin
+	always @(posedge clk_div_by_two) begin
+	//always @(posedge modified_clock) begin
 		if (pause == 0) begin
 			data_read_sync_x_pixel_filling = data_read;
 			
@@ -121,5 +136,5 @@ module x_pixel_filling (
 				wren = 1'b0;
 			end
 		end // end if pause == 0
-		end
+	end
 endmodule
