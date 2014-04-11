@@ -267,12 +267,12 @@ module mem_manager(
 					end
 	
 			LATCH_STATE:	begin
-//  						// Rudimentary single-word data cache
-//  						if ((address_buffered == address_prev) && ((wren_buffered == 0) || ((wren_buffered == 1) && (wren_prev == 1) && (data_write_buffered == data_write_prev)))) begin
-//  							// Do nothing!
-//  							ddr_op_in_progress <= 1;
-//  							state <= DDR_DATA_VALID_STATE;
-//  						end else begin
+ 						// Rudimentary single-word data cache
+ 						if ((address_buffered == address_prev) && ((wren_buffered == 0) || ((wren_buffered == 1) && (wren_prev == 1) && (data_write_buffered == data_write_prev)))) begin
+ 							// Do nothing!
+ 							ddr_op_in_progress <= 1;
+ 							state <= DDR_DATA_VALID_STATE;
+ 						end else begin
 							// DEACTIVATED--see below
 							//cmd_addr[29:2] <= address_buffered;	//starting address 17 bits--shove into upper 28b of 30b addr to leave room for two 0's
 							//cmd_addr[1:0] <= 0;
@@ -289,7 +289,6 @@ module mem_manager(
 								wr_en <= 1;	//now that data is in data path, assert write enable
 								state <= WRITE_WAIT_1;
 								ddr_op_in_progress <= 1;
-								pause_unbuffered <= 1;
 							end else begin	//wren_buffered == 0
 								cmd_instr <= READ;
 								//burst length set to constant 1
@@ -298,9 +297,8 @@ module mem_manager(
 								state <= READ_STATE;
 								word_read <= 0;
 								ddr_op_in_progress <= 1;
-								pause_unbuffered <= 1;
 							end // end else
-//  						end
+ 						end
 	
 						wren_prev <= wren_buffered;
 						data_write_prev <= data_write_buffered;
@@ -314,22 +312,20 @@ module mem_manager(
 						cmd_instr <= WRITE;
 						cmd_en <= 1;
 	
-// 						// MODE 1
-// 						// Rely on the MCB to read correct data out of its own buffers
-// 						// This mode is much faster but relies on proper transaction coherency handling by the MCB
-// 						if (!wr_full) begin
-// 							state <= DDR_DATA_VALID_STATE;
-// 						end else begin
-// 							// FIXME
-// 							// This implementation will likely lose the current data word
-// 							// Is there an "almost full" flag that can be used instead?
-// 							state <= WRITE_TRANSITION_STATE;
-// 						end
+						// MODE 1
+						// Rely on the MCB to read correct data out of its own buffers
+						// This mode is much faster but relies on proper transaction coherency handling by the MCB
+						if (wr_count < 60) begin	// If FIFO has a few words of space remaining (this should NEVER be 64 or greater as the FIFO is exactly 64 words long and data loss would occur during overruns!)
+							state <= DDR_DATA_VALID_STATE;
+						end else begin
+							pause_unbuffered <= 1;
+							state <= WRITE_TRANSITION_STATE;
+						end
 	
-						// MODE 2
-						// Ensure data is flushed to physical memory before resuming execution
-						// This mode is highly accurate even with broken MCB transaction coherency, but is extremely slow
-						state <= WRITE_TRANSITION_STATE;
+// 						// MODE 2
+// 						// Ensure data is flushed to physical memory before resuming execution
+// 						// This mode is highly accurate even with broken MCB transaction coherency, but is extremely slow
+// 						state <= WRITE_TRANSITION_STATE;
 					end
 
 			WRITE_TRANSITION_STATE:
@@ -358,6 +354,7 @@ module mem_manager(
 							// Wait for valid data to be driven onto the bus
 							state <= READ_STATE;
 						end
+						pause_unbuffered <= 1;
 					end
 	
 			//-----occurs only when an entire data word has been written or read to/from DDR

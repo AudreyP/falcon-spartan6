@@ -178,6 +178,7 @@ module infrastructure #
          .CLKOUT2_DIVIDE     (C_CLKOUT2_DIVIDE),
          .CLKOUT3_DIVIDE     (C_CLKOUT3_DIVIDE),
          .CLKOUT4_DIVIDE     (C_CLKFBOUT_MULT),
+         //.CLKOUT4_DIVIDE     (6),
          .CLKOUT5_DIVIDE     (1),
          .CLKOUT0_PHASE      (0.000),
          .CLKOUT1_PHASE      (180.000),

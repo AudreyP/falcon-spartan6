@@ -104,6 +104,8 @@ module main(
 
 	//parameter InternalClkFrequency = 6666666;	// 6.66MHz
 	parameter InternalClkFrequency = 10000000;	// 10MHz
+	//parameter InternalClkFrequency = 13333333;	// 13.33MHz
+	//parameter InternalClkFrequency = 20000000;	// 20MHz
 	//parameter InternalClkFrequency = 50000000;	// 50MHz
 	//parameter InternalClkFrequency = 66666666;	// 66MHz
 	//parameter InternalClkFrequency = 70000000;	// 70MHz
@@ -566,10 +568,10 @@ module main(
 	
 	blob_extraction blob_extraction(
 		//input wires
-// 		.clk(modified_clock_div_by_two),
-// 		.clk_fast(modified_clock),	//for stack ram
-		.clk(clk_div_by_two),
-		.clk_fast(clk),	//for stack ram
+		.clk(modified_clock),
+		.clk_fast(modified_clock_fast),	//for stack ram
+// 		.clk(clk_div_by_two),
+// 		.clk_fast(clk),	//for stack ram
 		.pause(global_pause),
 		.enable_blob_extraction(enable_blob_extraction),
 		.data_read(data_read),
