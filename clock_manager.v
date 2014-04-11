@@ -22,13 +22,14 @@
 module clock_manager(
 		input wire input_clk,
 		output wire modified_clock,
+		output wire modified_clock_inv,
+		output wire modified_clock_sync,
 		output wire modified_clock_div_by_two,
-		output wire modified_clock_two,
-		output wire modified_clock_two_div_by_two,
+		output wire modified_clock_fast,
+		output wire modified_clock_fast_inv,
 		output wire modified_clock_sram,
 	
 		output wire dcm_locked,
-		output wire dcm_locked_two,
 		output wire dcm_locked_sram
 	);
 
@@ -43,6 +44,10 @@ module clock_manager(
 	reg dcm_reset = 0;
 	wire dcm_feedback;
 	(* KEEP = "TRUE" *) reg modified_clock_bufg_in;
+	(* KEEP = "TRUE" *) reg modified_clock_inv_bufg_in;
+	(* KEEP = "TRUE" *) reg modified_clock_fast_bufg_in;
+	(* KEEP = "TRUE" *) reg modified_clock_fast_inv_bufg_in;
+	(* KEEP = "TRUE" *) reg modified_clock_div_by_two_bufg_in;
 	
 	BUFG U_BUFG_MODIFIED_CLOCK
 	(
@@ -50,60 +55,23 @@ module clock_manager(
 		.I (modified_clock_bufg_in)
 	);
 
-	// Divide SRAM clock by 10 to obtain the main system clock
-	// This locks the main system clock phase with respect to the SRAM clock
-	reg [2:0] modified_clock_counter;
-	always @(posedge modified_clock_sram) begin
-		if (modified_clock_counter >= 4) begin
-			modified_clock_counter <= 0;
-			modified_clock_bufg_in <= ~modified_clock_bufg_in;
-		end else begin
-			modified_clock_counter <= modified_clock_counter + 1;
-		end
-	end
-	assign dcm_locked = 1;
-
-	//-------------------------------
-	// MODIFIED CLOCK / 2
-	//-------------------------------
-
-	(* KEEP = "TRUE" *) reg modified_clock_two_div_by_two_bufg_in = 0;
-	always @(posedge modified_clock_two) begin
-		modified_clock_two_div_by_two_bufg_in = !modified_clock_two_div_by_two_bufg_in;
-	end
-
-	BUFG U_BUFG_MODIFIED_CLOCK_TWO_DIV_BY_TWO
+	BUFG U_BUFG_MODIFIED_CLOCK_INV
 	(
-		.O (modified_clock_two_div_by_two),
-		.I (modified_clock_two_div_by_two_bufg_in)
+		.O (modified_clock_inv),
+		.I (modified_clock_inv_bufg_in)
 	);
 
-
-	//-------------------------------
-	// MODIFIED CLOCK TWO
-	//-------------------------------
-	reg dcm_reset_two = 0;
-	wire dcm_feedback_two;
-	(* KEEP = "TRUE" *) wire modified_clock_two_bufg_in;
-	
-	BUFG U_BUFG_MODIFIED_CLOCK_TWO
+	BUFG U_BUFG_MODIFIED_CLOCK_FAST
 	(
-		.O (modified_clock_two),
-		.I (modified_clock_two_bufg_in)
+		.O (modified_clock_fast),
+		.I (modified_clock_fast_bufg_in)
 	);
 
-	// For now, lock the secondary system clock to the primary system clock
-	assign modified_clock_two_bufg_in = modified_clock_bufg_in;
-	assign dcm_locked_two = 1;
-
-	//-------------------------------
-	// MODIFIED CLOCK TWO / 2
-	//-------------------------------
-
-	(* KEEP = "TRUE" *) reg modified_clock_div_by_two_bufg_in = 0;
-	always @(posedge modified_clock) begin
-		modified_clock_div_by_two_bufg_in = !modified_clock_div_by_two_bufg_in;
-	end
+	BUFG U_BUFG_MODIFIED_CLOCK_FAST_INV
+	(
+		.O (modified_clock_fast_inv),
+		.I (modified_clock_fast_inv_bufg_in)
+	);
 
 	BUFG U_BUFG_MODIFIED_CLOCK_DIV_BY_TWO
 	(
@@ -111,6 +79,32 @@ module clock_manager(
 		.I (modified_clock_div_by_two_bufg_in)
 	);
 
+	// Divide SRAM clock by 10 to obtain the main system clock
+	// This locks the main system clock phase with respect to the SRAM clock
+	reg [2:0] modified_clock_counter;
+	always @(posedge modified_clock_sram) begin
+		if (modified_clock_counter == 2) begin
+			modified_clock_fast_bufg_in <= ~modified_clock_fast_bufg_in;
+			modified_clock_counter <= modified_clock_counter + 1;
+		end else if (modified_clock_counter >= 4) begin
+			modified_clock_counter <= 0;
+			modified_clock_bufg_in <= ~modified_clock_bufg_in;
+			modified_clock_fast_bufg_in <= ~modified_clock_fast_bufg_in;
+		end else begin
+			modified_clock_counter <= modified_clock_counter + 1;
+		end
+		modified_clock_inv_bufg_in <= ~modified_clock_bufg_in;
+		modified_clock_fast_inv_bufg_in <= ~modified_clock_fast_bufg_in;
+	end
+	assign modified_clock_sync = modified_clock_bufg_in;
+	assign dcm_locked = 1;
+
+	//-------------------------------
+	// MODIFIED CLOCK / 2
+	//-------------------------------
+	always @(posedge modified_clock) begin
+		modified_clock_div_by_two_bufg_in = !modified_clock_div_by_two_bufg_in;
+	end
 
 	//-------------------------------
 	// SRAM CLOCK

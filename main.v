@@ -86,12 +86,12 @@ module main(
 	inout wire camera_data_sda,
 	output wire camera_data_oe,
 	output wire camera_data_saddr,
-	output reg camera_data_reset,
-	
-	output wire global_pause	//comes from ddr memory, goes to all modules
+	output reg camera_data_reset
 
+	, output reg modified_clock_debug
 	, output reg modified_clock_sync_debug
 	, output reg modified_clock_sram_debug
+	, output reg modified_clock_fast_debug
 	);
 
 	wire c3_clk0;
@@ -115,9 +115,15 @@ module main(
 
 	wire clk;
 	(* KEEP = "TRUE" *) wire modified_clock;
-	(* KEEP = "TRUE" *) reg modified_clock_sync;
-
+	(* KEEP = "TRUE" *) wire modified_clock_inv;
+	(* KEEP = "TRUE" *) wire modified_clock_sync;
 	(* KEEP = "TRUE" *) wire modified_clock_sram;
+	(* KEEP = "TRUE" *) wire modified_clock_fast;
+	(* KEEP = "TRUE" *) wire modified_clock_fast_inv;
+
+	always @(posedge modified_clock) begin
+		modified_clock_debug = ~modified_clock_debug;
+	end
 
 	always @(posedge modified_clock_sync) begin
 		modified_clock_sync_debug = ~modified_clock_sync_debug;
@@ -126,6 +132,11 @@ module main(
 	always @(posedge modified_clock_sram) begin
 		modified_clock_sram_debug = ~modified_clock_sram_debug;
 	end
+
+	always @(posedge modified_clock_fast) begin
+		modified_clock_fast_debug = ~modified_clock_fast_debug;
+	end
+
 
 	//reg border_drawing_holdoff = 0;	//Not used anywhere??
 	
@@ -220,12 +231,16 @@ module main(
 	//------------------Memory module
 	wire [15:0] sram_debug0;
 	wire [15:0] sram_debug1;
+	wire [15:0] sram_debug2;
 	wire mem_read_error;
 	wire memory_controller_ready;
 
+	wire global_pause;	//comes from ddr memory, goes to all modules
+
 	mem_manager mem_manager(
 		.modified_clock_sram(modified_clock_sram),
-		.clk(modified_clock_sync),
+		.clk_fast(modified_clock_fast),
+		.clk_sync(modified_clock_sync),
 		.crystal_clk(crystal_clk),
 		.all_dcms_locked(all_dcms_locked),
 		.pause(global_pause),
@@ -234,16 +249,16 @@ module main(
 		.data_write(data_write), 
 		.data_read(data_read),
 		// DDR SDRAM external signals
-		.dram_dq(dram_dq),	// INOUT
-		.dram_a(dram_a),  	// OUTPUT
-		.dram_ba(dram_ba),	// OUTPUT
+		.dram_dq(dram_dq),		// INOUT
+		.dram_a(dram_a),  		// OUTPUT
+		.dram_ba(dram_ba),		// OUTPUT
 		.dram_ras_n(dram_ras_n),	// OUTPUT
 		.dram_cas_n(dram_cas_n),	// OUTPUT
 		.dram_we_n (dram_we_n), 	// OUTPUT
 		.dram_cke(dram_cke), 		// OUTPUT
 		.dram_ck(dram_ck), 		// OUTPUT
-		.dram_ck_n (dram_ck_n),	// OUTPUT 
-		.dram_dqs (dram_dqs),		// OUTPUT
+		.dram_ck_n(dram_ck_n),		// OUTPUT 
+		.dram_dqs(dram_dqs),		// OUTPUT
 		.dram_udqs(dram_udqs),    	// INOUT | for X16 parts
 		.dram_udm(dram_udm),     	// OUTPUT | for X16 parts
 		.dram_dm(dram_dm),		// OUTPUT
@@ -251,6 +266,7 @@ module main(
 		.controller_ready(memory_controller_ready),
 		.debug0(sram_debug0),
 		.debug1(sram_debug1),
+		.debug2(sram_debug2),
 		.main_system_clock(main_system_clock),
 		.read_error(mem_read_error)
 		);
@@ -261,7 +277,7 @@ module main(
 	wire [31:0] data_write_memory_blanking;
 	
 	memory_blanking memory_blanking(
-		.clk(clk_div_by_two),
+		.clk(clk),
 		.pause(global_pause),
 		.address(address_memory_blanking),
 		.data_write(data_write_memory_blanking),
@@ -291,7 +307,7 @@ module main(
 	wire [8:0] camera_fifo_debug;
 	
 	camera_module_v2 camera_capture(
-		.clk(clk_div_by_two),
+		.clk(clk),
 		.pause(global_pause),
 		//.startup_sequencer(startup_sequencer),
 		.ddr_addr(address_camera_capture),
@@ -390,7 +406,7 @@ module main(
 	
 	edge_detection edge_detection(
 		//input wires (as seen by module)
-		.clk(clk_div_by_two),
+		.clk(clk),
 		.pause(global_pause),
 		.data_read(data_read),
 		.enable_edge_detection(enable_edge_detection),
@@ -477,7 +493,7 @@ module main(
 
 	tracking_output tracking_output(
 		//input wires (as seen by module)
-		.clk(clk_div_by_two),
+		.clk(clk),
 		.pause(global_pause),
 		.blob_extraction_blob_counter(blob_extraction_blob_counter),
 		.enable_tracking_output(enable_tracking_output),
@@ -504,7 +520,7 @@ module main(
 	
 	x_pixel_filling x_pixel_filling(
 		//input wires
-		.clk_div_by_two(clk_div_by_two),
+		.clk(clk),
 		.pause(global_pause),
 		.enable_x_pixel_filling(enable_x_pixel_filling),
 		.data_read(data_read),
@@ -522,7 +538,7 @@ module main(
 	
 	y_pixel_filling y_pixel_filling(
 		//input wires
-		.clk_div_by_two(clk_div_by_two),
+		.clk(clk),
 		.pause(global_pause),
 		.enable_y_pixel_filling(enable_y_pixel_filling),
 		.data_read(data_read),
@@ -538,8 +554,6 @@ module main(
 	wire [17:0] address_blob_extraction;
 	wire [31:0] data_write_blob_extraction;
 	
-	wire modified_clock_two_div_by_two;
-	
 	wire [15:0] debug0, debug1;
 	wire [5:0] debug2;
 	wire [6:0] debug3;
@@ -552,8 +566,10 @@ module main(
 	
 	blob_extraction blob_extraction(
 		//input wires
-		.modified_clock_two_div_by_two(modified_clock_two_div_by_two),
-		.modified_clock_two(modified_clock_two),	//for stack ram
+// 		.clk(modified_clock_div_by_two),
+// 		.clk_fast(modified_clock),	//for stack ram
+		.clk(clk_div_by_two),
+		.clk_fast(clk),	//for stack ram
 		.pause(global_pause),
 		.enable_blob_extraction(enable_blob_extraction),
 		.data_read(data_read),
@@ -680,20 +696,21 @@ module main(
 //	reg enable_rgb = 0;
 //	reg enable_ycrcb = 1;
 	
-	wire dcm_locked, dcm_locked_two, dcm_locked_sram;
+	wire dcm_locked, dcm_locked_sram;
 
-	assign all_dcms_locked = dcm_locked && dcm_locked_two && dcm_locked_sram && camera_dcm_locked;
+	assign all_dcms_locked = dcm_locked && dcm_locked_sram && camera_dcm_locked;
 	
 	//instantiate clock manager (2014 edit)
 	clock_manager clock_manager(
 		.input_clk(main_system_clock),
 		.modified_clock(modified_clock),
+		.modified_clock_inv(modified_clock_inv),
+		.modified_clock_sync(modified_clock_sync),
 		.modified_clock_div_by_two(modified_clock_div_by_two),
-		.modified_clock_two(modified_clock_two),
-		.modified_clock_two_div_by_two(modified_clock_two_div_by_two),
+		.modified_clock_fast(modified_clock_fast),
+		.modified_clock_fast_inv(modified_clock_fast_inv),
 		.modified_clock_sram(modified_clock_sram),
 		.dcm_locked(dcm_locked),
-		.dcm_locked_two(dcm_locked_two),
 		.dcm_locked_sram(dcm_locked_sram)
 		);
 
@@ -786,6 +803,9 @@ module main(
 		if (slide_switches == 10) begin
 			display_value = sram_debug1;
 		end
+		if (slide_switches == 11) begin
+			display_value = sram_debug2;
+		end
 
 		
 		processing_started_prior = processing_started;
@@ -834,10 +854,10 @@ module main(
 	assign debug3[0] = run_frame_dump;
 	assign debug3[1] = run_single_shot_test;
 	assign debug3[2] = dcm_locked;
-	assign debug3[3] = dcm_locked_two;
-	assign debug3[4] = dcm_locked_sram;
-	assign debug3[5] = camera_dcm_locked;
-	assign debug3[6] = all_dcms_locked;
+	assign debug3[3] = dcm_locked_sram;
+	assign debug3[4] = camera_dcm_locked;
+	assign debug3[5] = all_dcms_locked;
+	assign debug3[6] = 0;
 
 	reg [17:0] frame_dump_origin_address = 76801;
 
@@ -851,10 +871,6 @@ module main(
 							
 		data_write <= data_write_edge_detection | data_write_tracking_output | data_write_x_pixel_filling | data_write_y_pixel_filling 
 								| data_write_blob_extraction | data_write_camera_capture | data_write_memory_blanking /*| data_write_median_filtering*/;
-	end
-
-	always @(posedge modified_clock) begin
-		modified_clock_sync <= ~modified_clock_sync;
 	end
 
 	localparam
@@ -875,7 +891,7 @@ module main(
 	STATE_FRAME_DUMP = 14,
 	STATE_SINGLE_SHOT = 15,
 	STATE_ONLINE_RECOGNITION = 16;
-	always @(posedge clk_div_by_two) begin
+	always @(posedge clk) begin
 		data_read_sync = data_read;
 
 		//if ((processing_done_internal == 0)) begin
@@ -1611,8 +1627,8 @@ module main(
 				ARRAY_SPEC_2_MAX = 3;	//fortunately, in the formula where it's used, it doesn't matter 		
 
 
-	async_transmit #(.ClkFrequency(InternalClkFrequency/2)) asyncTX(.clk(clk_div_by_two), .TxD_start(TxD_start), .TxD_data(TxD_data), .TxD(TxD), .TxD_busy(TxD_busy), .state(TxD_state));
-	async_receiver #(.ClkFrequency(InternalClkFrequency/2)) asyncRX(.clk(clk_div_by_two), .RxD(RxD), .RxD_data_ready(RxD_data_ready), .RxD_data(RxD_data), .RxD_endofpacket(RxD_endofpacket), .RxD_idle(RxD_idle));
+	async_transmit #(.ClkFrequency(InternalClkFrequency)) asyncTX(.clk(clk), .TxD_start(TxD_start), .TxD_data(TxD_data), .TxD(TxD), .TxD_busy(TxD_busy), .state(TxD_state));
+	async_receiver #(.ClkFrequency(InternalClkFrequency)) asyncRX(.clk(clk), .RxD(RxD), .RxD_data_ready(RxD_data_ready), .RxD_data(RxD_data), .RxD_endofpacket(RxD_endofpacket), .RxD_idle(RxD_idle));
 
 	reg [7:0] serial_receiver_timer = 21;
 	reg serial_character_received = 0;
@@ -1627,7 +1643,7 @@ module main(
 						
 	
 	// Receive serial commands
-	always @(posedge clk_div_by_two) begin
+	always @(posedge clk) begin
 		if (serial_receiver_timer > 40) begin
 			run_frame_dump = 0;				// These must only be pulsed, NOT stuck on!
 			run_single_shot_test = 0;

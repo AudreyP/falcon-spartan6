@@ -20,8 +20,8 @@
 
 module blob_extraction(
 	//input wires
-	input wire modified_clock_two_div_by_two,
-	input wire modified_clock_two,
+	input wire clk,
+	input wire clk_fast,
 
 	input wire primary_color_slots_clka,
 	input wire wren_primary_color_slots,
@@ -135,7 +135,7 @@ module blob_extraction(
 		wire [16:0] stack_ram_douta;
 		
 		stack_ram stack_ram(
-			.clka(modified_clock_two),
+			.clka(clk_fast),
 			.dina(stack_ram_dina),
 			.addra(stack_ram_addra),
 			.wea(stack_ram_wea),
@@ -152,7 +152,7 @@ module blob_extraction(
 		  .addra(address_primary_color_slots), // input [4 : 0] addra
 		  .dina(data_write_primary_color_slots), // input [23 : 0] dina
 		  .douta(), // output [23 : 0] douta (--NOT USED--)
-		  .clkb(modified_clock_two_div_by_two), // input clkb
+		  .clkb(clk), // input clkb
 		  .web(0), // input [0 : 0] web
 		  .addrb(primary_color_slots_addrb), // input [4 : 0] addrb
 		  .dinb(), // input [23 : 0] dinb (--NOT USED--)
@@ -182,8 +182,8 @@ module blob_extraction(
 		//always @(posedge clk_div_by_two) begin
 		//always @(posedge modified_clock) begin
 		//always @(posedge clk) begin
-		//always @(posedge modified_clock_two) begin
-		always @(posedge modified_clock_two_div_by_two) begin
+		//always @(posedge clk_fast) begin
+		always @(posedge clk) begin
 		if (pause == 0) begin
 			data_read_sync_blob_extraction = data_read;
 			

@@ -33,26 +33,25 @@ module memory_blanking(
 	reg [17:0] counter = 0;
 
 	always @(posedge clk) begin
-		if ((enable == 1) && (done == 0)) begin
-			if (pause == 0) begin
-				address = counter;
-				data_write = 32'h77553311;
-				wren = 1;
-				counter = counter + 1;
-				if (counter >= 262142) begin
-					done = 1;
+		if (enable == 1) begin
+			if (done == 0) begin
+				if (pause == 0) begin
+					address = counter;
+					data_write = 32'h77553311;
+					wren = 1;
+					counter = counter + 1;
+					if (counter >= 262142) begin
+						done = 1;
+					end
 				end
 			end
 		end else begin
-			if (enable == 0) begin
-				counter = 0;
+			done = 0;
+			counter = 0;
 
-				done = 0;
-
-				wren = 0;
-				address = 0;
-				data_write = 0;
-			end
+			wren = 0;
+			address = 0;
+			data_write = 0;
 		end
 	end
 endmodule

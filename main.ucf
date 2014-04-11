@@ -46,16 +46,17 @@ TIMESPEC TS_camera_data_pclk = PERIOD "camera_data_pclk" 20 ns HIGH 50%;
 # Over-constrain main clocks to guarantee data integrity at memory interface by the deadline
 # The deadline is currently 40ns after rising edge, minus 10ns for the synchronous module memory access mutiplexer
 NET "modified_clock" TNM_NET = modified_clock;
-NET "modified_clock_div_by_two" TNM_NET = modified_clock_div_by_two;
+NET "modified_clock_inv" TNM_NET = modified_clock_inv;
 NET "modified_clock_sram" TNM_NET = modified_clock_sram;
 
-TIMESPEC TS_modified_clock = PERIOD "modified_clock" 30 ns HIGH 50%;
-TIMESPEC TS_modified_clock_div_by_two = PERIOD "modified_clock_div_by_two" 30 ns HIGH 50%;
+TIMESPEC TS_modified_clock = PERIOD "modified_clock" 40 ns HIGH 50%;
+TIMESPEC TS_modified_clock_inv = PERIOD "modified_clock_inv" 10 ns HIGH 50%;
 
-TIMESPEC TS_main_processor_to_memory_controller = FROM "modified_clock" TO "modified_clock_sram" 30 ns;
-TIMESPEC TS_main_processor_div_by_two_to_memory_controller = FROM "modified_clock_div_by_two" TO "modified_clock_sram" 30 ns;
-TIMESPEC TS_memory_controller_to_main_processor = FROM "modified_clock_sram" TO "modified_clock" 30 ns;
-TIMESPEC TS_memory_controller_to_main_processor_div_by_two = FROM "modified_clock_sram" TO "modified_clock_div_by_two" 30 ns;
+TIMESPEC TS_memory_controller_to_buffer = FROM "modified_clock" TO "modified_clock_inv" 30 ns;
+TIMESPEC TS_buffer_to_memory_controller = FROM "modified_clock_inv" TO "modified_clock" 30 ns;
+
+TIMESPEC TS_main_processor_to_memory_controller = FROM "modified_clock" TO "modified_clock_sram" 20 ns;
+TIMESPEC TS_memory_controller_to_main_processor = FROM "modified_clock_sram" TO "modified_clock" 20 ns;
 
 TIMESPEC TS_modified_clock_sram = PERIOD "modified_clock_sram" 10 ns HIGH 50%;
 
@@ -105,9 +106,6 @@ NET "SEG4"         LOC = "C18" | IOSTANDARD = "LVCMOS33";   #Bank = 1, Pin name 
 NET "SEG5"         LOC = "C17" | IOSTANDARD = "LVCMOS33";   #Bank = 1, Pin name = IO_L53N_VREF,                      Sch name = CF
 NET "SEG6"         LOC = "A16" | IOSTANDARD = "LVCMOS33";   #Bank = 1, Pin name = IO_L61P,                           Sch name = CG
 NET "SEG7"         LOC = "B16" | IOSTANDARD = "LVCMOS33";   #Bank = 1, Pin name = IO_L61N,                           Sch name = DP
-
-#debug
-NET "global_pause"	LOC="B2" | IOSTANDARD = "LVCMOS33";
 
 NET "TxD" 				LOC = "A14" | IOSTANDARD = "LVCMOS33";	#serial output (from fpga)
 NET "RxD" 				LOC = "B14" | IOSTANDARD = "LVCMOS33";		#serial input (to fpga )
@@ -481,5 +479,7 @@ NET dram_we_n PULLUP;
 #NET cs_qn PULLUP;
 
 # DEBUG
-NET "modified_clock_sync_debug" LOC = "A3" | IOSTANDARD = "LVCMOS33";
-NET "modified_clock_sram_debug" LOC = "B3" | IOSTANDARD = "LVCMOS33";
+NET "modified_clock_debug"      LOC = "A3" | IOSTANDARD = "LVCMOS33";
+NET "modified_clock_sync_debug" LOC = "B3" | IOSTANDARD = "LVCMOS33";
+NET "modified_clock_sram_debug" LOC = "A2" | IOSTANDARD = "LVCMOS33";
+NET "modified_clock_fast_debug" LOC = "B2" | IOSTANDARD = "LVCMOS33";

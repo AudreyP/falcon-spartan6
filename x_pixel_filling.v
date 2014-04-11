@@ -20,7 +20,7 @@
 
 module x_pixel_filling (
 	//input wires
-	input wire clk_div_by_two,
+	input wire clk,
 	input wire pause,
 	input wire enable_x_pixel_filling,
 	input wire [31:0] data_read,
@@ -67,7 +67,7 @@ module x_pixel_filling (
 	
 	// Fill in missing edge pixels in the X direction.
 	//always @(posedge clk) begin
-	always @(posedge clk_div_by_two) begin
+	always @(posedge clk) begin
 	//always @(posedge modified_clock) begin
 		if (pause == 0) begin
 			data_read_sync_x_pixel_filling = data_read;

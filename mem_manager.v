@@ -18,7 +18,8 @@
 
 **********************************************************************/
 module mem_manager(
-	input wire clk,
+	input wire clk_fast,
+	input wire clk_sync,
 	input wire crystal_clk,
 	input wire all_dcms_locked,
 	input wire modified_clock_sram,
@@ -34,7 +35,6 @@ module mem_manager(
 	output wire dram_ck,
 	output wire dram_ck_n,
 	output wire dram_cke,
-	output wire cs_qn,
 	output wire dram_ras_n,
 	output wire dram_cas_n,
 	output wire dram_we_n,
@@ -57,7 +57,8 @@ module mem_manager(
 	input wire start_read,
 	input wire start_write,*/
 	output wire [15:0] debug0,
-	output wire [15:0] debug1
+	output wire [15:0] debug1,
+	output wire [15:0] debug2
 	 );
 
 	wire calib_done;
@@ -73,7 +74,9 @@ module mem_manager(
 	wire [15:0] data_out_q;
 	wire data_vld_q;
 
-	reg ddr_core_rst = 0;
+	wire ddr_core_rst;
+	//assign ddr_core_rst = ~all_dcms_locked;
+	assign ddr_core_rst = 0;
 
 	//command connections
 	wire cmd_clk;
@@ -184,8 +187,12 @@ module mem_manager(
 	// reg [18:0] addr;	//already declared
 	reg ddr_op_in_progress;
 
-	assign debug0 = state;
-	assign debug1 = counter;
+	assign debug0    = state;
+	assign debug1    = counter;
+	assign debug2[0] = read_error;
+	assign debug2[1] = rd_error;
+	assign debug2[2] = rd_overflow;
+	assign debug2[15:3] = 0;
 	
 	//states
 	localparam	INIT_STATE = 0,
@@ -194,29 +201,31 @@ module mem_manager(
 			
 			WRITE_WAIT_1 = 3,
 			SET_WRITE_COMMAND = 4,
-			SET_WRITE_WAIT = 5,
-			WRITE_DATA_VALID = 6,
+			WRITE_TRANSITION_STATE = 5,
 			
-			READ_COMMAND_STATE = 7,
-			READ_TRANSITION_STATE = 8,
-			READ_STATE = 9,
+			READ_STATE = 6,
 			
-			DDR_DATA_VALID_STATE = 10,
-			WAIT_STATE = 11;
+			DDR_DATA_VALID_STATE = 7;
+
+	reg word_read = 0;
 
 	localparam	WRITE = 0,
 			READ = 1,
 			REFRESH = 4;	
 	
-	localparam 	LATCH_TIME = 4,
-			NO_RETURN = 5;
+	localparam 	LATCH_TIME = 2;
 
 	reg wren_prev;
 	reg [31:0] data_write_prev;
-	reg [17:0] starting_address_prev;
+	reg [17:0] address_prev;
 
-	reg clk_reg = 0;
-	reg clk_prev = 0;
+	reg pause_unbuffered;
+	reg [31:0] data_read_unbuffered;
+	reg [31:0] data_write_buffered;
+	reg [17:0] address_buffered;
+	reg wren_buffered;
+
+	reg clk_sync_prev = 0;
 	//----------------------------
 	// BEGIN STATE MACHINE
 	//----------------------------
@@ -224,17 +233,12 @@ module mem_manager(
 		//counter resets on rising edge of main clock. 
 		//Divides one clock cycle into time slices determined by the modified clock rate (in this case, 10 slices per main clk cycle)
 		//(counter increments on posedge of modified clock)
-		if (clk_reg != clk_prev) begin
+		if ((clk_sync == 1) && (clk_sync_prev == 0)) begin
 			counter <= 0;
 		end else begin
 			counter <= counter + 1;
 		end
-		clk_reg <= clk;
-		clk_prev <= clk_reg;
-		
-		if ((counter > NO_RETURN) && (ddr_op_in_progress == 1)) begin
-			pause <= 1;
-		end
+		clk_sync_prev <= clk_sync;
 		
 		case (state)
 			INIT_STATE:	begin	
@@ -248,50 +252,59 @@ module mem_manager(
 					end
 			
 			IDLE_STATE:	begin
-						pause <= 0;
-						if (counter == LATCH_TIME) begin
+						if (pause_unbuffered == 1) begin
+							// Deassert pause
+							pause_unbuffered <= 0;
+
+							// Wait one clock cycle for the deasserted pause signal to propagate to the clocked user logic.
+							// If this is not done the memory controller will read stale data from the still-paused user logic!
+							state <= DDR_DATA_VALID_STATE;
+						end else if (counter == LATCH_TIME) begin
 							state <= LATCH_STATE;
-						end
-						else begin
+						end else begin
 							state <= IDLE_STATE;
 						end
 					end
 	
 			LATCH_STATE:	begin
-// 						// Rudimentary single-word data cache
-// 						if ((starting_address == starting_address_prev) && ((wren == 0) || ((wren == 1) && (wren_prev == 1) && (data_write == data_write_prev)))) begin
-// 							// Do nothing!
-// 							state <= DDR_DATA_VALID_STATE;
-// 						end else begin
+//  						// Rudimentary single-word data cache
+//  						if ((address_buffered == address_prev) && ((wren_buffered == 0) || ((wren_buffered == 1) && (wren_prev == 1) && (data_write_buffered == data_write_prev)))) begin
+//  							// Do nothing!
+//  							ddr_op_in_progress <= 1;
+//  							state <= DDR_DATA_VALID_STATE;
+//  						end else begin
 							// DEACTIVATED--see below
-							//cmd_addr[29:2] <= starting_address;	//starting address 17 bits--shove into upper 28b of 30b addr to leave room for two 0's
+							//cmd_addr[29:2] <= address_buffered;	//starting address 17 bits--shove into upper 28b of 30b addr to leave room for two 0's
 							//cmd_addr[1:0] <= 0;
 
 							// Work around serious data integrity problem where the value of cmd_addr[2] is ignored
-							cmd_addr[29:3] <= starting_address;
+							cmd_addr[29:3] <= address_buffered;
 							cmd_addr[2:0] <= 0;
 
 							//determine read or write operation
-							if (wren==1) begin	//if a write signal is received, begin write	
-								wr_data <= data_write;	//write whole 32-bit word
-								data_read <= data_write;	// When writing, pass the write data through to the read port.  This allows proper operation of the same-address write-->read turnaround portion of the data cache above
+							if (wren_buffered==1) begin	//if a write signal is received, begin write	
+								wr_data <= data_write_buffered;	//write whole 32-bit word
+								data_read_unbuffered <= data_write_buffered;	// When writing, pass the write data through to the read port.  This allows proper operation of the same-address write-->read turnaround portion of the data cache above
 								//wr_data <= 32'hf0806020;
 								wr_en <= 1;	//now that data is in data path, assert write enable
 								state <= WRITE_WAIT_1;
 								ddr_op_in_progress <= 1;
-							end
-							else begin	//wren == 0
+								pause_unbuffered <= 1;
+							end else begin	//wren_buffered == 0
 								cmd_instr <= READ;
 								//burst length set to constant 1
 								//address already set in LATCH STATE
-								state <= READ_COMMAND_STATE;
+								cmd_en <= 1;	//enable read command with addr, burst length, and instruction data set in IDLE STATE
+								state <= READ_STATE;
+								word_read <= 0;
 								ddr_op_in_progress <= 1;
+								pause_unbuffered <= 1;
 							end // end else
-// 						end
+//  						end
 	
-						wren_prev <= wren;
-						data_write_prev <= data_write;
-						starting_address_prev <= starting_address;
+						wren_prev <= wren_buffered;
+						data_write_prev <= data_write_buffered;
+						address_prev <= address_buffered;
 					end
 			
 			//-----WRITE CYCLE
@@ -310,64 +323,41 @@ module mem_manager(
 // 							// FIXME
 // 							// This implementation will likely lose the current data word
 // 							// Is there an "almost full" flag that can be used instead?
-// 							state <= SET_WRITE_WAIT;
+// 							state <= WRITE_TRANSITION_STATE;
 // 						end
 	
 						// MODE 2
 						// Ensure data is flushed to physical memory before resuming execution
 						// This mode is highly accurate even with broken MCB transaction coherency, but is extremely slow
-						state <= SET_WRITE_WAIT;
+						state <= WRITE_TRANSITION_STATE;
 					end
-			
-	// 		SET_WRITE_COMMAND:
-	// 				begin
-	// 					cmd_instr <= WRITE;
-	// 					//burst length set to constant "1"
-	// 					//address already set in LATCH STATE
-	// 					state <= SET_WRITE_WAIT;
-	// 				end
-			SET_WRITE_WAIT: //wait state to ensure the data is valid
-					begin
-						cmd_en <= 0;
-	
-						state <= WRITE_DATA_VALID;
-					end
-	
-			WRITE_DATA_VALID:
+
+			WRITE_TRANSITION_STATE:
 					begin
 						cmd_en <= 0;
 						if (wr_empty == 1) begin //write fifo empty--ie data is written to memory
 							state <= DDR_DATA_VALID_STATE;
-						end
-						else begin
-							state <= WRITE_DATA_VALID;
+						end else begin
+							state <= WRITE_TRANSITION_STATE;
 						end
 					end
 	
 			//----READ CYCLE
-			READ_COMMAND_STATE:
-					begin
-						cmd_en <= 1;	//enable read command with addr, burst length, and instruction data set in IDLE STATE
-						state <= READ_TRANSITION_STATE;
-					end			
-	
-			READ_TRANSITION_STATE:
-					begin
+			READ_STATE: 	begin
 						cmd_en <= 0;	//disable read command
+						rd_en <= 1;
 						if (rd_empty == 0) begin
+							data_read_unbuffered <= rd_data;
+							word_read <= 1;
+							// Valid data was received; make sure FIFO is truly empty before continuing
+							state <= READ_STATE;
+						end else if (word_read == 1) begin
+							// Valid data was received and FIFO is empty; proceed...
+							state <= DDR_DATA_VALID_STATE;
+						end else begin
+							// Wait for valid data to be driven onto the bus
 							state <= READ_STATE;
 						end
-						else
-							state <= READ_TRANSITION_STATE;
-					end
-			
-			READ_STATE: 	begin
-						rd_en <= 1;
-						data_read <= rd_data;
-						if (rd_empty == 1)
-							state <= DDR_DATA_VALID_STATE;
-						else
-							state <= READ_STATE;
 					end
 	
 			//-----occurs only when an entire data word has been written or read to/from DDR
@@ -376,22 +366,12 @@ module mem_manager(
 						wr_en <= 0;
 						cmd_en <= 0;
 						ddr_op_in_progress <= 0;
-						if (counter < NO_RETURN) begin
-							pause <= 0;
+
+						// wait 1 main clk cycle
+						if (counter == 0) begin
 							state <= IDLE_STATE;
-						end
-						else begin //counter >= point of no return (enters the "forbidden zone" and must wait 1 main clk cycle)
-							state <= WAIT_STATE;
-						end
-					end
-			
-			WAIT_STATE:	begin
-						pause <= 1;
-						if (counter >= NO_RETURN) begin
-							state <= IDLE_STATE;
-						end
-						else begin //remain in this state until the next "point of no return"
-							state <= WAIT_STATE;
+						end else begin //remain in this state until the next clock cycle
+							state <= DDR_DATA_VALID_STATE;
 						end
 					end
 			default:	begin
@@ -400,5 +380,15 @@ module mem_manager(
 		endcase
 	end	//end always
 	
+	// This block MUST be clocked at twice the speed of the user logic clock (a.k.a. clk_sync) to maintain data integrity
+	always @(posedge clk_fast) begin
+		// Register inputs
+		wren_buffered <= wren;
+		address_buffered <= starting_address;
+		data_write_buffered <= data_write;
 
+		// Register outputs
+		pause <= pause_unbuffered;
+		data_read <= data_read_unbuffered;
+	end
 endmodule
