@@ -49,6 +49,11 @@ module blob_extraction(
 	output reg [11:0] debug3_display
 	);
 
+	parameter ImageWidth = 320;
+	parameter ImageHeight = 240;
+	parameter ImageOffset = (ImageWidth*ImageHeight)+1;
+	parameter BlobStorageOffset = 200000;
+
 		initial blob_extraction_done = 0;
 
 		reg [3:0] enable_blob_extraction_verified = 0;
@@ -80,11 +85,8 @@ module blob_extraction(
 		
 		reg blob_extraction_execution_interrupted = 0; //here only
 		
-		// Here is the stack in all of its glory...we are using 9 bit numbers for X coordinate storage here, with a max. stack depth of 2000
+		// Here is the stack in all of its glory...we are using 9 bit numbers for X coordinate storage here, with a max. stack depth of 16384
 		// We will be using 8 bit numbers for the Y coordinates
-		//reg [17999:0] stack_x = 0;
-		//reg [15999:0] stack_y = 0;
-		//reg [11:0] stack_pointer = 0;
 		
 		//reg [31:0] stack = 0;
 		reg [15:0] stack_pointer = 0;
@@ -125,11 +127,6 @@ module blob_extraction(
 		
 		reg ok_to_do_averaging = 0;
 		
-//		localparam [5:0] PRIMARY_COLOR_SLOTS_WORD_SIZE = 24;
-//		localparam [3:0] ARRAY_SPEC_1_MAX = 5;
-//		reg [575:0] array_spec;
-		
-		
 		//-----Instantiate stack_ram
 		reg [16:0] stack_ram_dina;	
 		reg [13:0] stack_ram_addra;	
@@ -143,7 +140,7 @@ module blob_extraction(
 			.wea(stack_ram_wea),
 			.douta(stack_ram_douta)
 			);
-						
+
 		//-----Instantiate TDP block ram for primary_color_slots
 		reg [4:0] primary_color_slots_addrb;
 		wire [23:0] primary_color_slots_doutb;
@@ -220,9 +217,9 @@ module blob_extraction(
 				
 				if (blob_extraction_holdoff == 0) begin
 					wren = 0;
-					address = 2240;								// Skip the topmost 7 lines of the image
-					blob_extraction_counter_tog = 2240;
-					blob_extraction_counter_togg = 2240;
+					address = (ImageWidth*7);								// Skip the topmost 7 lines of the image
+					blob_extraction_counter_tog = (ImageWidth*7);
+					blob_extraction_counter_togg = (ImageWidth*7);
 					blob_extraction_holdoff = 1;
 					blob_extraction_toggler = 0;
 					blob_extraction_blob_counter = 1;
@@ -233,13 +230,13 @@ module blob_extraction(
 				end else begin
 					if (blob_extraction_execution_interrupted == 0) begin
 						// For blob_extraction_y = 7 to 233
-						if (blob_extraction_y < 233) begin
+						if (blob_extraction_y < (ImageHeight-7)) begin
 							// For blob_extraction_x = 7 to 313
-							if (blob_extraction_x < 313) begin
+							if (blob_extraction_x < (ImageWidth-7)) begin
 								if (blob_extraction_toggler == 0) begin
 									// Set up the next read
 									wren = 0;
-									address = ((blob_extraction_y * 320) + blob_extraction_x);
+									address = ((blob_extraction_y * ImageWidth) + blob_extraction_x);
 									
 									blob_extraction_toggler = 1;
 								end else begin
@@ -310,17 +307,17 @@ module blob_extraction(
 							spanLeft = 0;
 							spanRight = 0;
 							
-							address = ((blob_extraction_y_temp_1 * 320) + blob_extraction_x_temp);
+							address = ((blob_extraction_y_temp_1 * ImageWidth) + blob_extraction_x_temp);
 						end
 						
 						if (blob_extraction_toggler == 2) begin
 							// Go up until an edge is found
 							
-							if ((data_read == 0) && (blob_extraction_x_temp > 7) && (blob_extraction_x_temp < 313) && (blob_extraction_y_temp_1 > 7) && (blob_extraction_y_temp_1 < 233)) begin
+							if ((data_read == 0) && (blob_extraction_x_temp > 7) && (blob_extraction_x_temp < (ImageWidth-7)) && (blob_extraction_y_temp_1 > 7) && (blob_extraction_y_temp_1 < (ImageHeight-7))) begin
 								// Set up the read operation
 								wren = 0;
 								blob_extraction_y_temp_1 = blob_extraction_y_temp_1 - 1;
-								address = ((blob_extraction_y_temp_1 * 320) + blob_extraction_x_temp);
+								address = ((blob_extraction_y_temp_1 * ImageWidth) + blob_extraction_x_temp);
 									
 								blob_extraction_inner_toggler = 1;
 							end else begin
@@ -332,7 +329,7 @@ module blob_extraction(
 						
 						if (blob_extraction_toggler == 3) begin
 							// Set up a read operation for the pixel at (blob_extraction_x_temp, blob_extraction_y_temp)
-							address = ((blob_extraction_y_temp_1 * 320) + blob_extraction_x_temp);
+							address = ((blob_extraction_y_temp_1 * ImageWidth) + blob_extraction_x_temp);
 						end
 
 						if (blob_extraction_toggler == 4) begin
@@ -344,10 +341,10 @@ module blob_extraction(
 							// If the pixel is zero, write the current blob number in its place
 							if (blob_extraction_inner_toggler == 0) begin
 								if ((data_read == 0) 
-									&& (blob_extraction_x_temp > 7) && (blob_extraction_x_temp < 313) 
-									&& (blob_extraction_y_temp_1 > 7) && (blob_extraction_y_temp_1 < 233)) begin
+									&& (blob_extraction_x_temp > 7) && (blob_extraction_x_temp < (ImageWidth-7)) 
+									&& (blob_extraction_y_temp_1 > 7) && (blob_extraction_y_temp_1 < (ImageHeight-7))) begin
 									// Write the data
-									address = ((blob_extraction_y_temp_1 * 320) + blob_extraction_x_temp);
+									address = ((blob_extraction_y_temp_1 * ImageWidth) + blob_extraction_x_temp);
 									data_write = blob_extraction_blob_counter;
 									wren = 1;
 									
@@ -366,7 +363,7 @@ module blob_extraction(
 							if (blob_extraction_inner_toggler == 2) begin
 								// Switch to read; we need to read the RGB value of the median-filtered image
 								wren = 0;
-								address = (((blob_extraction_y_temp_1 * 320) + blob_extraction_x_temp) + 76801);
+								address = (((blob_extraction_y_temp_1 * ImageWidth) + blob_extraction_x_temp) + ImageOffset);
 							end
 
 							if (blob_extraction_inner_toggler == 3) begin
@@ -540,7 +537,7 @@ module blob_extraction(
 								end
 								
 								// We need to read data from the image here, so set up another read cycle
-								address = ((blob_extraction_y_temp_1 * 320) + blob_extraction_x_temp - 1);
+								address = ((blob_extraction_y_temp_1 * ImageWidth) + blob_extraction_x_temp - 1);
 								wren = 0;
 							end
 							
@@ -601,11 +598,11 @@ module blob_extraction(
 							end
 							
 							if (blob_extraction_inner_toggler == 6) begin
-								/*divider_dividend = 320;
+								/*divider_dividend = ImageWidth;
 								divider_divisor = 2;*/
 								
 								// We need to read some more data from the image here, so set up yet another read cycle
-								address = ((blob_extraction_y_temp_1 * 320) + blob_extraction_x_temp + 1);
+								address = ((blob_extraction_y_temp_1 * ImageWidth) + blob_extraction_x_temp + 1);
 								wren = 0;
 							end
 								
@@ -636,7 +633,7 @@ module blob_extraction(
 								// Wait a clock cycle
 								wren = 0;
 								blob_extraction_y_temp_1 = blob_extraction_y_temp_1 + 1;
-								address = ((blob_extraction_y_temp_1 * 320) + blob_extraction_x_temp);	// Set up the next read
+								address = ((blob_extraction_y_temp_1 * ImageWidth) + blob_extraction_x_temp);	// Set up the next read
 								blob_extraction_inner_toggler = 0;
 								blob_extraction_toggler = 4;			// Go again...this will become 5 on the next loop!
 							end
@@ -734,7 +731,7 @@ module blob_extraction(
 						
 						if (blob_extraction_toggler == 8) begin
 							// Begin writing the data
-							address = ((blob_extraction_blob_counter * 3) + 200000);
+							address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+0));
 							blob_extraction_data_temp[31:24] = blob_extraction_red_average_final;
 							blob_extraction_data_temp[23:16] = blob_extraction_green_average_final;
 							blob_extraction_data_temp[15:8] = blob_extraction_blue_average_final;
@@ -755,7 +752,7 @@ module blob_extraction(
 						
 						if (blob_extraction_toggler == 10) begin
 							// Continue writing the data
-							address = ((blob_extraction_blob_counter * 3) + 200001);
+							address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+1));
 							blob_extraction_data_temp[31:24] = ((blob_extraction_x_average_final - 8) / 2);
 							blob_extraction_data_temp[23:16] = ((blob_extraction_y_average_final - 8) / 2);
 							blob_extraction_data_temp[15:0] = (blob_extraction_blob_size / 2);
@@ -776,7 +773,7 @@ module blob_extraction(
 						
 						if (blob_extraction_toggler == 12) begin
 							// Write the third and last data frame
-							address = ((blob_extraction_blob_counter * 3) + 200002);
+							address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+2));
 							blob_extraction_data_temp[31:24] = (blob_extraction_lowest_x_value / 2);
 							blob_extraction_data_temp[23:16] = (blob_extraction_lowest_y_value / 2);
 							blob_extraction_data_temp[15:8] = (blob_extraction_highest_x_value / 2);
@@ -792,7 +789,7 @@ module blob_extraction(
 						
 						if (blob_extraction_toggler == 14) begin
 							// Put a little red dot dot where the centroid is
-							address = ((blob_extraction_y_average_final * 320) + blob_extraction_x_average_final) + 76801;	// Set up the next write
+							address = ((blob_extraction_y_average_final * ImageWidth) + blob_extraction_x_average_final) + ImageOffset;	// Set up the next write
 							blob_extraction_data_temp = 255;
 							blob_extraction_data_temp[31:24] = blob_extraction_blob_color_number;
 							data_write = blob_extraction_data_temp;

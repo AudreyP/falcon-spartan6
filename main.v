@@ -103,8 +103,8 @@ module main(
 	// '<=' is a nonblocking set operation (like '=') 
 
 	//parameter InternalClkFrequency = 6666666;	// 6.66MHz
-	parameter InternalClkFrequency = 10000000;	// 10MHz
-	//parameter InternalClkFrequency = 12500000;	// 12.5MHz
+	//parameter InternalClkFrequency = 10000000;	// 10MHz
+	parameter InternalClkFrequency = 12500000;	// 12.5MHz
 	//parameter InternalClkFrequency = 13333333;	// 13.33MHz
 	//parameter InternalClkFrequency = 20000000;	// 20MHz
 	//parameter InternalClkFrequency = 50000000;	// 50MHz
@@ -116,7 +116,7 @@ module main(
 	//parameter I2ClkCyclesToWait = (InternalClkFrequency / 100);
 	//parameter I2ClkCyclesToWait = (InternalClkFrequency / 1);
 
-	parameter MemoryToSystemClockRatio = 10;	// Ratio of the memory controller clock to the main system clock
+	parameter MemoryToSystemClockRatio = 8;	// Ratio of the memory controller clock to the main system clock
 
 	wire clk;
 	(* KEEP = "TRUE" *) wire modified_clock;
