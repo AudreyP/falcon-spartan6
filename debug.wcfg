@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="/home/audrey/Xilinx Projects/Falcon_Spartan6/clock_manager_test_isim_beh.wdb" id="1" type="auto">
+         <top_modules>
+            <top_module name="clock_manager_test" />
+            <top_module name="glbl" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <WVObjectSize size="55" />
+   <wvobject fp_name="/clock_manager_test/modified_clock" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">modified_clock</obj_property>
+      <obj_property name="ObjectShortName">modified_clock</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/modified_clock_inv" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">modified_clock_inv</obj_property>
+      <obj_property name="ObjectShortName">modified_clock_inv</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/modified_clock_div_by_two" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">modified_clock_div_by_two</obj_property>
+      <obj_property name="ObjectShortName">modified_clock_div_by_two</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/modified_clock_fast" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">modified_clock_fast</obj_property>
+      <obj_property name="ObjectShortName">modified_clock_fast</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/modified_clock_fast_inv" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">modified_clock_fast_inv</obj_property>
+      <obj_property name="ObjectShortName">modified_clock_fast_inv</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/modified_clock_sram" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">modified_clock_sram</obj_property>
+      <obj_property name="ObjectShortName">modified_clock_sram</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/dcm_locked" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">dcm_locked</obj_property>
+      <obj_property name="ObjectShortName">dcm_locked</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/dcm_locked_sram" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">dcm_locked_sram</obj_property>
+      <obj_property name="ObjectShortName">dcm_locked_sram</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/modified_clock_period" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">modified_clock_period[7:0]</obj_property>
+      <obj_property name="ObjectShortName">modified_clock_period[7:0]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/data_read" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">data_read[31:0]</obj_property>
+      <obj_property name="ObjectShortName">data_read[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/modified_clk" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">modified_clk</obj_property>
+      <obj_property name="ObjectShortName">modified_clk</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/all_dcms_locked" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">all_dcms_locked</obj_property>
+      <obj_property name="ObjectShortName">all_dcms_locked</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/global_pause" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">global_pause</obj_property>
+      <obj_property name="ObjectShortName">global_pause</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/dram_dq" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">dram_dq[15:0]</obj_property>
+      <obj_property name="ObjectShortName">dram_dq[15:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/dram_a" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">dram_a</obj_property>
+      <obj_property name="ObjectShortName">dram_a</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/dram_ba" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">dram_ba</obj_property>
+      <obj_property name="ObjectShortName">dram_ba</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/dram_ras_n" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">dram_ras_n</obj_property>
+      <obj_property name="ObjectShortName">dram_ras_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/dram_cas_n" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">dram_cas_n</obj_property>
+      <obj_property name="ObjectShortName">dram_cas_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/dram_we_n" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">dram_we_n</obj_property>
+      <obj_property name="ObjectShortName">dram_we_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/dram_cke" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">dram_cke</obj_property>
+      <obj_property name="ObjectShortName">dram_cke</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/dram_ck" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">dram_ck</obj_property>
+      <obj_property name="ObjectShortName">dram_ck</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/dram_ck_n" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">dram_ck_n</obj_property>
+      <obj_property name="ObjectShortName">dram_ck_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/dram_dqs" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">dram_dqs</obj_property>
+      <obj_property name="ObjectShortName">dram_dqs</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/dram_udqs" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">dram_udqs</obj_property>
+      <obj_property name="ObjectShortName">dram_udqs</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/dram_udm" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">dram_udm</obj_property>
+      <obj_property name="ObjectShortName">dram_udm</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/dram_dm" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">dram_dm</obj_property>
+      <obj_property name="ObjectShortName">dram_dm</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/rzq" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">rzq</obj_property>
+      <obj_property name="ObjectShortName">rzq</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/memory_controller_ready" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">memory_controller_ready</obj_property>
+      <obj_property name="ObjectShortName">memory_controller_ready</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/sram_debug0" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">sram_debug0</obj_property>
+      <obj_property name="ObjectShortName">sram_debug0</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/sram_debug1" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">sram_debug1</obj_property>
+      <obj_property name="ObjectShortName">sram_debug1</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/sram_debug2" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">sram_debug2</obj_property>
+      <obj_property name="ObjectShortName">sram_debug2</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/main_system_clock" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">main_system_clock</obj_property>
+      <obj_property name="ObjectShortName">main_system_clock</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/main_system_clock_stable" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">main_system_clock_stable</obj_property>
+      <obj_property name="ObjectShortName">main_system_clock_stable</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/mem_read_error" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">mem_read_error</obj_property>
+      <obj_property name="ObjectShortName">mem_read_error</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/input_clk" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">input_clk</obj_property>
+      <obj_property name="ObjectShortName">input_clk</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/input_clk_stable" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">input_clk_stable</obj_property>
+      <obj_property name="ObjectShortName">input_clk_stable</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/data_write" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">data_write[31:0]</obj_property>
+      <obj_property name="ObjectShortName">data_write[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/address" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">address[17:0]</obj_property>
+      <obj_property name="ObjectShortName">address[17:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/wren" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">wren</obj_property>
+      <obj_property name="ObjectShortName">wren</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/mem_manager/state" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">state[3:0]</obj_property>
+      <obj_property name="ObjectShortName">state[3:0]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/mem_manager/pause" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">pause</obj_property>
+      <obj_property name="ObjectShortName">pause</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/mem_manager/pause_unbuffered" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">pause_unbuffered</obj_property>
+      <obj_property name="ObjectShortName">pause_unbuffered</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/mem_manager/clk_sync" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">clk_sync[7:0]</obj_property>
+      <obj_property name="ObjectShortName">clk_sync[7:0]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/test_count" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">test_count[7:0]</obj_property>
+      <obj_property name="ObjectShortName">test_count[7:0]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/mem_manager/address" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">address[17:0]</obj_property>
+      <obj_property name="ObjectShortName">address[17:0]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/mem_manager/address_prev" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">address_prev[17:0]</obj_property>
+      <obj_property name="ObjectShortName">address_prev[17:0]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/mem_manager/cmd_instr" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">cmd_instr[2:0]</obj_property>
+      <obj_property name="ObjectShortName">cmd_instr[2:0]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/mem_manager/cmd_addr" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">cmd_addr[29:0]</obj_property>
+      <obj_property name="ObjectShortName">cmd_addr[29:0]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/mem_manager/cmd_en" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">cmd_en</obj_property>
+      <obj_property name="ObjectShortName">cmd_en</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/mem_manager/wr_data" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">wr_data[31:0]</obj_property>
+      <obj_property name="ObjectShortName">wr_data[31:0]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/mem_manager/wr_en" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">wr_en</obj_property>
+      <obj_property name="ObjectShortName">wr_en</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/mem_manager/wr_empty" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">wr_empty</obj_property>
+      <obj_property name="ObjectShortName">wr_empty</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/mem_manager/rd_data" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">rd_data[31:0]</obj_property>
+      <obj_property name="ObjectShortName">rd_data[31:0]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/mem_manager/rd_en" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">rd_en</obj_property>
+      <obj_property name="ObjectShortName">rd_en</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/mem_manager/rd_empty" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">rd_empty</obj_property>
+      <obj_property name="ObjectShortName">rd_empty</obj_property>
+   </wvobject>
+</wave_config>

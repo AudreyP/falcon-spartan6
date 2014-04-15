@@ -93,7 +93,8 @@ module infrastructure #
    output pll_ce_0,
    output pll_ce_90,
    output pll_lock,
-   output main_system_clock
+   output main_system_clock,
+   output main_system_clock_stable
    );
 
   // # of clock cycles to delay deassertion of reset. Needs to be a fairly
@@ -249,6 +250,8 @@ module infrastructure #
      .O (main_system_clock),
      .I (main_system_clock_bufg_in)
      );
+
+  assign main_system_clock_stable = locked;
 
   always @(posedge mcb_drp_clk , posedge sys_rst)
       if(sys_rst)

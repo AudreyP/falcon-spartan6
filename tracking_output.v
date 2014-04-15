@@ -1,6 +1,6 @@
 `timescale 1ns / 1ps
 /**********************************************************************
- Copyright (c) 2007 Timothy Pearson <kb9vqf@pearsoncomputing.net>
+ Copyright (c) 2007-2014 Timothy Pearson <kb9vqf@pearsoncomputing.net>
  Copyright (c) 2014 Audrey Pearson <aud.pearson@gmail.com> 
 
  This program is free software; you can redistribute it and/or modify
@@ -97,7 +97,6 @@ module tracking_output(
 	//reg tracking_output_main_chunk_already_loaded = 0;   //UNUSED IN EITHER LOCATION!
 	//reg [7:0] tracking_output_counter_buffer_blue;   //UNUSED IN EITHER LOCATION!
 
-	reg [31:0] data_read_sync_tracking_output = 0;	//HERE ONLY
 	reg [15:0] tracking_output_pointer_counter = 0;	//HERE ONLY
 	reg [7:0] tracking_output_counter_color;	//HERE ONLY
 	reg [15:0] tracking_output_counter_size;	//HERE ONLY
@@ -129,304 +128,302 @@ module tracking_output(
 	
 	// Output the tracking data
 	always @(posedge clk) begin
-	if (pause == 0) begin
-		data_read_sync_tracking_output = data_read;
-		
-		if (enable_tracking_output == 1) begin
-			enable_tracking_output_verified = enable_tracking_output_verified + 1;
-		end else begin
-			enable_tracking_output_verified = 0;
-		end
-		
-		if ((enable_tracking_output_verified >= 2) && (tracking_output_done == 0)) begin
-			enable_tracking_output_verified = 2;		// Keep this running!
-		
-			case (tracking_output_holdoff)
-			0:begin
-				wren = 0;
-				tracking_output_counter_tog = 5;
-				tracking_output_counter_togg = 0;
-				tracking_output_pointer_counter = 0;
-				tracking_output_ok_to_send_data = 0;
-				tracking_output_pointer = 6;
-				x_centroids_array[X_CENTROIDS_WORD_0 : 0] = 0;
-				y_centroids_array[Y_CENTROIDS_WORD_0 : 0] = 0;
-				x_centroids_array[X_CENTROIDS_WORD_1 : 1+X_CENTROIDS_WORD_0] = 0;
-				y_centroids_array[Y_CENTROIDS_WORD_1 : 1+Y_CENTROIDS_WORD_0] = 0;
-				x_centroids_array[X_CENTROIDS_WORD_2 : 1+X_CENTROIDS_WORD_1] = 0;
-				y_centroids_array[Y_CENTROIDS_WORD_2 : 1+Y_CENTROIDS_WORD_1] = 0;
-				x_centroids_array[X_CENTROIDS_WORD_3 : 1+X_CENTROIDS_WORD_2] = 0;
-				y_centroids_array[Y_CENTROIDS_WORD_3 : 1+Y_CENTROIDS_WORD_2] = 0;
-				x_centroids_array[X_CENTROIDS_WORD_4 : 1+X_CENTROIDS_WORD_3] = 0;
-				y_centroids_array[Y_CENTROIDS_WORD_4 : 1+Y_CENTROIDS_WORD_3] = 0;
-				x_centroids_array[X_CENTROIDS_WORD_5 : 1+X_CENTROIDS_WORD_4] = 0;
-				y_centroids_array[Y_CENTROIDS_WORD_5 : 1+Y_CENTROIDS_WORD_4] = 0;
-				tracking_output_holdoff = 1;
+		if (pause == 0) begin
+			if (enable_tracking_output == 1) begin
+				enable_tracking_output_verified = enable_tracking_output_verified + 1;
+			end else begin
+				enable_tracking_output_verified = 0;
 			end
 			
-			1:begin
-				tracking_output_blob_sizes[BLOB_SIZE_WORD_0 : 0] = 0;
-				tracking_output_blob_sizes[BLOB_SIZE_WORD_1 : 1+BLOB_SIZE_WORD_0] = 0;
-				tracking_output_blob_sizes[BLOB_SIZE_WORD_2 : 1+BLOB_SIZE_WORD_1] = 0;
-				tracking_output_blob_sizes[BLOB_SIZE_WORD_3 : 1+BLOB_SIZE_WORD_2] = 0;
-				tracking_output_blob_sizes[BLOB_SIZE_WORD_4 : 1+BLOB_SIZE_WORD_3] = 0;
-				tracking_output_blob_sizes[BLOB_SIZE_WORD_5 : 1+BLOB_SIZE_WORD_4] = 0;
-				tracking_output_blob_sizes[BLOB_SIZE_WORD_6 : 1+BLOB_SIZE_WORD_5] = 0;
-				tracking_output_blob_sizes[BLOB_SIZE_WORD_7 : 1+BLOB_SIZE_WORD_6] = 0;
-				tracking_output_blob_sizes[BLOB_SIZE_WORD_8 : 1+BLOB_SIZE_WORD_7] = 0;
-				tracking_output_blob_sizes[BLOB_SIZE_WORD_9 : 1+BLOB_SIZE_WORD_8] = 0;
-				tracking_output_blob_sizes[BLOB_SIZE_WORD_10 : 1+BLOB_SIZE_WORD_9] = 0;
-				tracking_output_blob_sizes[BLOB_SIZE_WORD_11 : 1+BLOB_SIZE_WORD_10] = 0;
-				tracking_output_blob_sizes[BLOB_SIZE_WORD_12 : 1+BLOB_SIZE_WORD_11] = 0;
-				tracking_output_blob_sizes[BLOB_SIZE_WORD_13 : 1+BLOB_SIZE_WORD_12] = 0;
-				tracking_output_blob_sizes[BLOB_SIZE_WORD_14 : 1+BLOB_SIZE_WORD_13] = 0;
-				tracking_output_blob_sizes[BLOB_SIZE_WORD_15 : 1+BLOB_SIZE_WORD_14] = 0;
-				tracking_output_blob_sizes[BLOB_SIZE_WORD_16 : 1+BLOB_SIZE_WORD_15] = 0;
-				tracking_output_blob_sizes[BLOB_SIZE_WORD_17 : 1+BLOB_SIZE_WORD_16] = 0;
-				tracking_output_holdoff = 2;
-			end
+			if ((enable_tracking_output_verified >= 2) && (tracking_output_done == 0)) begin
+				enable_tracking_output_verified = 2;		// Keep this running!
 			
-			2:begin
-				tracking_output_blob_location[0] = 0;
-				tracking_output_blob_location[1] = 0;
-				tracking_output_blob_location[2] = 0;
-				tracking_output_blob_location[3] = 0;
-				tracking_output_blob_location[4] = 0;
-				tracking_output_blob_location[5] = 0;
-				tracking_output_blob_location[6] = 0;
-				tracking_output_blob_location[7] = 0;
-				tracking_output_blob_location[8] = 0;
-				tracking_output_blob_location[9] = 0;
-				tracking_output_blob_location[10] = 0;
-				tracking_output_blob_location[11] = 0;
-				tracking_output_blob_location[12] = 0;
-				tracking_output_blob_location[13] = 0;
-				tracking_output_blob_location[14] = 0;
-				tracking_output_blob_location[15] = 0;
-				tracking_output_blob_location[16] = 0;
-				tracking_output_blob_location[17] = 0;
-				tracking_output_holdoff = 3;
-			end
-			
-			3:begin
-				if (tracking_output_pointer <= (blob_extraction_blob_counter * 3)) begin
-					// Cycle through the data points
-					if (tracking_output_counter_tog == 5) begin			// Only run this once to preload data
-						wren = 0;
-						address = tracking_output_pointer + 200000;
-					end
-					
-					if (tracking_output_counter_tog == 0) begin
-						tracking_output_counter_color = data_read_sync_tracking_output[7:0];
-						if (tracking_output_counter_color == 0) begin		// If the blob we are looking at is NOT a recognized color
-							tracking_output_pointer = tracking_output_pointer + 3;
+				case (tracking_output_holdoff)
+				0:begin
+					wren = 0;
+					tracking_output_counter_tog = 5;
+					tracking_output_counter_togg = 0;
+					tracking_output_pointer_counter = 0;
+					tracking_output_ok_to_send_data = 0;
+					tracking_output_pointer = 6;
+					x_centroids_array[X_CENTROIDS_WORD_0 : 0] = 0;
+					y_centroids_array[Y_CENTROIDS_WORD_0 : 0] = 0;
+					x_centroids_array[X_CENTROIDS_WORD_1 : 1+X_CENTROIDS_WORD_0] = 0;
+					y_centroids_array[Y_CENTROIDS_WORD_1 : 1+Y_CENTROIDS_WORD_0] = 0;
+					x_centroids_array[X_CENTROIDS_WORD_2 : 1+X_CENTROIDS_WORD_1] = 0;
+					y_centroids_array[Y_CENTROIDS_WORD_2 : 1+Y_CENTROIDS_WORD_1] = 0;
+					x_centroids_array[X_CENTROIDS_WORD_3 : 1+X_CENTROIDS_WORD_2] = 0;
+					y_centroids_array[Y_CENTROIDS_WORD_3 : 1+Y_CENTROIDS_WORD_2] = 0;
+					x_centroids_array[X_CENTROIDS_WORD_4 : 1+X_CENTROIDS_WORD_3] = 0;
+					y_centroids_array[Y_CENTROIDS_WORD_4 : 1+Y_CENTROIDS_WORD_3] = 0;
+					x_centroids_array[X_CENTROIDS_WORD_5 : 1+X_CENTROIDS_WORD_4] = 0;
+					y_centroids_array[Y_CENTROIDS_WORD_5 : 1+Y_CENTROIDS_WORD_4] = 0;
+					tracking_output_holdoff = 1;
+				end
+				
+				1:begin
+					tracking_output_blob_sizes[BLOB_SIZE_WORD_0 : 0] = 0;
+					tracking_output_blob_sizes[BLOB_SIZE_WORD_1 : 1+BLOB_SIZE_WORD_0] = 0;
+					tracking_output_blob_sizes[BLOB_SIZE_WORD_2 : 1+BLOB_SIZE_WORD_1] = 0;
+					tracking_output_blob_sizes[BLOB_SIZE_WORD_3 : 1+BLOB_SIZE_WORD_2] = 0;
+					tracking_output_blob_sizes[BLOB_SIZE_WORD_4 : 1+BLOB_SIZE_WORD_3] = 0;
+					tracking_output_blob_sizes[BLOB_SIZE_WORD_5 : 1+BLOB_SIZE_WORD_4] = 0;
+					tracking_output_blob_sizes[BLOB_SIZE_WORD_6 : 1+BLOB_SIZE_WORD_5] = 0;
+					tracking_output_blob_sizes[BLOB_SIZE_WORD_7 : 1+BLOB_SIZE_WORD_6] = 0;
+					tracking_output_blob_sizes[BLOB_SIZE_WORD_8 : 1+BLOB_SIZE_WORD_7] = 0;
+					tracking_output_blob_sizes[BLOB_SIZE_WORD_9 : 1+BLOB_SIZE_WORD_8] = 0;
+					tracking_output_blob_sizes[BLOB_SIZE_WORD_10 : 1+BLOB_SIZE_WORD_9] = 0;
+					tracking_output_blob_sizes[BLOB_SIZE_WORD_11 : 1+BLOB_SIZE_WORD_10] = 0;
+					tracking_output_blob_sizes[BLOB_SIZE_WORD_12 : 1+BLOB_SIZE_WORD_11] = 0;
+					tracking_output_blob_sizes[BLOB_SIZE_WORD_13 : 1+BLOB_SIZE_WORD_12] = 0;
+					tracking_output_blob_sizes[BLOB_SIZE_WORD_14 : 1+BLOB_SIZE_WORD_13] = 0;
+					tracking_output_blob_sizes[BLOB_SIZE_WORD_15 : 1+BLOB_SIZE_WORD_14] = 0;
+					tracking_output_blob_sizes[BLOB_SIZE_WORD_16 : 1+BLOB_SIZE_WORD_15] = 0;
+					tracking_output_blob_sizes[BLOB_SIZE_WORD_17 : 1+BLOB_SIZE_WORD_16] = 0;
+					tracking_output_holdoff = 2;
+				end
+				
+				2:begin
+					tracking_output_blob_location[0] = 0;
+					tracking_output_blob_location[1] = 0;
+					tracking_output_blob_location[2] = 0;
+					tracking_output_blob_location[3] = 0;
+					tracking_output_blob_location[4] = 0;
+					tracking_output_blob_location[5] = 0;
+					tracking_output_blob_location[6] = 0;
+					tracking_output_blob_location[7] = 0;
+					tracking_output_blob_location[8] = 0;
+					tracking_output_blob_location[9] = 0;
+					tracking_output_blob_location[10] = 0;
+					tracking_output_blob_location[11] = 0;
+					tracking_output_blob_location[12] = 0;
+					tracking_output_blob_location[13] = 0;
+					tracking_output_blob_location[14] = 0;
+					tracking_output_blob_location[15] = 0;
+					tracking_output_blob_location[16] = 0;
+					tracking_output_blob_location[17] = 0;
+					tracking_output_holdoff = 3;
+				end
+				
+				3:begin
+					if (tracking_output_pointer <= (blob_extraction_blob_counter * 3)) begin
+						// Cycle through the data points
+						if (tracking_output_counter_tog == 5) begin			// Only run this once to preload data
 							wren = 0;
 							address = tracking_output_pointer + 200000;
-							tracking_output_counter_tog = 2;		// Go again with the next blob!
-						end else begin
-							tracking_output_counter_color = tracking_output_counter_color - 1;		// The color data is stored offset by 1
-							wren = 0;
-							tracking_output_pointer = tracking_output_pointer + 1;
-							address = tracking_output_pointer + 200000;
-						end
-					end
-					
-					if (tracking_output_counter_tog == 1) begin
-						if (find_biggest == 1) begin
-							tracking_output_counter_size = data_read_sync_tracking_output[15:0];
 						end
 						
-						if (find_highest == 1) begin
-							tracking_output_counter_size = data_read_sync_tracking_output[23:16];
-							if (tracking_output_counter_size > 120) begin
-								tracking_output_counter_size = 0;			// Ignore this; out of bounds!
+						if (tracking_output_counter_tog == 0) begin
+							tracking_output_counter_color = data_read[7:0];
+							if (tracking_output_counter_color == 0) begin		// If the blob we are looking at is NOT a recognized color
+								tracking_output_pointer = tracking_output_pointer + 3;
+								wren = 0;
+								address = tracking_output_pointer + 200000;
+								tracking_output_counter_tog = 2;		// Go again with the next blob!
+							end else begin
+								tracking_output_counter_color = tracking_output_counter_color - 1;		// The color data is stored offset by 1
+								wren = 0;
+								tracking_output_pointer = tracking_output_pointer + 1;
+								address = tracking_output_pointer + 200000;
 							end
 						end
-						wren = 0;
-						tracking_output_pointer = tracking_output_pointer + 2;
-						address = tracking_output_pointer + 200000;
-						if ((tracking_output_blob_sizes[tracking_output_counter_color] < tracking_output_counter_size) && (tracking_output_counter_size > minimum_blob_size)) begin
-							tracking_output_blob_sizes[tracking_output_counter_color + 12] = tracking_output_blob_sizes[tracking_output_counter_color + 6];
-							tracking_output_blob_location[tracking_output_counter_color + 12] = tracking_output_blob_location[tracking_output_counter_color + 6];
 						
-							tracking_output_blob_sizes[tracking_output_counter_color + 6] = tracking_output_blob_sizes[tracking_output_counter_color];
-							tracking_output_blob_location[tracking_output_counter_color + 6] = tracking_output_blob_location[tracking_output_counter_color];
+						if (tracking_output_counter_tog == 1) begin
+							if (find_biggest == 1) begin
+								tracking_output_counter_size = data_read[15:0];
+							end
 							
-							tracking_output_blob_sizes[tracking_output_counter_color] = tracking_output_counter_size;
-							tracking_output_blob_location[tracking_output_counter_color] = tracking_output_pointer;
-						end else begin						
-							if ((tracking_output_blob_sizes[tracking_output_counter_color + 6] < tracking_output_counter_size) && (tracking_output_counter_size > minimum_blob_size)) begin
+							if (find_highest == 1) begin
+								tracking_output_counter_size = data_read[23:16];
+								if (tracking_output_counter_size > 120) begin
+									tracking_output_counter_size = 0;			// Ignore this; out of bounds!
+								end
+							end
+							wren = 0;
+							tracking_output_pointer = tracking_output_pointer + 2;
+							address = tracking_output_pointer + 200000;
+							if ((tracking_output_blob_sizes[tracking_output_counter_color] < tracking_output_counter_size) && (tracking_output_counter_size > minimum_blob_size)) begin
 								tracking_output_blob_sizes[tracking_output_counter_color + 12] = tracking_output_blob_sizes[tracking_output_counter_color + 6];
 								tracking_output_blob_location[tracking_output_counter_color + 12] = tracking_output_blob_location[tracking_output_counter_color + 6];
+							
+								tracking_output_blob_sizes[tracking_output_counter_color + 6] = tracking_output_blob_sizes[tracking_output_counter_color];
+								tracking_output_blob_location[tracking_output_counter_color + 6] = tracking_output_blob_location[tracking_output_counter_color];
 								
-								tracking_output_blob_sizes[tracking_output_counter_color + 6] = tracking_output_counter_size;
-								tracking_output_blob_location[tracking_output_counter_color + 6] = tracking_output_pointer;
-							end else begin
-								if ((tracking_output_blob_sizes[tracking_output_counter_color + 12] < tracking_output_counter_size) && (tracking_output_counter_size > minimum_blob_size)) begin
-									tracking_output_blob_sizes[tracking_output_counter_color + 12] = tracking_output_counter_size;
-									tracking_output_blob_location[tracking_output_counter_color + 12] = tracking_output_pointer;
+								tracking_output_blob_sizes[tracking_output_counter_color] = tracking_output_counter_size;
+								tracking_output_blob_location[tracking_output_counter_color] = tracking_output_pointer;
+							end else begin						
+								if ((tracking_output_blob_sizes[tracking_output_counter_color + 6] < tracking_output_counter_size) && (tracking_output_counter_size > minimum_blob_size)) begin
+									tracking_output_blob_sizes[tracking_output_counter_color + 12] = tracking_output_blob_sizes[tracking_output_counter_color + 6];
+									tracking_output_blob_location[tracking_output_counter_color + 12] = tracking_output_blob_location[tracking_output_counter_color + 6];
+									
+									tracking_output_blob_sizes[tracking_output_counter_color + 6] = tracking_output_counter_size;
+									tracking_output_blob_location[tracking_output_counter_color + 6] = tracking_output_pointer;
+								end else begin
+									if ((tracking_output_blob_sizes[tracking_output_counter_color + 12] < tracking_output_counter_size) && (tracking_output_counter_size > minimum_blob_size)) begin
+										tracking_output_blob_sizes[tracking_output_counter_color + 12] = tracking_output_counter_size;
+										tracking_output_blob_location[tracking_output_counter_color + 12] = tracking_output_pointer;
+									end
 								end
 							end
 						end
-					end
-					
-					tracking_output_counter_tog = tracking_output_counter_tog + 1;
-					if (tracking_output_counter_tog > 1) begin
-						tracking_output_counter_tog = 0;
-					end
-				end else begin
-					// Write the zeroes to our selected blobs' sizes
-					location_to_extract = ((tracking_output_counter_tog - 1) / 2);
-					if ((slide_switches[1] == 1) && (slide_switches[0] == 1)) begin		// Enhanced mode!
-						if (slide_switches[2] == 0) begin		// 2 color 6 centroids
-							if (tracking_output_counter_tog == 3) begin
-								location_to_extract = 6; 
-							end
-							if (tracking_output_counter_tog == 4) begin
-								location_to_extract = 6; 
-							end
-							if (tracking_output_counter_tog == 5) begin
-								location_to_extract = 12; 
-							end
-							if (tracking_output_counter_tog == 6) begin
-								location_to_extract = 12; 
-							end
-							if (tracking_output_counter_tog == 9) begin
-								location_to_extract = 7; 
-							end
-							if (tracking_output_counter_tog == 10) begin
-								location_to_extract = 7; 
-							end
-							if (tracking_output_counter_tog == 11) begin
-								location_to_extract = 13;
-							end
-							if (tracking_output_counter_tog == 12) begin
-								location_to_extract = 13;
+						
+						tracking_output_counter_tog = tracking_output_counter_tog + 1;
+						if (tracking_output_counter_tog > 1) begin
+							tracking_output_counter_tog = 0;
+						end
+					end else begin
+						// Write the zeroes to our selected blobs' sizes
+						location_to_extract = ((tracking_output_counter_tog - 1) / 2);
+						if ((slide_switches[1] == 1) && (slide_switches[0] == 1)) begin		// Enhanced mode!
+							if (slide_switches[2] == 0) begin		// 2 color 6 centroids
+								if (tracking_output_counter_tog == 3) begin
+									location_to_extract = 6; 
+								end
+								if (tracking_output_counter_tog == 4) begin
+									location_to_extract = 6; 
+								end
+								if (tracking_output_counter_tog == 5) begin
+									location_to_extract = 12; 
+								end
+								if (tracking_output_counter_tog == 6) begin
+									location_to_extract = 12; 
+								end
+								if (tracking_output_counter_tog == 9) begin
+									location_to_extract = 7; 
+								end
+								if (tracking_output_counter_tog == 10) begin
+									location_to_extract = 7; 
+								end
+								if (tracking_output_counter_tog == 11) begin
+									location_to_extract = 13;
+								end
+								if (tracking_output_counter_tog == 12) begin
+									location_to_extract = 13;
+								end
 							end
 						end
-					end
-					
-					if (tracking_output_counter_tog == 1) begin		// Pick up where we left off above...						
-						wren = 0;
-						address = tracking_output_blob_location[location_to_extract] + 199998;
-					end
-					
-					if ((tracking_output_counter_tog == 2) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
-						tracking_output_temp_data = data_read_sync_tracking_output;
-						x_centroids_array[X_CENTROIDS_WORD_0 : 0] = tracking_output_temp_data[31:24];
-						y_centroids_array[Y_CENTROIDS_WORD_0 : 0] = tracking_output_temp_data[23:16];
-						s_centroids_array[S_CENTROIDS_WORD_0 : 0] = tracking_output_temp_data[15:0];
-						tracking_output_temp_data[15:0] = 0;
-						address = tracking_output_blob_location[location_to_extract];
-						data_write = tracking_output_temp_data;
-						wren = 1;
-					end
-					
-					if (tracking_output_counter_tog == 3) begin
-						wren = 0;
-						address = tracking_output_blob_location[location_to_extract] + 199998;
-					end
-					
-					if ((tracking_output_counter_tog == 4) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
-						tracking_output_temp_data = data_read_sync_tracking_output;
-						x_centroids_array[X_CENTROIDS_WORD_1 : 1+X_CENTROIDS_WORD_0] = tracking_output_temp_data[31:24];
-						y_centroids_array[Y_CENTROIDS_WORD_1 : 1+Y_CENTROIDS_WORD_0] = tracking_output_temp_data[23:16];
-						s_centroids_array[S_CENTROIDS_WORD_1 : 1+S_CENTROIDS_WORD_0] = tracking_output_temp_data[15:0];
-						tracking_output_temp_data[15:0] = 0;
-						address = tracking_output_blob_location[location_to_extract] + 199998;
-						data_write = tracking_output_temp_data;
-						wren = 1;
-					end
-					
-					if (tracking_output_counter_tog == 5) begin
-						wren = 0;
-						address = tracking_output_blob_location[location_to_extract] + 199998;
-					end
-					
-					if ((tracking_output_counter_tog == 6) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
-						tracking_output_temp_data = data_read_sync_tracking_output;
-						x_centroids_array[X_CENTROIDS_WORD_2 : 1+X_CENTROIDS_WORD_1] = tracking_output_temp_data[31:24];
-						y_centroids_array[Y_CENTROIDS_WORD_2 : 1+Y_CENTROIDS_WORD_1] = tracking_output_temp_data[23:16];
-						s_centroids_array[S_CENTROIDS_WORD_2 : 1+S_CENTROIDS_WORD_1] = tracking_output_temp_data[15:0];
-						tracking_output_temp_data[15:0] = 0;
-						address = tracking_output_blob_location[location_to_extract] + 199998;
-						data_write = tracking_output_temp_data;
-						wren = 1;
-					end
-					
-					if (tracking_output_counter_tog == 7) begin
-						wren = 0;
-						address = tracking_output_blob_location[location_to_extract] + 199998;
-					end
-					
-					if ((tracking_output_counter_tog == 8) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
-						tracking_output_temp_data = data_read_sync_tracking_output;
-						x_centroids_array[X_CENTROIDS_WORD_3 : 1+X_CENTROIDS_WORD_2] = tracking_output_temp_data[31:24];
-						y_centroids_array[Y_CENTROIDS_WORD_3 : 1+Y_CENTROIDS_WORD_2] = tracking_output_temp_data[23:16];
-						s_centroids_array[S_CENTROIDS_WORD_3 : 1+S_CENTROIDS_WORD_2] = tracking_output_temp_data[15:0];
-						tracking_output_temp_data[15:0] = 0;
-						address = tracking_output_blob_location[location_to_extract] + 199998;
-						data_write = tracking_output_temp_data;
-						wren = 1;
-					end
-					
-					if (tracking_output_counter_tog == 9) begin
-						wren = 0;
-						address = tracking_output_blob_location[location_to_extract] + 199998;
-					end
-					
-					if ((tracking_output_counter_tog == 10) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
-						tracking_output_temp_data = data_read_sync_tracking_output;
-						x_centroids_array[X_CENTROIDS_WORD_4 : 1+X_CENTROIDS_WORD_3] = tracking_output_temp_data[31:24];
-						y_centroids_array[Y_CENTROIDS_WORD_4 : 1+Y_CENTROIDS_WORD_3] = tracking_output_temp_data[23:16];
-						s_centroids_array[S_CENTROIDS_WORD_4 : 1+S_CENTROIDS_WORD_3] = tracking_output_temp_data[15:0];
-						tracking_output_temp_data[15:0] = 0;
-						address = tracking_output_blob_location[location_to_extract] + 199998;
-						data_write = tracking_output_temp_data;
-						wren = 1;
-					end
-					
-					if (tracking_output_counter_tog == 11) begin
-						wren = 0;
-						address = tracking_output_blob_location[location_to_extract] + 199998;
-					end
-					
-					if ((tracking_output_counter_tog == 12) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
-						tracking_output_temp_data = data_read_sync_tracking_output;
-						x_centroids_array[X_CENTROIDS_WORD_5 : 1+X_CENTROIDS_WORD_4] = tracking_output_temp_data[31:24];
-						y_centroids_array[Y_CENTROIDS_WORD_5 : 1+Y_CENTROIDS_WORD_4] = tracking_output_temp_data[23:16];
-						s_centroids_array[S_CENTROIDS_WORD_5 : 1+S_CENTROIDS_WORD_4] = tracking_output_temp_data[15:0];
-						tracking_output_temp_data[15:0] = 0;
-						address = tracking_output_blob_location[location_to_extract] + 199998;
-						data_write = tracking_output_temp_data;
-						wren = 1;
-					end
-					
-					if (tracking_output_counter_tog == 13) begin
-						wren = 0;
-					end
-					
-					if (tracking_output_counter_tog > 13) begin
-						// Done!
-						tracking_output_done = 1;
-						wren = 0;
-					end else begin
-						tracking_output_counter_tog = tracking_output_counter_tog + 1;
+						
+						if (tracking_output_counter_tog == 1) begin		// Pick up where we left off above...						
+							wren = 0;
+							address = tracking_output_blob_location[location_to_extract] + 199998;
+						end
+						
+						if ((tracking_output_counter_tog == 2) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
+							tracking_output_temp_data = data_read;
+							x_centroids_array[X_CENTROIDS_WORD_0 : 0] = tracking_output_temp_data[31:24];
+							y_centroids_array[Y_CENTROIDS_WORD_0 : 0] = tracking_output_temp_data[23:16];
+							s_centroids_array[S_CENTROIDS_WORD_0 : 0] = tracking_output_temp_data[15:0];
+							tracking_output_temp_data[15:0] = 0;
+							address = tracking_output_blob_location[location_to_extract];
+							data_write = tracking_output_temp_data;
+							wren = 1;
+						end
+						
+						if (tracking_output_counter_tog == 3) begin
+							wren = 0;
+							address = tracking_output_blob_location[location_to_extract] + 199998;
+						end
+						
+						if ((tracking_output_counter_tog == 4) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
+							tracking_output_temp_data = data_read;
+							x_centroids_array[X_CENTROIDS_WORD_1 : 1+X_CENTROIDS_WORD_0] = tracking_output_temp_data[31:24];
+							y_centroids_array[Y_CENTROIDS_WORD_1 : 1+Y_CENTROIDS_WORD_0] = tracking_output_temp_data[23:16];
+							s_centroids_array[S_CENTROIDS_WORD_1 : 1+S_CENTROIDS_WORD_0] = tracking_output_temp_data[15:0];
+							tracking_output_temp_data[15:0] = 0;
+							address = tracking_output_blob_location[location_to_extract] + 199998;
+							data_write = tracking_output_temp_data;
+							wren = 1;
+						end
+						
+						if (tracking_output_counter_tog == 5) begin
+							wren = 0;
+							address = tracking_output_blob_location[location_to_extract] + 199998;
+						end
+						
+						if ((tracking_output_counter_tog == 6) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
+							tracking_output_temp_data = data_read;
+							x_centroids_array[X_CENTROIDS_WORD_2 : 1+X_CENTROIDS_WORD_1] = tracking_output_temp_data[31:24];
+							y_centroids_array[Y_CENTROIDS_WORD_2 : 1+Y_CENTROIDS_WORD_1] = tracking_output_temp_data[23:16];
+							s_centroids_array[S_CENTROIDS_WORD_2 : 1+S_CENTROIDS_WORD_1] = tracking_output_temp_data[15:0];
+							tracking_output_temp_data[15:0] = 0;
+							address = tracking_output_blob_location[location_to_extract] + 199998;
+							data_write = tracking_output_temp_data;
+							wren = 1;
+						end
+						
+						if (tracking_output_counter_tog == 7) begin
+							wren = 0;
+							address = tracking_output_blob_location[location_to_extract] + 199998;
+						end
+						
+						if ((tracking_output_counter_tog == 8) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
+							tracking_output_temp_data = data_read;
+							x_centroids_array[X_CENTROIDS_WORD_3 : 1+X_CENTROIDS_WORD_2] = tracking_output_temp_data[31:24];
+							y_centroids_array[Y_CENTROIDS_WORD_3 : 1+Y_CENTROIDS_WORD_2] = tracking_output_temp_data[23:16];
+							s_centroids_array[S_CENTROIDS_WORD_3 : 1+S_CENTROIDS_WORD_2] = tracking_output_temp_data[15:0];
+							tracking_output_temp_data[15:0] = 0;
+							address = tracking_output_blob_location[location_to_extract] + 199998;
+							data_write = tracking_output_temp_data;
+							wren = 1;
+						end
+						
+						if (tracking_output_counter_tog == 9) begin
+							wren = 0;
+							address = tracking_output_blob_location[location_to_extract] + 199998;
+						end
+						
+						if ((tracking_output_counter_tog == 10) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
+							tracking_output_temp_data = data_read;
+							x_centroids_array[X_CENTROIDS_WORD_4 : 1+X_CENTROIDS_WORD_3] = tracking_output_temp_data[31:24];
+							y_centroids_array[Y_CENTROIDS_WORD_4 : 1+Y_CENTROIDS_WORD_3] = tracking_output_temp_data[23:16];
+							s_centroids_array[S_CENTROIDS_WORD_4 : 1+S_CENTROIDS_WORD_3] = tracking_output_temp_data[15:0];
+							tracking_output_temp_data[15:0] = 0;
+							address = tracking_output_blob_location[location_to_extract] + 199998;
+							data_write = tracking_output_temp_data;
+							wren = 1;
+						end
+						
+						if (tracking_output_counter_tog == 11) begin
+							wren = 0;
+							address = tracking_output_blob_location[location_to_extract] + 199998;
+						end
+						
+						if ((tracking_output_counter_tog == 12) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
+							tracking_output_temp_data = data_read;
+							x_centroids_array[X_CENTROIDS_WORD_5 : 1+X_CENTROIDS_WORD_4] = tracking_output_temp_data[31:24];
+							y_centroids_array[Y_CENTROIDS_WORD_5 : 1+Y_CENTROIDS_WORD_4] = tracking_output_temp_data[23:16];
+							s_centroids_array[S_CENTROIDS_WORD_5 : 1+S_CENTROIDS_WORD_4] = tracking_output_temp_data[15:0];
+							tracking_output_temp_data[15:0] = 0;
+							address = tracking_output_blob_location[location_to_extract] + 199998;
+							data_write = tracking_output_temp_data;
+							wren = 1;
+						end
+						
+						if (tracking_output_counter_tog == 13) begin
+							wren = 0;
+						end
+						
+						if (tracking_output_counter_tog > 13) begin
+							// Done!
+							tracking_output_done = 1;
+							wren = 0;
+						end else begin
+							tracking_output_counter_tog = tracking_output_counter_tog + 1;
+						end
 					end
 				end
+				endcase
 			end
-			endcase
-		end
-		
-		if (enable_tracking_output == 0) begin
-			tracking_output_counter_tog = 0;
-			tracking_output_holdoff = 0;
-			tracking_output_done = 0;
-			address = 18'b0;
-			data_write = 32'b0;
-			wren = 1'b0;
-		end
-	end	//end if pause == 0
+			
+			if (enable_tracking_output == 0) begin
+				tracking_output_counter_tog = 0;
+				tracking_output_holdoff = 0;
+				tracking_output_done = 0;
+				address = 18'b0;
+				data_write = 32'b0;
+				wren = 1'b0;
+			end
+		end	//end if pause == 0
 	end
 
 endmodule

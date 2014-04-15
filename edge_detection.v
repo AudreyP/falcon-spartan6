@@ -1,7 +1,7 @@
 `timescale 1ns / 1ps
 /**********************************************************************
- Copyright (c) 2007 Timothy Pearson <kb9vqf@pearsoncomputing.net>
- Copyright (c) 2014 Audrey Pearson <aud.pearson@gmail.com> 
+ Copyright (c) 2007-2014 Timothy Pearson <kb9vqf@pearsoncomputing.net>
+ Copyright (c) 2014 Audrey Pearson <aud.pearson@gmail.com>
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -43,7 +43,6 @@ module edge_detection(
 	reg [17:0] edge_detection_counter_toggle = 0;
 	reg [31:0] edge_detection_counter_temp = 0;
 
-	reg [31:0] data_read_sync_edge_detection = 0;
 	reg edge_detection_main_chunk_already_loaded = 0;
 	reg [7:0] edge_detection_x_counter = 0;
 	reg [7:0] edge_detection_y_counter = 0;
@@ -79,9 +78,7 @@ module edge_detection(
 					edge_detection_running_total_red = 0;
 					edge_detection_running_total_green = 0;
 					edge_detection_running_total_blue = 0;
-				end else begin				
-					data_read_sync_edge_detection = data_read;
-					
+				end else begin
 					// Now find the average of the surrounding pixels (8 in either direction :ahh:)
 					if (edge_detection_counter_toggle == 4) begin
 						if (edge_detection_main_chunk_already_loaded == 1) begin

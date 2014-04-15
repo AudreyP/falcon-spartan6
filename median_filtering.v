@@ -1,3 +1,22 @@
+`timescale 1ns / 1ps
+/**********************************************************************
+ Copyright (c) 2007-2014 Timothy Pearson <kb9vqf@pearsoncomputing.net>
+
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 2.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+ 02111-1307, USA
+**********************************************************************/
+
 module median_filtering(
 	//input wires
 	input wire clk_fifty_div_by_two,
@@ -12,7 +31,6 @@ module median_filtering(
 		
 		reg median_filtering_holdoff = 0;
 		reg [7:0] median_filtering_swap_buffer;
-		reg [31:0] data_read_sync_median_filtering;
 		reg [71:0] median_filtering_counter_buffer_red;
 		reg [71:0] median_filtering_counter_buffer_green;
 		reg [71:0] median_filtering_counter_buffer_blue;
@@ -21,8 +39,6 @@ module median_filtering(
 		always @(posedge clk) begin
 		//always @(posedge modified_clock) begin
 		//always @(posedge clk_div_by_two) begin
-			data_read_sync_median_filtering = data_read;
-		
 			if (enable_median_filtering == 1) begin
 				if (median_filtering_holdoff == 0) begin
 					wren = 0;
@@ -32,65 +48,65 @@ module median_filtering(
 				end else begin
 					// Load in the first pixel
 					if (median_filtering_counter_toggle == 1) begin
-						median_filtering_counter_buffer_red[7:0] = data_read_sync_median_filtering[7:0];			// This is the center pixel
-						median_filtering_counter_buffer_green[7:0] = data_read_sync_median_filtering[15:8];
-						median_filtering_counter_buffer_blue[7:0] = data_read_sync_median_filtering[31:24];
+						median_filtering_counter_buffer_red[7:0] = data_read[7:0];			// This is the center pixel
+						median_filtering_counter_buffer_green[7:0] = data_read[15:8];
+						median_filtering_counter_buffer_blue[7:0] = data_read[31:24];
 						median_filtering_counter_tog = median_filtering_counter_tog - 1;	// Set next read address (one pixel to the left)
 					end
 
 					if (median_filtering_counter_toggle == 2) begin
-						median_filtering_counter_buffer_red[15:8] = data_read_sync_median_filtering[7:0];			// This is the left pixel
-						median_filtering_counter_buffer_green[15:8] = data_read_sync_median_filtering[15:8];
-						median_filtering_counter_buffer_blue[15:8] = data_read_sync_median_filtering[31:24];
+						median_filtering_counter_buffer_red[15:8] = data_read[7:0];			// This is the left pixel
+						median_filtering_counter_buffer_green[15:8] = data_read[15:8];
+						median_filtering_counter_buffer_blue[15:8] = data_read[31:24];
 						median_filtering_counter_tog = median_filtering_counter_tog + 2;	// Set next read address (two pixels to the right)
 					end
 		
 					if (median_filtering_counter_toggle == 3) begin
-						median_filtering_counter_buffer_red[23:16] = data_read_sync_median_filtering[7:0];			// This is the right pixel
-						median_filtering_counter_buffer_green[23:16] = data_read_sync_median_filtering[15:8];
-						median_filtering_counter_buffer_blue[23:16] = data_read_sync_median_filtering[31:24];
+						median_filtering_counter_buffer_red[23:16] = data_read[7:0];			// This is the right pixel
+						median_filtering_counter_buffer_green[23:16] = data_read[15:8];
+						median_filtering_counter_buffer_blue[23:16] = data_read[31:24];
 						median_filtering_counter_tog = median_filtering_counter_tog - 320;	// Set next read address (one pixel up)
 					end
 					
 					if (median_filtering_counter_toggle == 4) begin
-						median_filtering_counter_buffer_red[31:24] = data_read_sync_median_filtering[7:0];			// This is the top-right pixel
-						median_filtering_counter_buffer_green[31:24] = data_read_sync_median_filtering[15:8];
-						median_filtering_counter_buffer_blue[31:24] = data_read_sync_median_filtering[31:24];
+						median_filtering_counter_buffer_red[31:24] = data_read[7:0];			// This is the top-right pixel
+						median_filtering_counter_buffer_green[31:24] = data_read[15:8];
+						median_filtering_counter_buffer_blue[31:24] = data_read[31:24];
 						median_filtering_counter_tog = median_filtering_counter_tog - 1;	// Set next read address (one pixel to the left)
 					end
 					
 					if (median_filtering_counter_toggle == 5) begin
-						median_filtering_counter_buffer_red[39:32] = data_read_sync_median_filtering[7:0];			// This is the top pixel
-						median_filtering_counter_buffer_green[39:32] = data_read_sync_median_filtering[15:8];
-						median_filtering_counter_buffer_blue[39:32] = data_read_sync_median_filtering[31:24];
+						median_filtering_counter_buffer_red[39:32] = data_read[7:0];			// This is the top pixel
+						median_filtering_counter_buffer_green[39:32] = data_read[15:8];
+						median_filtering_counter_buffer_blue[39:32] = data_read[31:24];
 						median_filtering_counter_tog = median_filtering_counter_tog - 1;	// Set next read address (one pixel to the left)
 					end
 					
 					if (median_filtering_counter_toggle == 6) begin
-						median_filtering_counter_buffer_red[47:40] = data_read_sync_median_filtering[7:0];			// This is the top-left pixel
-						median_filtering_counter_buffer_green[47:40] = data_read_sync_median_filtering[15:8];
-						median_filtering_counter_buffer_blue[47:40] = data_read_sync_median_filtering[31:24];
+						median_filtering_counter_buffer_red[47:40] = data_read[7:0];			// This is the top-left pixel
+						median_filtering_counter_buffer_green[47:40] = data_read[15:8];
+						median_filtering_counter_buffer_blue[47:40] = data_read[31:24];
 						median_filtering_counter_tog = median_filtering_counter_tog + 640;	// Set next read address (two pixels down)
 					end
 					
 					if (median_filtering_counter_toggle == 7) begin
-						median_filtering_counter_buffer_red[55:48] = data_read_sync_median_filtering[7:0];			// This is the bottom-left pixel
-						median_filtering_counter_buffer_green[55:48] = data_read_sync_median_filtering[15:8];
-						median_filtering_counter_buffer_blue[55:48] = data_read_sync_median_filtering[31:24];
+						median_filtering_counter_buffer_red[55:48] = data_read[7:0];			// This is the bottom-left pixel
+						median_filtering_counter_buffer_green[55:48] = data_read[15:8];
+						median_filtering_counter_buffer_blue[55:48] = data_read[31:24];
 						median_filtering_counter_tog = median_filtering_counter_tog + 1;	// Set next read address (one pixel to the right)
 					end
 					
 					if (median_filtering_counter_toggle == 8) begin
-						median_filtering_counter_buffer_red[63:56] = data_read_sync_median_filtering[7:0];			// This is the bottom pixel
-						median_filtering_counter_buffer_green[63:56] = data_read_sync_median_filtering[15:8];
-						median_filtering_counter_buffer_blue[63:56] = data_read_sync_median_filtering[31:24];
+						median_filtering_counter_buffer_red[63:56] = data_read[7:0];			// This is the bottom pixel
+						median_filtering_counter_buffer_green[63:56] = data_read[15:8];
+						median_filtering_counter_buffer_blue[63:56] = data_read[31:24];
 						median_filtering_counter_tog = median_filtering_counter_tog + 1;	// Set next read address (one pixel to the right)
 					end
 					
 					if (median_filtering_counter_toggle == 9) begin
-						median_filtering_counter_buffer_red[71:64] = data_read_sync_median_filtering[7:0];			// This is the bottom-right pixel
-						median_filtering_counter_buffer_green[71:64] = data_read_sync_median_filtering[15:8];
-						median_filtering_counter_buffer_blue[71:64] = data_read_sync_median_filtering[31:24];
+						median_filtering_counter_buffer_red[71:64] = data_read[7:0];			// This is the bottom-right pixel
+						median_filtering_counter_buffer_green[71:64] = data_read[15:8];
+						median_filtering_counter_buffer_blue[71:64] = data_read[31:24];
 						median_filtering_counter_tog = median_filtering_counter_tog - 320;	// Set next read address (one pixel up) (this is to put the "cursor" in the correct position for the next pixel!
 						
 						// Now, since we have all of this data collected (finally!), we can calculate the median of the numbers

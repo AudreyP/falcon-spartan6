@@ -16,7 +16,7 @@
 //		You should have received a copy of the GNU General Public License
 //		along with the FALCON II.  If not, see http://www.gnu.org/licenses/.
 //
-//		The FALCON II is copyright 2008-2010 by Timothy Pearson
+//		The FALCON II is copyright 2008-2014 by Timothy Pearson
 //		tpearson@raptorengineeringinc.com
 //		http://www.raptorengineeringinc.com
 //
@@ -56,7 +56,7 @@ module camera_module_v2(
 	output wire [8:0] fifo_debug,
 	
 	// Camera signals
-	input camera_data_pclk_unbuffered,
+	input camera_data_pclk_in,
 	input camera_data_extclk,
 	input camera_data_href,
 	input camera_data_vsync,
@@ -88,18 +88,108 @@ module camera_module_v2(
 	initial pixel_valid = 0;
 	initial camera_memory_address = 76801;
 	initial vsync_locked = 0;
+
+	// Deskew incoming camera clock
+	// See http://forums.xilinx.com/t5/forums/forumtopicprintpage/board-id/GenDis/message-id/8978/print-single-message/true/page/1 for the general scheme
+	wire camera_data_pclk;
+	wire camera_data_pclk_inv;
+	wire camera_data_pclk_fb;
+	wire camera_data_pclk_to_dcm;
+	wire camera_data_pclk_to_gclk;
+	wire camera_data_pclk_to_gclk_inv;
+
+	wire camera_pclk_dcm_locked;
+	reg camera_pclk_dcm_reset = 1'b1;
+
+	DCM_SP #(
+		.CLKDV_DIVIDE(2.0),                   // CLKDV divide value
+							// (1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,8,9,10,11,12,13,14,15,16).
+		.CLKFX_DIVIDE(2),                     // Divide value on CLKFX outputs - D - (1-32)
+		.CLKFX_MULTIPLY(2),                   // Multiply value on CLKFX outputs - M - (2-32)
+		.CLKIN_DIVIDE_BY_2("FALSE"),          // CLKIN divide by two (TRUE/FALSE)
+		.CLKIN_PERIOD(40.0),                  // Input clock period specified in nS
+		.CLKOUT_PHASE_SHIFT("NONE"),          // Output phase shift (NONE, FIXED, VARIABLE)
+		.CLK_FEEDBACK("1X"),                  // Feedback source (NONE, 1X, 2X)
+		.DESKEW_ADJUST("SYSTEM_SYNCHRONOUS"), // SYSTEM_SYNCHRONOUS or SOURCE_SYNCHRONOUS
+		.DFS_FREQUENCY_MODE("LOW"),           // Unsupported - Do not change value
+		.DLL_FREQUENCY_MODE("LOW"),           // Unsupported - Do not change value
+		.DSS_MODE("NONE"),                    // Unsupported - Do not change value
+		.DUTY_CYCLE_CORRECTION("TRUE"),       // Unsupported - Do not change value
+		.FACTORY_JF(16'hc080),                // Unsupported - Do not change value
+		.PHASE_SHIFT(0),                      // Amount of fixed phase shift (-255 to 255)
+		.STARTUP_WAIT("FALSE")                // Delay config DONE until DCM_SP LOCKED (TRUE/FALSE)
+	)
+	CAMERA_PCLK_DCM (
+		.CLK0(camera_data_pclk_to_gclk),         // 1-bit output: 0 degree clock output
+		.CLK180(camera_data_pclk_to_gclk_inv),     // 1-bit output: 180 degree clock output
+		.CLK270(),     // 1-bit output: 270 degree clock output
+		.CLK2X(),       // 1-bit output: 2X clock frequency clock output
+		.CLK2X180(), // 1-bit output: 2X clock frequency, 180 degree clock output
+		.CLK90(),       // 1-bit output: 90 degree clock output
+		.CLKDV(),       // 1-bit output: Divided clock output
+		.CLKFX(),       // 1-bit output: Digital Frequency Synthesizer output (DFS)
+		.CLKFX180(), // 1-bit output: 180 degree CLKFX output
+		.LOCKED(camera_pclk_dcm_locked),     // 1-bit output: DCM_SP Lock Output
+		.PSDONE(),     // 1-bit output: Phase shift done output
+		.STATUS(),     // 8-bit output: DCM_SP status output
+		.CLKFB(camera_data_pclk_fb),       // 1-bit input: Clock feedback input
+		.CLKIN(camera_data_pclk_to_dcm),       // 1-bit input: Clock input
+		.DSSEN(1'b0),       // 1-bit input: Unsupported, specify to GND.
+		.PSCLK(1'b0),       // 1-bit input: Phase shift clock input
+		.PSEN(1'b0),         // 1-bit input: Phase shift enable
+		.PSINCDEC(), // 1-bit input: Phase shift increment/decrement input
+		.RST(camera_pclk_dcm_reset)            // 1-bit input: Active high reset input
+	);
+
+	IBUFG CAMERA_PCLK_DCM_IBUFG (
+		.O(camera_data_pclk_to_dcm), // Clock buffer output
+		.I(camera_data_pclk_in)  // Clock buffer input (connect directly to top-level port)
+	);
+
+	BUFIO2FB CAMERA_PCLK_DCM_FB (
+		.O(camera_data_pclk_fb),
+		.I(camera_data_pclk)
+	);
 	
 	BUFG CAMERA_CLOCK_BUF(
 		.O(camera_data_pclk),
-		.I(~camera_data_pclk_unbuffered)
-		);
+		.I(camera_data_pclk_to_gclk)
+	);
+
+	BUFG CAMERA_CLOCK_INV_BUF(
+		.O(camera_data_pclk_inv),
+		.I(camera_data_pclk_to_gclk_inv)
+	);
+
+	reg [18:0] dcm_lock_timer = 0;
+
+	always @(posedge clk) begin
+		if (camera_pclk_dcm_locked == 0) begin
+			dcm_lock_timer = dcm_lock_timer + 1;
+		end else begin
+			dcm_lock_timer = 0;
+			camera_pclk_dcm_reset = 0;
+		end
+		if (dcm_lock_timer > 50000) begin
+			camera_pclk_dcm_reset = 1;
+		end
+		
+		if (dcm_lock_timer > 50010) begin		// Allow 10 clock cycles to reset the DCM
+			camera_pclk_dcm_reset = 0;
+			dcm_lock_timer = 0;
+		end
+	end
 
 	//reg [18:0] camera_memory_address = 76801;
 	reg [19:0] address_buffer;
 	reg [15:0] databuffer;
 	reg [3:0] camera_toggle = 0;
 	reg [23:0] databuffer_mem;
-	//free-running 2-bit counters
+
+	reg camera_data_href_buffered;
+	reg camera_data_vsync_buffered;
+
+	//free-running 1-bit "counters"
  	reg col_count = 0;
  	reg row_count = 0;
 	
@@ -218,10 +308,12 @@ module camera_module_v2(
 	//----begin FIFO read controls
 	//----this runs at clk
 	//----MUST respect the pause signal from memory controller
+	reg pause_sync;
 	always @(posedge clk) begin
+		pause_sync = pause;
+
 		// G2 (8 bits) is not used. To save on space, it will not be written to the fifo. 
 		// The G2 space of data_write is later trimmed in main, so it will be replaced with zeros for now.
-	
 		if (camera_grab_enable == 1) begin
 			if ((camera_grab_done == 0) && (exposed == 1)) begin
 				case (state)
@@ -258,7 +350,7 @@ module camera_module_v2(
 						end
 					READ_WAIT:
 						begin
-							if (pause == 0) begin
+							if (pause_sync == 0) begin
 								state = IDLE;
 							end else begin
 								state = READ_WAIT;
@@ -344,20 +436,22 @@ module camera_module_v2(
 			camera_agc_done = 1;
 		end
 	end
-	
+
 	// Camera data input processor
 	always @(posedge camera_data_pclk) begin
-		databuffer = camera_data_port;
+		databuffer <= camera_data_port;
+		camera_data_href_buffered <= camera_data_href;
+		camera_data_vsync_buffered <= camera_data_vsync;
 
 		// Capture a 320 x 240 image if enabled (8-bit tricolor)
 		// One line is G1-R-G1-R-G1-R...
 		// The next line is B-G2-B-G2-B-G2...
 		// This is the well known Bayer pattern
 		if (camera_memory_address < 76800) begin	//if complete 320x240 frame not yet written
-			if ((camera_data_href_prev == 1) && (camera_data_href == 0)) begin
+			if ((camera_data_href_prev == 1) && (camera_data_href_buffered == 0)) begin
 				row_count = !row_count;
 			end
-			if ((camera_data_href == 1) && (camera_data_vsync == 1) && (vsync_locked == 1) && (line_valid == 1)) begin
+			if ((camera_data_href_buffered == 1) && (camera_data_vsync_buffered == 1) && (vsync_locked == 1) && (line_valid == 1)) begin
 				col_count = !col_count;
 				
 				case (row_count)
@@ -445,11 +539,11 @@ module camera_module_v2(
 		// These if blocks and assignments operate independently 
 		// of whether a 320*240 frame is being written.
 		// Run at pixel clock
-		if ((camera_data_href_prev == 1) && (camera_data_href == 0)) begin
+		if ((camera_data_href_prev == 1) && (camera_data_href_buffered == 0)) begin
 			camera_module_detect = 1;
 			camera_not_present_timer = 0;
 		end
-		if (camera_data_href == 0) begin
+		if (camera_data_href_buffered == 0) begin
 			line_counter = 0;
 			camera_toggle = 0;
 		end
@@ -467,7 +561,7 @@ module camera_module_v2(
 		end
 		
 		//debugging
-		if (camera_data_href == 1) begin
+		if (camera_data_href_buffered == 1) begin
 			if (camera_data_href_prev == 0) begin
 				//reset on rising edge
 				href_active = href_active_count;
@@ -476,7 +570,7 @@ module camera_module_v2(
 				href_active_count = href_active_count + 1;
 			end
 		end
-		if (camera_data_vsync == 1) begin
+		if (camera_data_vsync_buffered == 1) begin
 			if (camera_data_vsync_prev == 0) begin
 				//reset on rising edge
 				vsync_active = vsync_active_count;
@@ -494,8 +588,8 @@ module camera_module_v2(
 		end
 
 		camera_grab_enable_prev <= camera_grab_enable;
-		camera_data_href_prev <= camera_data_href;
-		camera_data_vsync_prev <= camera_data_vsync;
+		camera_data_href_prev <= camera_data_href_buffered;
+		camera_data_vsync_prev <= camera_data_vsync_buffered;
 	end
 
 endmodule

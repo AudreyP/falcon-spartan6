@@ -16,7 +16,7 @@
 //		You should have received a copy of the GNU General Public License
 //		along with the FALCON II.  If not, see http://www.gnu.org/licenses/.
 //
-//		The FALCON II is copyright 2008-2010 by Timothy Pearson
+//		The FALCON II is copyright 2008-2014 by Timothy Pearson
 //		tpearson@raptorengineeringinc.com
 //		http://www.raptorengineeringinc.com
 //
@@ -31,7 +31,7 @@
 // synthesis attribute mult_style of i2c_module is lut;
 
 module i2c_module(
-	input [15:0] startup_sequencer,
+	input [17:0] startup_sequencer,
 	input send_special_i2c_command,
 	output reg camera_data_sda_sw,
 	output reg camera_data_scl = 1'bz,
@@ -59,7 +59,7 @@ module i2c_module(
 	reg [7:0] i2c_clock_state = 0;
 
 	always @(posedge clk) begin
-		if ((startup_sequencer[0] == 1) || (startup_sequencer[2] == 1) || (startup_sequencer[4] == 1) || (startup_sequencer[6] == 1) || (startup_sequencer[8] == 1) || (startup_sequencer[10] == 1) || (startup_sequencer[12] == 1) || (startup_sequencer[14] == 1) || (send_special_i2c_command == 1)) begin
+		if ((startup_sequencer[0] == 1) || (startup_sequencer[2] == 1) || (startup_sequencer[4] == 1) || (startup_sequencer[6] == 1) || (startup_sequencer[8] == 1) || (startup_sequencer[10] == 1) || (startup_sequencer[12] == 1) || (startup_sequencer[14] == 1) || (startup_sequencer[16] == 1) || (send_special_i2c_command == 1)) begin
 			External_I2C_Clock_Enable = 1;
 		end else begin
 			External_I2C_Clock_Enable = 0;
@@ -81,13 +81,13 @@ module i2c_module(
 			if (startup_sequencer[6] == 1) begin
 				i2c_address = 144;			// 90 hex
 				i2c_register = 4;			// 04 hex
-				i2c_data = 2559;				// 9FF hex [Column Size]
+				i2c_data = 2559;			// 9FF hex [Column Size]
 			end
 			
 			if (startup_sequencer[8] == 1) begin
 				i2c_address = 144;			// 90 hex
 				i2c_register = 3;			// 03 hex
-				i2c_data = 1919;				// 77F hex [Row Size]
+				i2c_data = 1919;			// 77F hex [Row Size]
 			end
 			
 			if (startup_sequencer[10] == 1) begin
@@ -106,6 +106,12 @@ module i2c_module(
 				i2c_address = 144;			// 90 hex
 				i2c_register = 30;			// 1E hex
 				i2c_data = 16710;			// 4146 hex [Electronic Rolling Shutter Bulb Trigger Mode]
+			end
+
+			if (startup_sequencer[16] == 1) begin
+				i2c_address = 144;			// 90 hex
+				i2c_register = 10;			// 0A hex
+				i2c_data = 32768;			// 8000 hex [Invert Pixel Clock]
 			end
 		end
 		

@@ -1,7 +1,7 @@
 `timescale 1ns / 1ps
 /**********************************************************************
- Copyright (c) 2007 Timothy Pearson <kb9vqf@pearsoncomputing.net>
- Copyright (c) 2014 Audrey Pearson <aud.pearson@gmail.com> 
+ Copyright (c) 2007-2014 Timothy Pearson <kb9vqf@pearsoncomputing.net>
+ Copyright (c) 2014 Audrey Pearson <aud.pearson@gmail.com>
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -41,7 +41,6 @@ module y_pixel_filling (
 	reg [17:0] y_pixel_filling_counter_toggle = 0;
 	reg [31:0] y_pixel_filling_counter_temp = 0;
 
-	reg [31:0] data_read_sync_y_pixel_filling = 0;
 	reg [7:0] y_pixel_filling_x_counter = 0;
 	reg [7:0] y_pixel_filling_y_counter = 0;
 	reg [31:0] y_pixel_filling_counter_buffer_red;
@@ -70,8 +69,6 @@ module y_pixel_filling (
 	always @(posedge clk) begin
 	//always @(posedge modified_clock) begin
 		if (pause == 0) begin
-			data_read_sync_y_pixel_filling = data_read;
-			
 			if (enable_y_pixel_filling == 1) begin
 				if (y_pixel_filling_holdoff == 0) begin
 					wren = 0;
@@ -82,17 +79,17 @@ module y_pixel_filling (
 				end else begin
 					// Load in the first pixel
 					if (y_pixel_filling_counter_toggle == 1) begin
-						y_pixel_filling_counter_buffer_red = data_read_sync_y_pixel_filling;			// This is the center pixel
+						y_pixel_filling_counter_buffer_red = data_read;			// This is the center pixel
 						y_pixel_filling_counter_tog = y_pixel_filling_counter_tog + 320;				// Set next read address (one pixel down)
 					end
 					
 					if (y_pixel_filling_counter_toggle == 2) begin
-						y_pixel_filling_counter_buffer_green = data_read_sync_y_pixel_filling;		// This is the rightmost pixel
+						y_pixel_filling_counter_buffer_green = data_read;		// This is the rightmost pixel
 						y_pixel_filling_counter_tog = y_pixel_filling_counter_tog - 640;					// Set next read address (two pixels up)
 					end
 					
 					if (y_pixel_filling_counter_toggle == 3) begin
-						y_pixel_filling_counter_buffer_blue = data_read_sync_y_pixel_filling;		// This is the leftmost pixel
+						y_pixel_filling_counter_buffer_blue = data_read;		// This is the leftmost pixel
 						y_pixel_filling_counter_tog = y_pixel_filling_counter_tog + 321;					// Set next read address (one pixel to the right and one down)
 						
 						// OK, we have our data, now we can see if we need to fill this pixel or not!

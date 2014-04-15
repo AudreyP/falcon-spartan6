@@ -145,7 +145,8 @@ module lpddr_s6 #
       output [6:0]	c3_p0_rd_count,
       output		c3_p0_rd_overflow,
       output		c3_p0_rd_error,
-	output 	main_system_clock
+	output 	main_system_clock,
+	output	main_system_clock_stable
 );
 // The parameter CX_PORT_ENABLE shows all the active user ports in the design.
 // For example, the value 6'b111100 tells that only port-2, port-3, port-4
@@ -425,7 +426,8 @@ assign  c3_sys_clk_n = 1'b0;
          .pll_ce_90                      (c3_pll_ce_90),
          .pll_lock                       (c3_pll_lock),
          .mcb_drp_clk                    (c3_mcb_drp_clk),
-	   .main_system_clock(main_system_clock)
+	   .main_system_clock(main_system_clock),
+	   .main_system_clock_stable(main_system_clock_stable)
       );
    
 

@@ -43,7 +43,10 @@ module blob_extraction(
 	output wire [15:0] debug0,
 	output wire [15:0] debug1,
 	output wire [3:0] debug2,
-	output wire [4:0] debug3
+	output wire [4:0] debug3,
+	output reg [23:0] debug_display,
+	output reg [11:0] debug2_display,
+	output reg [11:0] debug3_display
 	);
 
 		initial blob_extraction_done = 0;
@@ -57,7 +60,6 @@ module blob_extraction(
 		reg [31:0] blob_extraction_counter_temp = 0;
 		
 		reg blob_extraction_holdoff = 0;
-		reg [31:0] data_read_sync_blob_extraction = 0;
 		reg blob_extraction_main_chunk_already_loaded = 0;	//not used anywhere!
 		reg [8:0] blob_extraction_x_counter = 0;	//here only
 		reg [8:0] blob_extraction_y_counter = 0;	//here only
@@ -152,7 +154,7 @@ module blob_extraction(
 		  .addra(address_primary_color_slots), // input [4 : 0] addra
 		  .dina(data_write_primary_color_slots), // input [23 : 0] dina
 		  .douta(), // output [23 : 0] douta (--NOT USED--)
-		  .clkb(clk), // input clkb
+		  .clkb(clk_fast), // input clkb
 		  .web(0), // input [0 : 0] web
 		  .addrb(primary_color_slots_addrb), // input [4 : 0] addrb
 		  .dinb(), // input [23 : 0] dinb (--NOT USED--)
@@ -205,8 +207,6 @@ module blob_extraction(
 		//always @(posedge clk_fast) begin
 		always @(posedge clk) begin
 		if (pause == 0) begin
-			data_read_sync_blob_extraction = data_read;
-			
 			//leds[5:0] = blob_extraction_toggler + 1;
 			
 			if (enable_blob_extraction == 1) begin
@@ -245,7 +245,7 @@ module blob_extraction(
 								end else begin
 									// Read the current X, Y pixel
 									// If pixel == 0, then we need to fill this region
-									if (data_read_sync_blob_extraction == 0) begin
+									if (data_read == 0) begin
 										blob_extraction_data_temp[16:8] = blob_extraction_x;
 										blob_extraction_data_temp[7:0] = blob_extraction_y;
 										stack_ram_dina = blob_extraction_data_temp;
@@ -316,7 +316,7 @@ module blob_extraction(
 						if (blob_extraction_toggler == 2) begin
 							// Go up until an edge is found
 							
-							if ((data_read_sync_blob_extraction == 0) && (blob_extraction_x_temp > 7) && (blob_extraction_x_temp < 313) && (blob_extraction_y_temp_1 > 7) && (blob_extraction_y_temp_1 < 233)) begin
+							if ((data_read == 0) && (blob_extraction_x_temp > 7) && (blob_extraction_x_temp < 313) && (blob_extraction_y_temp_1 > 7) && (blob_extraction_y_temp_1 < 233)) begin
 								// Set up the read operation
 								wren = 0;
 								blob_extraction_y_temp_1 = blob_extraction_y_temp_1 - 1;
@@ -343,7 +343,7 @@ module blob_extraction(
 							// Read in the first pixel
 							// If the pixel is zero, write the current blob number in its place
 							if (blob_extraction_inner_toggler == 0) begin
-								if ((data_read_sync_blob_extraction == 0) 
+								if ((data_read == 0) 
 									&& (blob_extraction_x_temp > 7) && (blob_extraction_x_temp < 313) 
 									&& (blob_extraction_y_temp_1 > 7) && (blob_extraction_y_temp_1 < 233)) begin
 									// Write the data
@@ -372,9 +372,9 @@ module blob_extraction(
 							if (blob_extraction_inner_toggler == 3) begin
 								// And compute the running average, lowest pixel, centroid, etc.
 								if (ok_to_do_averaging == 1) begin
-									blob_extraction_red_average = blob_extraction_red_average + data_read_sync_blob_extraction[7:0];
-									blob_extraction_green_average = blob_extraction_green_average + data_read_sync_blob_extraction[15:8];
-									blob_extraction_blue_average = blob_extraction_blue_average + data_read_sync_blob_extraction[31:24];
+									blob_extraction_red_average = blob_extraction_red_average + data_read[7:0];
+									blob_extraction_green_average = blob_extraction_green_average + data_read[15:8];
+									blob_extraction_blue_average = blob_extraction_blue_average + data_read[31:24];
 									blob_extraction_x_average = blob_extraction_x_average + blob_extraction_x_temp;
 									blob_extraction_y_average = blob_extraction_y_average + blob_extraction_y_temp_1;
 									
@@ -396,9 +396,9 @@ module blob_extraction(
 									
 									blob_extraction_blob_size = blob_extraction_blob_size + 1;
 								end else begin
-									blob_extraction_red_average = data_read_sync_blob_extraction[7:0];
-									blob_extraction_green_average = data_read_sync_blob_extraction[15:8];
-									blob_extraction_blue_average = data_read_sync_blob_extraction[31:24];
+									blob_extraction_red_average = data_read[7:0];
+									blob_extraction_green_average = data_read[15:8];
+									blob_extraction_blue_average = data_read[31:24];
 									blob_extraction_x_average = blob_extraction_x_temp;
 									blob_extraction_y_average = blob_extraction_y_temp_1;
 									
@@ -582,7 +582,7 @@ module blob_extraction(
 								end
 								
 								// Now read in the data
-								if ((spanLeft == 0) && (data_read_sync_blob_extraction == 0)) begin
+								if ((spanLeft == 0) && (data_read == 0)) begin
 									// Push data!
 									stack_pointer = stack_pointer + 1;
 									stack_ram_addra = stack_pointer;
@@ -592,7 +592,7 @@ module blob_extraction(
 									stack_ram_wea = 1;
 									spanLeft = 1;
 								end else begin
-									if ((spanLeft == 1) && (data_read_sync_blob_extraction != 0)) begin
+									if ((spanLeft == 1) && (data_read != 0)) begin
 										spanLeft = 0;
 									end
 								end
@@ -614,7 +614,7 @@ module blob_extraction(
 								blob_extraction_y_average_final = divider_quotient_y;
 								
 								// Now read in the data
-								if ((spanRight == 0) && (data_read_sync_blob_extraction == 0)) begin
+								if ((spanRight == 0) && (data_read == 0)) begin
 									// Push data!
 									stack_pointer = stack_pointer + 1;
 									stack_ram_addra = stack_pointer;
@@ -624,7 +624,7 @@ module blob_extraction(
 									stack_ram_wea = 1;
 									spanRight = 1;
 								end else begin
-									if ((spanRight == 1) && (data_read_sync_blob_extraction != 0)) begin
+									if ((spanRight == 1) && (data_read != 0)) begin
 										spanRight = 0;
 									end
 								end
@@ -698,10 +698,19 @@ module blob_extraction(
 											+ (primary_color_slots_doutb[23:16] - blob_extraction_blue_average_final));
 									end
 									
+									// debugging
+									// red slot
+									if (blob_extraction_slot_loop == 0 && blob_extraction_color_loop == 0) begin
+										// sends red, green, blue out to main for display
+										debug_display = primary_color_slots_doutb;
+										debug2_display = primary_color_slots_addrb;
+									end
+									
 									// Compare...
 									if (blob_extraction_current_difference < blob_extraction_minimum_difference) begin
 										blob_extraction_minimum_difference = blob_extraction_current_difference;
 										blob_extraction_blob_color_number = blob_extraction_color_loop + 1;
+										debug3_display = debug3_display + 1;
 									end
 								//end
 							//end	
@@ -800,7 +809,7 @@ module blob_extraction(
 							wren = 0;
 							blob_extraction_toggler = 17;
 						end
-						
+												
 						// Increment our counters
 						if (blob_extraction_inner_toggler == 0) begin
 							blob_extraction_toggler = blob_extraction_toggler + 1;
@@ -819,6 +828,8 @@ module blob_extraction(
 				address = 18'b0;
 				data_write = 32'b0;
 				wren = 1'b0;
+
+				debug3_display = 0;
 			end
 		end	//end if pause = 0
 		end

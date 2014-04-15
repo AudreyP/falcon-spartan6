@@ -1,7 +1,7 @@
 `timescale 1ns / 1ps
 /**********************************************************************
- Copyright (c) 2007 Timothy Pearson <kb9vqf@pearsoncomputing.net>
- Copyright (c) 2014 Audrey Pearson <aud.pearson@gmail.com> 
+ Copyright (c) 2007-2014 Timothy Pearson <kb9vqf@pearsoncomputing.net>
+ Copyright (c) 2014 Audrey Pearson <aud.pearson@gmail.com>
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -41,7 +41,6 @@ module x_pixel_filling (
 	reg [17:0] x_pixel_filling_counter_toggle = 0;
 	reg [31:0] x_pixel_filling_counter_temp = 0;
 
-	reg [31:0] data_read_sync_x_pixel_filling = 0;
 	reg [7:0] x_pixel_filling_x_counter = 0;
 	reg [7:0] x_pixel_filling_y_counter = 0;
 	reg [31:0] x_pixel_filling_counter_buffer_red;
@@ -70,8 +69,6 @@ module x_pixel_filling (
 	always @(posedge clk) begin
 	//always @(posedge modified_clock) begin
 		if (pause == 0) begin
-			data_read_sync_x_pixel_filling = data_read;
-			
 			if (enable_x_pixel_filling == 1) begin
 				if (x_pixel_filling_holdoff == 0) begin
 					wren = 0;
@@ -82,17 +79,17 @@ module x_pixel_filling (
 				end else begin
 					// Load in the first pixel
 					if (x_pixel_filling_counter_toggle == 1) begin
-						x_pixel_filling_counter_buffer_red = data_read_sync_x_pixel_filling;			// This is the center pixel
+						x_pixel_filling_counter_buffer_red = data_read;			// This is the center pixel
 						x_pixel_filling_counter_tog = x_pixel_filling_counter_tog + 1;							// Set next read address (one pixel to the right)
 					end
 					
 					if (x_pixel_filling_counter_toggle == 2) begin
-						x_pixel_filling_counter_buffer_green = data_read_sync_x_pixel_filling;		// This is the rightmost pixel
+						x_pixel_filling_counter_buffer_green = data_read;		// This is the rightmost pixel
 						x_pixel_filling_counter_tog = x_pixel_filling_counter_tog - 2;							// Set next read address (two pixels to the left)
 					end
 					
 					if (x_pixel_filling_counter_toggle == 3) begin
-						x_pixel_filling_counter_buffer_blue = data_read_sync_x_pixel_filling;			// This is the leftmost pixel
+						x_pixel_filling_counter_buffer_blue = data_read;			// This is the leftmost pixel
 						x_pixel_filling_counter_tog = x_pixel_filling_counter_tog + 2;							// Set next read address (two pixels to the right)
 						
 						// OK, we have our data, now we can see if we need to fill this pixel or not!

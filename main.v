@@ -89,7 +89,6 @@ module main(
 	output reg camera_data_reset
 
 	, output reg modified_clock_debug
-	, output reg modified_clock_sync_debug
 	, output reg modified_clock_sram_debug
 	, output reg modified_clock_fast_debug
 	);
@@ -99,11 +98,13 @@ module main(
 	wire c3_calib_done;
 	
 	wire main_system_clock;
+	wire main_system_clock_stable;
 	
 	// '<=' is a nonblocking set operation (like '=') 
 
 	//parameter InternalClkFrequency = 6666666;	// 6.66MHz
 	parameter InternalClkFrequency = 10000000;	// 10MHz
+	//parameter InternalClkFrequency = 12500000;	// 12.5MHz
 	//parameter InternalClkFrequency = 13333333;	// 13.33MHz
 	//parameter InternalClkFrequency = 20000000;	// 20MHz
 	//parameter InternalClkFrequency = 50000000;	// 50MHz
@@ -115,20 +116,17 @@ module main(
 	//parameter I2ClkCyclesToWait = (InternalClkFrequency / 100);
 	//parameter I2ClkCyclesToWait = (InternalClkFrequency / 1);
 
+	parameter MemoryToSystemClockRatio = 10;	// Ratio of the memory controller clock to the main system clock
+
 	wire clk;
 	(* KEEP = "TRUE" *) wire modified_clock;
 	(* KEEP = "TRUE" *) wire modified_clock_inv;
-	(* KEEP = "TRUE" *) wire modified_clock_sync;
 	(* KEEP = "TRUE" *) wire modified_clock_sram;
 	(* KEEP = "TRUE" *) wire modified_clock_fast;
 	(* KEEP = "TRUE" *) wire modified_clock_fast_inv;
 
 	always @(posedge modified_clock) begin
 		modified_clock_debug = ~modified_clock_debug;
-	end
-
-	always @(posedge modified_clock_sync) begin
-		modified_clock_sync_debug = ~modified_clock_sync_debug;
 	end
 
 	always @(posedge modified_clock_sram) begin
@@ -151,13 +149,14 @@ module main(
 	wire [3:0] cseg;
 	reg [7:0] temp1;		// Temporary data storage
 
+	wire dcm_locked;
+	wire dcm_locked_sram;
 	wire all_dcms_locked;
 
-	reg wren = 0;
-	reg [17:0] address = 0;
-	reg [31:0] data_write = 0;
+	wire wren;
+	wire [17:0] address;
+	wire [31:0] data_write;
 	wire [31:0] data_read;
-	reg [31:0] data_read_sync;
 
 	reg [7:0] delay_loop = 0;
 
@@ -239,14 +238,20 @@ module main(
 
 	wire global_pause;	//comes from ddr memory, goes to all modules
 
-	mem_manager mem_manager(
+	wire [7:0] modified_clock_phase;
+
+	mem_manager #(
+		.MemoryToSystemClockRatio(MemoryToSystemClockRatio)
+		)
+		mem_manager(
 		.modified_clock_sram(modified_clock_sram),
+		.clk(modified_clk),
 		.clk_fast(modified_clock_fast),
-		.clk_sync(modified_clock_sync),
+		.clk_sync(modified_clock_phase),
 		.crystal_clk(crystal_clk),
 		.all_dcms_locked(all_dcms_locked),
 		.pause(global_pause),
-		.starting_address(address), 
+		.address(address), 
 		.wren(wren), 
 		.data_write(data_write), 
 		.data_read(data_read),
@@ -270,6 +275,7 @@ module main(
 		.debug1(sram_debug1),
 		.debug2(sram_debug2),
 		.main_system_clock(main_system_clock),
+		.main_system_clock_stable(main_system_clock_stable),
 		.read_error(mem_read_error)
 		);
 
@@ -302,7 +308,7 @@ module main(
 	wire wren_camera_capture;
 	wire [17:0] address_camera_capture;
 	wire [31:0] data_write_camera_capture;
-	reg [15:0] startup_sequencer = 0;
+	reg [17:0] startup_sequencer = 0;
 
 	wire [19:0] camera_debug_current_address;
 	wire [18:0] camera_debug_current_address_module;
@@ -316,7 +322,7 @@ module main(
 		.ddr_data_write(data_write_camera_capture),
 		.ddr_wren(wren_camera_capture),
 		.data_read(data_read),
-		.camera_data_pclk_unbuffered(camera_data_pclk),
+		.camera_data_pclk_in(camera_data_pclk),
 		.camera_data_extclk(camera_data_extclk),
 		.camera_data_href(camera_data_href),
 		.camera_data_vsync(camera_data_vsync),
@@ -344,7 +350,12 @@ module main(
 	
 	reg [20:0] reset_delay_timer = 0;
 
-	always @(posedge clk) begin
+	reg startup_clock;
+	always @(posedge main_system_clock) begin
+		startup_clock = ~startup_clock;
+	end
+
+	always @(posedge startup_clock) begin
 		if (reset_delay_timer < 2000000) begin
 			reset_delay_timer = reset_delay_timer + 1;
 			if (reset_delay_timer < 1500000) begin
@@ -356,7 +367,7 @@ module main(
 			startup_sequencer_timer = startup_sequencer_timer + 1;
 			if (startup_sequencer_timer >= 1677721) begin
 				startup_sequencer_timer = 0;
-				if (startup_sequencer < 16384) begin
+				if (startup_sequencer < 65536) begin
 					if (startup_sequencer == 0) begin
 						startup_sequencer = 1;
 					end else begin
@@ -366,7 +377,7 @@ module main(
 			end
 		end
 		
-		if ((dcm_locked && camera_dcm_locked) == 0) begin
+		if (all_dcms_locked == 0) begin
 			startup_sequencer = 0;
 			reset_delay_timer = 0;
 		end
@@ -559,12 +570,13 @@ module main(
 	wire [15:0] debug0, debug1;
 	wire [5:0] debug2;
 	wire [6:0] debug3;
+	wire [23:0] blob_debug;
+	wire [11:0] blob_debug2;
+	wire [11:0] blob_debug3;
 	
 	reg [4:0] address_primary_color_slots;
 	reg [23:0] data_write_primary_color_slots;
 	reg wren_primary_color_slots;
-	wire primary_color_slots_clka;
-	assign primary_color_slots_clka = clk;
 	
 	blob_extraction blob_extraction(
 		//input wires
@@ -582,18 +594,13 @@ module main(
 		.data_write(data_write_blob_extraction),
 		.address(address_blob_extraction),
 		.blob_extraction_done(blob_extraction_done),
-		.primary_color_slots_clka(primary_color_slots_clka),
+		.primary_color_slots_clka(clk),
 		.wren_primary_color_slots(wren_primary_color_slots),
 		.address_primary_color_slots(address_primary_color_slots),
-		.data_write_primary_color_slots(data_write_primary_color_slots)
-	/*	.debug0(debug0),
-		.debug1(debug1),
-		.debug2(debug2),
-		.debug3(debug3)*/
-		/*.stack_ram_douta(stack_ram_douta),
-		.stack_ram_addra(stack_ram_addra),
-		.stack_ram_wea(stack_ram_wea),
-		.stack_ram_dina(stack_ram_dina)*/
+		.data_write_primary_color_slots(data_write_primary_color_slots),
+		.debug_display(blob_debug),
+		.debug2_display(blob_debug2),
+		.debug3_display(blob_debug3)
 		);
 	
 
@@ -697,23 +704,25 @@ module main(
 	
 //	reg enable_rgb = 0;
 //	reg enable_ycrcb = 1;
-	
-	wire dcm_locked, dcm_locked_sram;
 
 	assign all_dcms_locked = dcm_locked && dcm_locked_sram && camera_dcm_locked;
 	
 	//instantiate clock manager (2014 edit)
-	clock_manager clock_manager(
+	clock_manager  #(
+		.MemoryToSystemClockRatio(MemoryToSystemClockRatio)
+		)
+		clock_manager(
 		.input_clk(main_system_clock),
+		.input_clk_stable(main_system_clock_stable),
 		.modified_clock(modified_clock),
 		.modified_clock_inv(modified_clock_inv),
-		.modified_clock_sync(modified_clock_sync),
 		.modified_clock_div_by_two(modified_clock_div_by_two),
 		.modified_clock_fast(modified_clock_fast),
 		.modified_clock_fast_inv(modified_clock_fast_inv),
 		.modified_clock_sram(modified_clock_sram),
 		.dcm_locked(dcm_locked),
-		.dcm_locked_sram(dcm_locked_sram)
+		.dcm_locked_sram(dcm_locked_sram),
+		.modified_clock_period(modified_clock_phase)
 		);
 
 	reg reset_system = 0;
@@ -771,45 +780,70 @@ module main(
 			display_value = display_value_timer;
 		end
 		
-		if (slide_switches == 0) begin
+		if (slide_switches[4:0] == 0) begin
 			display_value = debug0;
 		end
-		if (slide_switches == 1) begin
+		if (slide_switches[4:0] == 1) begin
 			display_value = debug1;
 		end
-		if (slide_switches == 2) begin
+		if (slide_switches[4:0] == 2) begin
 			display_value = debug2;
 		end
-		if (slide_switches == 3) begin
+		if (slide_switches[4:0] == 3) begin
 			display_value = debug3;
 		end
-		if (slide_switches == 4) begin
+		if (slide_switches[4:0] == 4) begin
 			display_value = current_main_processing_state;
 		end
-		if (slide_switches == 5) begin
+		if (slide_switches[4:0] == 5) begin
 			//display_value = address[17:4];
 			display_value = address[17:5];
 		end
-		if (slide_switches == 6) begin
+		if (slide_switches[4:0] == 6) begin
 			display_value = camera_debug_current_address[19:4];
 		end
-		if (slide_switches == 7) begin
+		if (slide_switches[4:0] == 7) begin
 			display_value = camera_debug_current_address_module[18:4];
 		end
-		if (slide_switches == 8) begin
-			display_value = camera_fifo_debug;
+		if (slide_switches[4:0] == 8) begin
+// 			display_value = camera_fifo_debug;
+			display_value = blob_debug[7:0];	// red slot, red
 		end
-		if (slide_switches == 9) begin
+		if (slide_switches[4:0] == 9) begin
+// 			display_value = sram_debug0;
+			display_value = blob_debug[15:8];	//red slot, green
+		end
+		if (slide_switches[4:0] == 10) begin
+ 			display_value = blob_debug[23:16];	// red slot, blue
+		end
+		if (slide_switches[4:0] == 11) begin
+ 			display_value = blob_debug2;		// address
+		end
+		if (slide_switches[4:0] == 12) begin
+ 			display_value = blob_debug3;		// number of blobs detected that match any of the color slots
+		end
+		if (slide_switches[4:0] == 13) begin
+			display_value = data_write_primary_color_slots[7:0];	// red slot, red input
+		end
+		if (slide_switches[4:0] == 14) begin
+			display_value = data_write_primary_color_slots[15:8];	//red slot, green input
+		end
+		if (slide_switches[4:0] == 15) begin
+			display_value = data_write_primary_color_slots[23:16];	// red slot, blue input
+		end
+		if (slide_switches[4:0] == 16) begin
+			display_value = address_primary_color_slots;
+		end
+		if (slide_switches[4:0] == 17) begin
 			display_value = sram_debug0;
 		end
-		if (slide_switches == 10) begin
+		if (slide_switches[4:0] == 18) begin
 			display_value = sram_debug1;
 		end
-		if (slide_switches == 11) begin
+		if (slide_switches[4:0] == 19) begin
 			display_value = sram_debug2;
 		end
 
-		
 		processing_started_prior = processing_started;
 		processing_ended_prior = processing_ended;
 	end
@@ -863,17 +897,27 @@ module main(
 
 	reg [17:0] frame_dump_origin_address = 76801;
 
-	always @(posedge modified_clock_sram) begin
-		address <= address_edge_detection | address_tracking_output | address_x_pixel_filling 
-								| address_y_pixel_filling | address_blob_extraction | address_camera_capture | address_memory_blanking 
-								| address_single_shot | address_frame_dump /*| address_median_filtering*/;
-							
-		wren <= wren_edge_detection | wren_tracking_output | wren_x_pixel_filling | wren_y_pixel_filling 
-								| wren_blob_extraction | wren_camera_capture | wren_memory_blanking /*| wren_median_filtering*/;
-							
-		data_write <= data_write_edge_detection | data_write_tracking_output | data_write_x_pixel_filling | data_write_y_pixel_filling 
-								| data_write_blob_extraction | data_write_camera_capture | data_write_memory_blanking /*| data_write_median_filtering*/;
-	end
+	assign address = address_edge_detection | address_tracking_output | address_x_pixel_filling 
+							| address_y_pixel_filling | address_blob_extraction | address_camera_capture | address_memory_blanking 
+							| address_single_shot | address_frame_dump /*| address_median_filtering*/;
+						
+	assign wren = wren_edge_detection | wren_tracking_output | wren_x_pixel_filling | wren_y_pixel_filling 
+							| wren_blob_extraction | wren_camera_capture | wren_memory_blanking /*| wren_median_filtering*/;
+						
+	assign data_write = data_write_edge_detection | data_write_tracking_output | data_write_x_pixel_filling | data_write_y_pixel_filling 
+							| data_write_blob_extraction | data_write_camera_capture | data_write_memory_blanking /*| data_write_median_filtering*/;
+
+// 	always @(posedge modified_clock_sram) begin
+// 		address <= address_edge_detection | address_tracking_output | address_x_pixel_filling 
+// 								| address_y_pixel_filling | address_blob_extraction | address_camera_capture | address_memory_blanking 
+// 								| address_single_shot | address_frame_dump /*| address_median_filtering*/;
+// 							
+// 		wren <= wren_edge_detection | wren_tracking_output | wren_x_pixel_filling | wren_y_pixel_filling 
+// 								| wren_blob_extraction | wren_camera_capture | wren_memory_blanking /*| wren_median_filtering*/;
+// 							
+// 		data_write <= data_write_edge_detection | data_write_tracking_output | data_write_x_pixel_filling | data_write_y_pixel_filling 
+// 								| data_write_blob_extraction | data_write_camera_capture | data_write_memory_blanking /*| data_write_median_filtering*/;
+// 	end
 
 	localparam
 	STATE_POWERUP = 0,
@@ -893,22 +937,22 @@ module main(
 	STATE_FRAME_DUMP = 14,
 	STATE_SINGLE_SHOT = 15,
 	STATE_ONLINE_RECOGNITION = 16;
-	always @(posedge clk) begin
-		data_read_sync = data_read;
 
-		//if ((processing_done_internal == 0)) begin
-		//if (camera_transfer_done == 1) begin
+	always @(posedge clk) begin
+// 		if (global_pause == 0) begin
+			//if ((processing_done_internal == 0)) begin
+			//if (camera_transfer_done == 1) begin
 				processing_done = 0;
 				
 				//leds[5:0] = current_main_processing_state + 1;
 
-				if(current_main_processing_state == STATE_POWERUP) begin
+				if (current_main_processing_state == STATE_POWERUP) begin
 					if ((all_dcms_locked == 1) && (memory_controller_ready == 1)) begin
 						current_main_processing_state = STATE_INITIAL;
 					end
 				end
 				
-				if(current_main_processing_state == STATE_INITIAL) begin
+				else if (current_main_processing_state == STATE_INITIAL) begin
 					//camera controls -- these run once per loop
 					run_frame_dump_internal = 0;
 					run_single_shot_test_internal = 0;
@@ -931,16 +975,20 @@ module main(
 					end
 				end
 
-				if (current_main_processing_state == STATE_MEMORY_BLANKING) begin
+				else if (current_main_processing_state == STATE_MEMORY_BLANKING) begin
 					//leds[5] = 1;
 					enable_memory_blanking = 1;
 					if (memory_blanking_done == 1) begin
 						enable_memory_blanking = 0;
-						current_main_processing_state = STATE_CAMERA_CAPTURE;
+						if (slide_switches[4] == 0) begin
+							current_main_processing_state = STATE_CAMERA_CAPTURE;
+						end else begin
+							current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY****
+						end
 					end
 				end
 				
-				if (current_main_processing_state == STATE_CAMERA_CAPTURE) begin
+				else if (current_main_processing_state == STATE_CAMERA_CAPTURE) begin
 					//leds[5] = 1;
 					enable_camera_capture = 1;
 					if (camera_capture_done == 1) begin
@@ -950,61 +998,47 @@ module main(
 					end
 				end
 	
-				if (current_main_processing_state == STATE_MEDIAN_FILTERING) begin
+				else if (current_main_processing_state == STATE_MEDIAN_FILTERING) begin
 					//leds[5] = 1;
 					//enable_median_filtering = 1;
 					//if (median_filtering_done == 1) begin
 					//	enable_median_filtering = 0;
-						if (slide_switches[2] == 1) begin
-							current_main_processing_state = STATE_EDGE_DETECTION;
-						end else begin
-							current_main_processing_state = STATE_X_PIXEL_FILLING;	// skip edge detection
-						end
-					//end		
-					
+						current_main_processing_state = STATE_EDGE_DETECTION;
+					//end
 				end					
 				
-				if (current_main_processing_state == STATE_EDGE_DETECTION) begin
+				else if (current_main_processing_state == STATE_EDGE_DETECTION) begin
 					//leds[5] = 1;
 					enable_edge_detection = 1;
 					if (edge_detection_done == 1) begin
 						enable_edge_detection = 0;
-						if (slide_switches[3] == 1) begin
- 							current_main_processing_state = STATE_X_PIXEL_FILLING;
- 						end else begin
-							current_main_processing_state = STATE_Y_PIXEL_FILLING;	// skip x pixel filling
-						end
-					end
+						current_main_processing_state = STATE_X_PIXEL_FILLING;
+ 					end
 				end
 				
-				if (current_main_processing_state == STATE_X_PIXEL_FILLING) begin
+				else if (current_main_processing_state == STATE_X_PIXEL_FILLING) begin
 					//leds[5] = 1;
 					enable_x_pixel_filling = 1;
 					if (x_pixel_filling_done == 1) begin
 						enable_x_pixel_filling = 0;
-						if (slide_switches[4] == 1) begin
- 							current_main_processing_state = STATE_Y_PIXEL_FILLING;
- 						end else begin
-							current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY****
-						end
+ 						current_main_processing_state = STATE_Y_PIXEL_FILLING;
 					end
 				end
 				
-				if (current_main_processing_state == STATE_Y_PIXEL_FILLING) begin
+				else if (current_main_processing_state == STATE_Y_PIXEL_FILLING) begin
 					//leds[5] = 1;
 					enable_y_pixel_filling = 1;
 					if (y_pixel_filling_done == 1) begin
 						enable_y_pixel_filling = 0;
-						//SKIPS BORDER DRAWING STATE
-						if (slide_switches[5] == 1) begin
+						if (slide_switches[5] == 0) begin
 							current_main_processing_state = STATE_BORDER_DRAWING;
 						end else begin
- 							current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY****
- 						end
+							current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY****
+						end
 					end
 				end		
 				
-				if (current_main_processing_state == STATE_BORDER_DRAWING) begin
+				else if (current_main_processing_state == STATE_BORDER_DRAWING) begin
 					current_main_processing_state = STATE_BLOB_EXTRACTION;
 				end
 				
@@ -1017,17 +1051,17 @@ module main(
 					end
 				end		*/
 				
-				if (current_main_processing_state == STATE_BLOB_EXTRACTION) begin
+				else if (current_main_processing_state == STATE_BLOB_EXTRACTION) begin
 					//leds[5] = 1;
 					enable_blob_extraction = 1;
 					if (blob_extraction_done == 1) begin
 						enable_blob_extraction = 0;
-// 						current_main_processing_state = STATE_TRACKING_OUTPUT;
-						current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY****
+						current_main_processing_state = STATE_TRACKING_OUTPUT;
+// 						current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY****
 					end
 				end
 				
-				if (current_main_processing_state == STATE_TRACKING_OUTPUT) begin
+				else if (current_main_processing_state == STATE_TRACKING_OUTPUT) begin
 					//leds[5] = 1;
 					enable_tracking_output = 1;
 					if (tracking_output_done == 1) begin
@@ -1043,7 +1077,7 @@ module main(
 					leds[5] = 0;
 				end
 				
-				if (current_main_processing_state == STATE_ASSEMBLE_DATA) begin
+				else if (current_main_processing_state == STATE_ASSEMBLE_DATA) begin
 					first_x_centroids_array[X_CENTROIDS_WORD_0 : 0] = x_centroids_array[X_CENTROIDS_WORD_0 : 0];
 					first_y_centroids_array[Y_CENTROIDS_WORD_0 : 0] = y_centroids_array[Y_CENTROIDS_WORD_0 : 0];
 					first_s_centroids_array[S_CENTROIDS_WORD_0 : 0] = s_centroids_array[S_CENTROIDS_WORD_0 : 0];
@@ -1076,7 +1110,7 @@ module main(
 					end
 				end
 				
-				if (current_main_processing_state == STATE_TRACKING_OUTPUT_TWO) begin
+				else if (current_main_processing_state == STATE_TRACKING_OUTPUT_TWO) begin
 					if (pleasedelayhere == 0) begin
 						//leds[5] = 1;
 						enable_tracking_output = 1;
@@ -1091,7 +1125,7 @@ module main(
 					end
 				end
 				
-				if (current_main_processing_state == STATE_DATA_OUTPUT_CTL) begin
+				else if (current_main_processing_state == STATE_DATA_OUTPUT_CTL) begin
 					if (run_frame_dump_internal == 1) begin
 						current_main_processing_state = STATE_FRAME_DUMP;
 					end
@@ -1107,21 +1141,12 @@ module main(
 					if ((run_frame_dump_internal == 0) && (run_single_shot_test_internal == 0) && (run_online_recognition_internal == 0)) begin
 						// Run again!
 						current_main_processing_state = STATE_INITIAL;
-						
-						// 2014 edit
-						//these used to be set to Z
-						/*address = 18'b0;
-						data_write = 32'b0;
-						wren = 1'b0;*/
-						
-						current_main_processing_state = STATE_INITIAL;
 						processing_done_internal = 1;
-						
 						//processing_ended = 1;
 					end
 				end
 	
-				if (current_main_processing_state == STATE_FRAME_DUMP) begin
+				else if (current_main_processing_state == STATE_FRAME_DUMP) begin
 					leds[7] = 1;
 					serial_output_enabled = 1;
 					
@@ -1139,8 +1164,8 @@ module main(
 							frame_dump_origin_address = 230403;
 						end
 
-						// Normal operation
-						// frame_dump_origin_address = 76801;
+// 						// Normal operation
+// 						frame_dump_origin_address = 76801;
 
 						address_frame_dump = frame_dump_origin_address;
 						serial_output_index = 0;
@@ -1151,15 +1176,15 @@ module main(
 							// Transmit the entire contents of the image buffer to the serial port
 							if (tx_toggle == 0) begin
 								if (serial_output_index_toggle == 0) begin
-									TxD_data = data_read_sync[31:24];
+									TxD_data = data_read[31:24];
 								end
 								
 								if (serial_output_index_toggle == 1) begin
-									TxD_data = data_read_sync[15:8];
+									TxD_data = data_read[15:8];
 								end
 								
 								if (serial_output_index_toggle == 2) begin
-									TxD_data = data_read_sync[7:0];
+									TxD_data = data_read[7:0];
 								end
 								
 								TxD_start = 1;
@@ -1206,7 +1231,7 @@ module main(
 					end
 				end
 				
-				if (current_main_processing_state == STATE_SINGLE_SHOT) begin
+				else if (current_main_processing_state == STATE_SINGLE_SHOT) begin
 					leds[7] = 1;
 					serial_output_enabled = 1;
 					
@@ -1225,9 +1250,9 @@ module main(
 							// Transmit the entire contents of the image buffer to the serial port
 							if (tx_toggle == 0) begin
 								if (serial_output_index_toggle == 0) begin
-									address_single_shot = ((data_read_sync * 3) + 200000);
+									address_single_shot = ((data_read * 3) + 200000);
 									//address = address + 76801;
-									if (data_read_sync == 1) begin
+									if (data_read == 1) begin
 										thisiswhite = 1;
 									end else begin
 										thisiswhite = 0;
@@ -1240,8 +1265,8 @@ module main(
 								
 								if (serial_output_index_toggle == 2) begin
 									if (thisiswhite == 0) begin
-										TxD_data = data_read_sync[15:8];
-										//TxD_data = data_read_sync[7:0];
+										TxD_data = data_read[15:8];
+										//TxD_data = data_read[7:0];
 									end else begin
 										TxD_data = 255;
 									end
@@ -1249,8 +1274,8 @@ module main(
 								
 								if (serial_output_index_toggle == 3) begin
 									if (thisiswhite == 0) begin
-										TxD_data = data_read_sync[23:16];
-										//TxD_data = data_read_sync[7:0];
+										TxD_data = data_read[23:16];
+										//TxD_data = data_read[7:0];
 									end else begin
 										TxD_data = 255;
 									end
@@ -1258,8 +1283,8 @@ module main(
 								
 								if (serial_output_index_toggle == 4) begin
 									if (thisiswhite == 0) begin
-										TxD_data = data_read_sync[31:24];
-										//TxD_data = data_read_sync[7:0];
+										TxD_data = data_read[31:24];
+										//TxD_data = data_read[7:0];
 									end else begin
 										TxD_data = 255;
 									end
@@ -1313,7 +1338,7 @@ module main(
 					end
 				end
 				
-				if (current_main_processing_state == STATE_ONLINE_RECOGNITION) begin
+				else if (current_main_processing_state == STATE_ONLINE_RECOGNITION) begin
 					leds[7] = 1;
 					serial_output_enabled = 1;
 					if (serial_output_holdoff == 0) begin
@@ -1323,7 +1348,7 @@ module main(
 						processing_ended = 1;
 						serial_output_index = 0;
 					end else begin
-						if (serial_output_enabled == 1) begin
+						if ((serial_output_enabled == 1) && (global_pause == 0)) begin
 							processing_ended = 0;		// We only needed to pulse this
 									
 							// Transmit the entire contents of the image buffer to the serial port
@@ -1615,11 +1640,12 @@ module main(
 						end
 					end
 				end
-		//end else begin
-		//	if (processing_done_internal == 1) begin
-		//		processing_done = 0;				
-		//	end	//end else
-		//end	//end if(processing_done_internal == 0)
+			//end else begin
+			//	if (processing_done_internal == 1) begin
+			//		processing_done = 0;				
+			//	end	//end else
+			//end	//end if(processing_done_internal == 0)
+// 		end
 	end	//end of always 
 
 	//for the primary_color_slots array
@@ -1642,7 +1668,6 @@ module main(
 	
 	reg [5:0] array_spec_1;
 	reg [5:0] array_spec_2;
-						
 	
 	// Receive serial commands
 	always @(posedge clk) begin
@@ -1753,10 +1778,8 @@ module main(
 								
 								array_spec_1 = ((next_byte_is_command_prev_command / 8) - 11);
 								array_spec_2 = (next_byte_is_command_prev_command[2:0] - 3);
-								
-								
 							end
-						end else begin							
+						end else begin
 							if (next_byte_is_command == 3) begin
 								if ((next_byte_is_command_prev_command > 90) && (next_byte_is_command_prev_command < 140)) begin
 									// Blue
@@ -1839,6 +1862,7 @@ module main(
 		
 		if (RxD_data_ready == 0) begin
 			serial_character_received = 0;
+			wren_primary_color_slots = 1'b0;
 		end
 	end
 
