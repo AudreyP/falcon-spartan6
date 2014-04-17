@@ -141,7 +141,7 @@ module blob_extraction(
 			.douta(stack_ram_douta)
 			);
 
-		//-----Instantiate TDP block ram for primary_color_slots
+		//-----Instantiate block ram for primary_color_slots
 		reg [4:0] primary_color_slots_addrb;
 		wire [23:0] primary_color_slots_doutb;
 		

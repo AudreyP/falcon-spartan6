@@ -34,80 +34,70 @@ module tracking_output(
 	output reg wren,
 	output reg [31:0] data_write,
 	output reg [17:0] address,
-	output reg [63:0] x_centroids_array,   //assigned here--only used in main.
-	output reg [63:0] y_centroids_array,   //assigned here--only used in main.
-	output reg [127:0] s_centroids_array,   //assigned here--only used in main.
-	output reg [288:0] tracking_output_blob_sizes /*[17:0]*/,	//assigned here--only used in main. 
+	// centroids
+	input wire [2:0] centroids_read_addr,
+ 	output wire [31:0] centroids_data_read,
+ 	//blob sizes
+	input wire [4:0] blob_sizes_read_addr_b,
+ 	output wire [15:0] blob_sizes_data_read_b,
 	output reg tracking_output_done
 	);
 		
 	initial tracking_output_done = 0;
-
-	localparam  	BLOB_SIZE_WORD_SIZE = 16,
-			BLOB_SIZE_WORD_0 = 1*BLOB_SIZE_WORD_SIZE-1,
-			BLOB_SIZE_WORD_1 = 2*BLOB_SIZE_WORD_SIZE-1,
-			BLOB_SIZE_WORD_2 = 3*BLOB_SIZE_WORD_SIZE-1,
-			BLOB_SIZE_WORD_3 = 4*BLOB_SIZE_WORD_SIZE-1,
-			BLOB_SIZE_WORD_4 = 5*BLOB_SIZE_WORD_SIZE-1,
-			BLOB_SIZE_WORD_5 = 6*BLOB_SIZE_WORD_SIZE-1,
-			BLOB_SIZE_WORD_6 = 7*BLOB_SIZE_WORD_SIZE-1,
-			BLOB_SIZE_WORD_7 = 8*BLOB_SIZE_WORD_SIZE-1,
-			BLOB_SIZE_WORD_8 = 9*BLOB_SIZE_WORD_SIZE-1,
-			BLOB_SIZE_WORD_9 = 10*BLOB_SIZE_WORD_SIZE-1,
-			BLOB_SIZE_WORD_10 = 11*BLOB_SIZE_WORD_SIZE-1,
-			BLOB_SIZE_WORD_11 = 12*BLOB_SIZE_WORD_SIZE-1,
-			BLOB_SIZE_WORD_12 = 13*BLOB_SIZE_WORD_SIZE-1,
-			BLOB_SIZE_WORD_13 = 14*BLOB_SIZE_WORD_SIZE-1,
-			BLOB_SIZE_WORD_14 = 15*BLOB_SIZE_WORD_SIZE-1,
-			BLOB_SIZE_WORD_15 = 16*BLOB_SIZE_WORD_SIZE-1,
-			BLOB_SIZE_WORD_16 = 17*BLOB_SIZE_WORD_SIZE-1,
-			BLOB_SIZE_WORD_17 = 18*BLOB_SIZE_WORD_SIZE-1;
 	
-	localparam	S_CENTROIDS_WORD_SIZE = 16,
-			S_CENTROIDS_WORD_0 = 1*S_CENTROIDS_WORD_SIZE - 1,
-			S_CENTROIDS_WORD_1 = 2*S_CENTROIDS_WORD_SIZE - 1,
-			S_CENTROIDS_WORD_2 = 3*S_CENTROIDS_WORD_SIZE - 1,
-			S_CENTROIDS_WORD_3 = 4*S_CENTROIDS_WORD_SIZE - 1,
-			S_CENTROIDS_WORD_4 = 5*S_CENTROIDS_WORD_SIZE - 1,
-			S_CENTROIDS_WORD_5 = 6*S_CENTROIDS_WORD_SIZE - 1,
-			S_CENTROIDS_WORD_6 = 7*S_CENTROIDS_WORD_SIZE - 1,
-			S_CENTROIDS_WORD_7 = 8*S_CENTROIDS_WORD_SIZE - 1,
-			
-			X_CENTROIDS_WORD_SIZE = 8,
-			X_CENTROIDS_WORD_0 = 1*X_CENTROIDS_WORD_SIZE - 1,
-			X_CENTROIDS_WORD_1 = 2*X_CENTROIDS_WORD_SIZE - 1,
-			X_CENTROIDS_WORD_2 = 3*X_CENTROIDS_WORD_SIZE - 1,
-			X_CENTROIDS_WORD_3 = 4*X_CENTROIDS_WORD_SIZE - 1,
-			X_CENTROIDS_WORD_4 = 5*X_CENTROIDS_WORD_SIZE - 1,
-			X_CENTROIDS_WORD_5 = 6*X_CENTROIDS_WORD_SIZE - 1,
-			X_CENTROIDS_WORD_6 = 7*X_CENTROIDS_WORD_SIZE - 1,
-			X_CENTROIDS_WORD_7 = 8*X_CENTROIDS_WORD_SIZE - 1,
-			
-			Y_CENTROIDS_WORD_SIZE = 8,
-			Y_CENTROIDS_WORD_0 = 1*Y_CENTROIDS_WORD_SIZE - 1,
-			Y_CENTROIDS_WORD_1 = 2*Y_CENTROIDS_WORD_SIZE - 1,
-			Y_CENTROIDS_WORD_2 = 3*Y_CENTROIDS_WORD_SIZE - 1,
-			Y_CENTROIDS_WORD_3 = 4*Y_CENTROIDS_WORD_SIZE - 1,
-			Y_CENTROIDS_WORD_4 = 5*Y_CENTROIDS_WORD_SIZE - 1,
-			Y_CENTROIDS_WORD_5 = 6*Y_CENTROIDS_WORD_SIZE - 1,
-			Y_CENTROIDS_WORD_6 = 7*Y_CENTROIDS_WORD_SIZE - 1,
-			Y_CENTROIDS_WORD_7 = 8*Y_CENTROIDS_WORD_SIZE - 1;
+	//-----Instantiate block ram for x, y, s centroids
+	// x centroids = [31:24] centroids
+	// y centroids = [23:16] centroids
+	// s centroids = [15:0] centroids
+	reg [2:0] centroids_write_addr = 0;
+	reg [31:0] centroids_data_write;
+	reg wren_centroids;
+	
+	// written to here, read from in main. 
+	centroids xys_centroids_array(
+		.clka(clk), 	// input clka
+		.wea(wren_centroids), // input [0 : 0] wea
+		.addra(centroids_write_addr), // input [2 : 0] addra
+		.dina(centroids_data_write), 	// input [31 : 0] dina
+		.douta(), // output [31 : 0] douta (--NOT USED--)
+		.clkb(clk),	 // input clkb
+		.web(0), 	// input [0 : 0] web
+		.addrb(centroids_read_addr), // input [2 : 0] addrb
+		.dinb(),	 // input [31 : 0] dinb (--NOT USED--)
+		.doutb(centroids_data_read) // output [31 : 0] doutb
+		);	
+	
+	reg [4:0] blob_sizes_write_addr;
+	reg [15:0] blob_sizes_data_write;
+	reg [4:0] blob_sizes_read_addr_a;
+ 	wire [15:0] blob_sizes_data_read_a;
+	reg wren_blob_sizes;
+	
+	// written to here, read from in main. 
+	blob_sizes_ram blob_sizes_ram (
+		.clka(clk), // input clka
+		.wea(wren_blob_sizes), // input [0 : 0] wea
+		.addra(blob_sizes_write_addr), // input [4 : 0] addra
+		.dina(blob_sizes_data_write), // input [15 : 0] dina 
+		.douta(blob_sizes_data_read_a), // output [15 : 0] douta
+		.clkb(clk), // input clkbf
+		.web(0), // input [0 : 0] web
+		.addrb(blob_sizes_read_addr_b), // input [4 : 0] addrb
+		.dinb(), // input [15 : 0] dinb (--NOT USED--)
+		.doutb(blob_sizes_data_read_b) // output [15 : 0] doutb
+		);
 				
+	reg [15:0] tracking_output_pointer_counter = 0;	// local
+	reg [7:0] tracking_output_counter_color;	// local
+	reg [15:0] tracking_output_counter_size;	// local
 	
-	//reg tracking_output_main_chunk_already_loaded = 0;   //UNUSED IN EITHER LOCATION!
-	//reg [7:0] tracking_output_counter_buffer_blue;   //UNUSED IN EITHER LOCATION!
-
-	reg [15:0] tracking_output_pointer_counter = 0;	//HERE ONLY
-	reg [7:0] tracking_output_counter_color;	//HERE ONLY
-	reg [15:0] tracking_output_counter_size;	//HERE ONLY
+	reg tracking_output_ok_to_send_data = 0;	// local
+	reg [15:0] tracking_output_pointer = 0;		// local
 	
-	reg tracking_output_ok_to_send_data = 0;	//HERE ONLY
-	reg [15:0] tracking_output_pointer = 0;		//HERE ONLY
-	
-	reg [15:0] tracking_output_blob_location [17:0];  //HERE ONLY
-	reg [31:0] tracking_output_temp_data;	//HERE ONLY
-	reg [7:0] location_to_extract = 0;	//HERE ONLY
-	reg [3:0] enable_tracking_output_verified = 0;	//here only
+	reg [15:0] tracking_output_blob_location [17:0];  // local
+	reg [31:0] tracking_output_temp_data;	// local
+	reg [7:0] location_to_extract = 0;	// local
+	reg [3:0] enable_tracking_output_verified = 0;	// local
 
 	reg [5:0] tracking_output_counter_tog = 0;
 	reg [5:0] tracking_output_counter_togg = 0;
@@ -115,16 +105,23 @@ module tracking_output(
 	reg [31:0] tracking_output_counter_temp = 0;
 	
 	reg [2:0] tracking_output_holdoff = 0;
-
-//---IS THIS STUFF OK?
-/*	reg wren;
-	reg [31:0] data_write;
-	reg [17:0] address;
-		
-	assign wren_wire = wren;
-	assign data_write_wire = data_write;
-	assign address_wire = address;*/
 	
+	reg [4:0] centroid_array_state;
+	reg [4:0] blob_sizes_state;
+	reg [4:0] test_value_state;
+	reg [4:0] test_value_state1;
+	
+	reg [8:0] blob_size_color_counter1;
+	reg [8:0] blob_size_color_counter2;
+	reg [8:0] blob_size_color_counter3;
+	reg [8:0] blob_size_location_to_extract;
+	
+	reg [2:0] statecount1;
+	reg [2:0] statecount2;
+	reg [2:0] statecount3;
+	reg [2:0] statecount4;
+	reg [2:0] statecount5;
+	reg [2:0] statecount6;
 	
 	// Output the tracking data
 	always @(posedge clk) begin
@@ -146,40 +143,57 @@ module tracking_output(
 					tracking_output_pointer_counter = 0;
 					tracking_output_ok_to_send_data = 0;
 					tracking_output_pointer = 6;
-					x_centroids_array[X_CENTROIDS_WORD_0 : 0] = 0;
-					y_centroids_array[Y_CENTROIDS_WORD_0 : 0] = 0;
-					x_centroids_array[X_CENTROIDS_WORD_1 : 1+X_CENTROIDS_WORD_0] = 0;
-					y_centroids_array[Y_CENTROIDS_WORD_1 : 1+Y_CENTROIDS_WORD_0] = 0;
-					x_centroids_array[X_CENTROIDS_WORD_2 : 1+X_CENTROIDS_WORD_1] = 0;
-					y_centroids_array[Y_CENTROIDS_WORD_2 : 1+Y_CENTROIDS_WORD_1] = 0;
-					x_centroids_array[X_CENTROIDS_WORD_3 : 1+X_CENTROIDS_WORD_2] = 0;
-					y_centroids_array[Y_CENTROIDS_WORD_3 : 1+Y_CENTROIDS_WORD_2] = 0;
-					x_centroids_array[X_CENTROIDS_WORD_4 : 1+X_CENTROIDS_WORD_3] = 0;
-					y_centroids_array[Y_CENTROIDS_WORD_4 : 1+Y_CENTROIDS_WORD_3] = 0;
-					x_centroids_array[X_CENTROIDS_WORD_5 : 1+X_CENTROIDS_WORD_4] = 0;
-					y_centroids_array[Y_CENTROIDS_WORD_5 : 1+Y_CENTROIDS_WORD_4] = 0;
+					//write zeros to the first 5 slots in the XY portion of centroid array
+					case (centroid_array_state) 
+						0: begin
+							wren_centroids = 1'b0;
+							centroids_write_addr = 0;
+							centroid_array_state = centroid_array_state + 1;
+						end
+						1: begin
+							centroids_data_write = 0;
+							wren_centroids = 1'b1;
+							centroids_write_addr = centroids_write_addr + 1;
+							centroid_array_state = centroid_array_state + 1;
+						end
+						2: begin
+							wren_centroids = 1'b0;
+							//reset addresses after words 0-5 written
+							if (centroids_write_addr > 5) begin
+								centroids_write_addr = 0;
+							end
+							centroid_array_state = centroid_array_state - 1; //bounce between states 1 and 2 (0 state is initial only)
+						end
+					endcase
+					
+					
 					tracking_output_holdoff = 1;
 				end
 				
 				1:begin
-					tracking_output_blob_sizes[BLOB_SIZE_WORD_0 : 0] = 0;
-					tracking_output_blob_sizes[BLOB_SIZE_WORD_1 : 1+BLOB_SIZE_WORD_0] = 0;
-					tracking_output_blob_sizes[BLOB_SIZE_WORD_2 : 1+BLOB_SIZE_WORD_1] = 0;
-					tracking_output_blob_sizes[BLOB_SIZE_WORD_3 : 1+BLOB_SIZE_WORD_2] = 0;
-					tracking_output_blob_sizes[BLOB_SIZE_WORD_4 : 1+BLOB_SIZE_WORD_3] = 0;
-					tracking_output_blob_sizes[BLOB_SIZE_WORD_5 : 1+BLOB_SIZE_WORD_4] = 0;
-					tracking_output_blob_sizes[BLOB_SIZE_WORD_6 : 1+BLOB_SIZE_WORD_5] = 0;
-					tracking_output_blob_sizes[BLOB_SIZE_WORD_7 : 1+BLOB_SIZE_WORD_6] = 0;
-					tracking_output_blob_sizes[BLOB_SIZE_WORD_8 : 1+BLOB_SIZE_WORD_7] = 0;
-					tracking_output_blob_sizes[BLOB_SIZE_WORD_9 : 1+BLOB_SIZE_WORD_8] = 0;
-					tracking_output_blob_sizes[BLOB_SIZE_WORD_10 : 1+BLOB_SIZE_WORD_9] = 0;
-					tracking_output_blob_sizes[BLOB_SIZE_WORD_11 : 1+BLOB_SIZE_WORD_10] = 0;
-					tracking_output_blob_sizes[BLOB_SIZE_WORD_12 : 1+BLOB_SIZE_WORD_11] = 0;
-					tracking_output_blob_sizes[BLOB_SIZE_WORD_13 : 1+BLOB_SIZE_WORD_12] = 0;
-					tracking_output_blob_sizes[BLOB_SIZE_WORD_14 : 1+BLOB_SIZE_WORD_13] = 0;
-					tracking_output_blob_sizes[BLOB_SIZE_WORD_15 : 1+BLOB_SIZE_WORD_14] = 0;
-					tracking_output_blob_sizes[BLOB_SIZE_WORD_16 : 1+BLOB_SIZE_WORD_15] = 0;
-					tracking_output_blob_sizes[BLOB_SIZE_WORD_17 : 1+BLOB_SIZE_WORD_16] = 0;
+					//write zeros to the 0-17 slots in the blob sizes array
+					case (blob_sizes_state) 
+						0: begin
+							wren_blob_sizes = 1'b0;
+							blob_sizes_write_addr = 0;
+							blob_sizes_state = blob_sizes_state + 1;
+						end
+						1: begin
+							blob_sizes_data_write = 0;
+							wren_blob_sizes = 1'b1;
+							blob_sizes_write_addr = blob_sizes_write_addr + 1;
+							blob_sizes_state = blob_sizes_state + 1;
+						end
+						2: begin
+							wren_blob_sizes = 1'b0;
+							//reset addresses after words 0-17 written
+							if (blob_sizes_write_addr > 18) begin
+								blob_sizes_write_addr = 0;
+							end
+							blob_sizes_state = blob_sizes_state - 1; //bounce between states 1 and 2 (0 state is initial only)
+						end
+					endcase
+
 					tracking_output_holdoff = 2;
 				end
 				
@@ -239,28 +253,155 @@ module tracking_output(
 									tracking_output_counter_size = 0;			// Ignore this; out of bounds!
 								end
 							end
+							
+							// read from ram into test condition values
+							// ensure wren low (read) for duration of this case
+							case(test_value_state) 
+								0: begin
+									wren_blob_sizes = 0;
+									blob_sizes_read_addr_a = tracking_output_counter_color;
+									test_value_state = test_value_state + 1;
+								end
+								1: begin
+									blob_size_color_counter1 = blob_sizes_data_read_a;
+									test_value_state = test_value_state + 1;
+								end
+								2: begin
+									blob_sizes_read_addr_a = tracking_output_counter_color + 6;
+									test_value_state = test_value_state + 1;
+								end
+								3: begin
+									blob_size_color_counter2 = blob_sizes_data_read_a;
+									test_value_state = test_value_state + 1;
+								end
+								4: begin
+									blob_sizes_read_addr_a = tracking_output_counter_color + 12;
+									test_value_state = test_value_state + 1;
+								end
+								5: begin
+									blob_size_color_counter3 = blob_sizes_data_read_a;
+									test_value_state = test_value_state + 1;
+								end
+								6: begin
+									blob_sizes_read_addr_a = 0;
+								end
+							endcase
+							 
 							wren = 0;
 							tracking_output_pointer = tracking_output_pointer + 2;
 							address = tracking_output_pointer + 200000;
-							if ((tracking_output_blob_sizes[tracking_output_counter_color] < tracking_output_counter_size) && (tracking_output_counter_size > minimum_blob_size)) begin
-								tracking_output_blob_sizes[tracking_output_counter_color + 12] = tracking_output_blob_sizes[tracking_output_counter_color + 6];
+							if ((blob_size_color_counter1 < tracking_output_counter_size) && (tracking_output_counter_size > minimum_blob_size)) begin
+								
+								case(statecount1) 
+									0: begin
+										blob_sizes_write_addr   = tracking_output_counter_color + 12;
+										statecount1 = statecount1 + 1;
+									end
+									1: begin
+										blob_sizes_data_write = blob_size_color_counter2;
+										wren_blob_sizes = 1;
+										statecount1 = statecount1 + 1;
+									end
+									2: begin
+										wren_blob_sizes = 0;
+										blob_sizes_write_addr   = 0;
+										statecount1 = 0;
+									end
+								endcase
 								tracking_output_blob_location[tracking_output_counter_color + 12] = tracking_output_blob_location[tracking_output_counter_color + 6];
-							
-								tracking_output_blob_sizes[tracking_output_counter_color + 6] = tracking_output_blob_sizes[tracking_output_counter_color];
+								
+								case(statecount2) 
+									0: begin
+										blob_sizes_write_addr   = tracking_output_counter_color + 6;
+										statecount2 = statecount2 + 1;
+									end
+									1: begin
+										blob_sizes_data_write = blob_size_color_counter1;
+										wren_blob_sizes = 1;
+										statecount2 = statecount2 + 1;
+									end
+									2: begin
+										wren_blob_sizes = 0;
+										blob_sizes_write_addr   = 0;
+										statecount2 = 0;
+									end
+								endcase
 								tracking_output_blob_location[tracking_output_counter_color + 6] = tracking_output_blob_location[tracking_output_counter_color];
 								
-								tracking_output_blob_sizes[tracking_output_counter_color] = tracking_output_counter_size;
+								case(statecount3) 
+									0: begin
+										blob_sizes_write_addr   = tracking_output_counter_color;
+										statecount3 = statecount3 + 1;
+									end
+									1: begin
+										blob_sizes_data_write = tracking_output_counter_size;
+										wren_blob_sizes = 1;
+										statecount3 = statecount3 + 1;
+									end
+									2: begin
+										wren_blob_sizes = 0;
+										blob_sizes_write_addr   = 0;
+										statecount3 = 0;
+									end
+								endcase
 								tracking_output_blob_location[tracking_output_counter_color] = tracking_output_pointer;
 							end else begin						
-								if ((tracking_output_blob_sizes[tracking_output_counter_color + 6] < tracking_output_counter_size) && (tracking_output_counter_size > minimum_blob_size)) begin
-									tracking_output_blob_sizes[tracking_output_counter_color + 12] = tracking_output_blob_sizes[tracking_output_counter_color + 6];
+								if ((blob_size_color_counter2 < tracking_output_counter_size) && (tracking_output_counter_size > minimum_blob_size)) begin
+									
+									case(statecount4) 
+										0: begin
+											blob_sizes_write_addr   = tracking_output_counter_color + 12;
+											statecount4 = statecount4 + 1;
+										end
+										1: begin
+											blob_sizes_data_write = blob_size_color_counter2;
+											wren_blob_sizes = 1;
+											statecount4 = statecount4 + 1;
+										end
+										2: begin
+											wren_blob_sizes = 0;
+											blob_sizes_write_addr   = 0;
+											statecount4 = 0;
+										end
+									endcase
 									tracking_output_blob_location[tracking_output_counter_color + 12] = tracking_output_blob_location[tracking_output_counter_color + 6];
 									
-									tracking_output_blob_sizes[tracking_output_counter_color + 6] = tracking_output_counter_size;
+									case(statecount5) 
+										0: begin
+											blob_sizes_write_addr   = tracking_output_counter_color + 6;
+											statecount5 = statecount5 + 1;
+										end
+										1: begin
+											blob_sizes_data_write = tracking_output_counter_size;
+											wren_blob_sizes = 1;
+											statecount5 = statecount5 + 1;
+										end
+										2: begin
+											wren_blob_sizes = 0;
+											blob_sizes_write_addr   = 0;
+											statecount5 = 0;
+										end
+									endcase
 									tracking_output_blob_location[tracking_output_counter_color + 6] = tracking_output_pointer;
 								end else begin
-									if ((tracking_output_blob_sizes[tracking_output_counter_color + 12] < tracking_output_counter_size) && (tracking_output_counter_size > minimum_blob_size)) begin
-										tracking_output_blob_sizes[tracking_output_counter_color + 12] = tracking_output_counter_size;
+									if ((blob_size_color_counter3 < tracking_output_counter_size) && (tracking_output_counter_size > minimum_blob_size)) begin
+										
+										case(statecount6) 
+											0: begin
+												blob_sizes_write_addr   = tracking_output_counter_color + 12;
+												statecount6 = statecount6 + 1;
+											end
+											1: begin
+												blob_sizes_data_write = tracking_output_counter_size;
+												wren_blob_sizes = 1;
+												statecount6 = statecount6 + 1;
+											end
+											2: begin
+												wren_blob_sizes = 0;
+												blob_sizes_write_addr   = 0;
+												statecount6 = 0;
+											end
+										endcase
 										tracking_output_blob_location[tracking_output_counter_color + 12] = tracking_output_pointer;
 									end
 								end
@@ -306,13 +447,35 @@ module tracking_output(
 						if (tracking_output_counter_tog == 1) begin		// Pick up where we left off above...						
 							wren = 0;
 							address = tracking_output_blob_location[location_to_extract] + 199998;
+							centroids_write_addr = 0;
 						end
 						
-						if ((tracking_output_counter_tog == 2) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
+						// get value of blob_size_location_to_extract
+						case(test_value_state1) 
+								0: begin
+									blob_sizes_read_addr_a = location_to_extract;
+									test_value_state1 = test_value_state1 + 1;
+								end
+								1: begin
+									blob_size_location_to_extract = blob_sizes_read_addr_a;
+									wren_blob_sizes = 1;
+									test_value_state1 = test_value_state1 + 1;
+								end
+								3: begin
+									wren_blob_sizes = 0;
+									blob_sizes_read_addr_a = 0;
+								end
+							endcase
+						
+						if ((tracking_output_counter_tog == 2) && (blob_size_location_to_extract != 0)) begin
 							tracking_output_temp_data = data_read;
-							x_centroids_array[X_CENTROIDS_WORD_0 : 0] = tracking_output_temp_data[31:24];
-							y_centroids_array[Y_CENTROIDS_WORD_0 : 0] = tracking_output_temp_data[23:16];
-							s_centroids_array[S_CENTROIDS_WORD_0 : 0] = tracking_output_temp_data[15:0];
+							
+							centroids_data_write[31:24] = tracking_output_temp_data[31:24]; // x data
+							centroids_data_write[23:16] = tracking_output_temp_data[23:16]; // y data
+							centroids_data_write[15:0] = tracking_output_temp_data[15:0];   // s data
+							centroids_write_addr = centroids_write_addr + 1;
+							wren_centroids = 1'b1;
+							
 							tracking_output_temp_data[15:0] = 0;
 							address = tracking_output_blob_location[location_to_extract];
 							data_write = tracking_output_temp_data;
@@ -324,11 +487,14 @@ module tracking_output(
 							address = tracking_output_blob_location[location_to_extract] + 199998;
 						end
 						
-						if ((tracking_output_counter_tog == 4) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
+						if ((tracking_output_counter_tog == 4) && (blob_size_location_to_extract != 0)) begin
 							tracking_output_temp_data = data_read;
-							x_centroids_array[X_CENTROIDS_WORD_1 : 1+X_CENTROIDS_WORD_0] = tracking_output_temp_data[31:24];
-							y_centroids_array[Y_CENTROIDS_WORD_1 : 1+Y_CENTROIDS_WORD_0] = tracking_output_temp_data[23:16];
-							s_centroids_array[S_CENTROIDS_WORD_1 : 1+S_CENTROIDS_WORD_0] = tracking_output_temp_data[15:0];
+							centroids_data_write[31:24] = tracking_output_temp_data[31:24]; // x data
+							centroids_data_write[31:16] = tracking_output_temp_data[23:16]; // y data
+							centroids_data_write[15:0] = tracking_output_temp_data[15:0];   // s data
+							centroids_write_addr = centroids_write_addr + 1;
+							wren_centroids = 1'b1;
+							
 							tracking_output_temp_data[15:0] = 0;
 							address = tracking_output_blob_location[location_to_extract] + 199998;
 							data_write = tracking_output_temp_data;
@@ -340,11 +506,14 @@ module tracking_output(
 							address = tracking_output_blob_location[location_to_extract] + 199998;
 						end
 						
-						if ((tracking_output_counter_tog == 6) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
+						if ((tracking_output_counter_tog == 6) && (blob_size_location_to_extract != 0)) begin
 							tracking_output_temp_data = data_read;
-							x_centroids_array[X_CENTROIDS_WORD_2 : 1+X_CENTROIDS_WORD_1] = tracking_output_temp_data[31:24];
-							y_centroids_array[Y_CENTROIDS_WORD_2 : 1+Y_CENTROIDS_WORD_1] = tracking_output_temp_data[23:16];
-							s_centroids_array[S_CENTROIDS_WORD_2 : 1+S_CENTROIDS_WORD_1] = tracking_output_temp_data[15:0];
+							centroids_data_write[31:24] = tracking_output_temp_data[31:24]; // x data
+							centroids_data_write[31:16] = tracking_output_temp_data[23:16]; // y data
+							centroids_data_write[15:0] = tracking_output_temp_data[15:0];   // s data
+							centroids_write_addr = centroids_write_addr + 1;
+							wren_centroids = 1'b1;
+							
 							tracking_output_temp_data[15:0] = 0;
 							address = tracking_output_blob_location[location_to_extract] + 199998;
 							data_write = tracking_output_temp_data;
@@ -356,11 +525,14 @@ module tracking_output(
 							address = tracking_output_blob_location[location_to_extract] + 199998;
 						end
 						
-						if ((tracking_output_counter_tog == 8) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
+						if ((tracking_output_counter_tog == 8) && (blob_size_location_to_extract != 0)) begin
 							tracking_output_temp_data = data_read;
-							x_centroids_array[X_CENTROIDS_WORD_3 : 1+X_CENTROIDS_WORD_2] = tracking_output_temp_data[31:24];
-							y_centroids_array[Y_CENTROIDS_WORD_3 : 1+Y_CENTROIDS_WORD_2] = tracking_output_temp_data[23:16];
-							s_centroids_array[S_CENTROIDS_WORD_3 : 1+S_CENTROIDS_WORD_2] = tracking_output_temp_data[15:0];
+							centroids_data_write[31:24] = tracking_output_temp_data[31:24]; // x data
+							centroids_data_write[31:16] = tracking_output_temp_data[23:16]; // y data
+							centroids_data_write[15:0] = tracking_output_temp_data[15:0];   // s data
+							centroids_write_addr = centroids_write_addr + 1;
+							wren_centroids = 1'b1;
+							
 							tracking_output_temp_data[15:0] = 0;
 							address = tracking_output_blob_location[location_to_extract] + 199998;
 							data_write = tracking_output_temp_data;
@@ -372,11 +544,14 @@ module tracking_output(
 							address = tracking_output_blob_location[location_to_extract] + 199998;
 						end
 						
-						if ((tracking_output_counter_tog == 10) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
+						if ((tracking_output_counter_tog == 10) && (blob_size_location_to_extract != 0)) begin
 							tracking_output_temp_data = data_read;
-							x_centroids_array[X_CENTROIDS_WORD_4 : 1+X_CENTROIDS_WORD_3] = tracking_output_temp_data[31:24];
-							y_centroids_array[Y_CENTROIDS_WORD_4 : 1+Y_CENTROIDS_WORD_3] = tracking_output_temp_data[23:16];
-							s_centroids_array[S_CENTROIDS_WORD_4 : 1+S_CENTROIDS_WORD_3] = tracking_output_temp_data[15:0];
+							centroids_data_write[31:24] = tracking_output_temp_data[31:24]; // x data
+							centroids_data_write[31:16] = tracking_output_temp_data[23:16]; // y data
+							centroids_data_write[15:0] = tracking_output_temp_data[15:0];   // s data
+							centroids_write_addr = centroids_write_addr + 1;
+							wren_centroids = 1'b1;
+							
 							tracking_output_temp_data[15:0] = 0;
 							address = tracking_output_blob_location[location_to_extract] + 199998;
 							data_write = tracking_output_temp_data;
@@ -388,11 +563,14 @@ module tracking_output(
 							address = tracking_output_blob_location[location_to_extract] + 199998;
 						end
 						
-						if ((tracking_output_counter_tog == 12) && (tracking_output_blob_sizes[location_to_extract] != 0)) begin
+						if ((tracking_output_counter_tog == 12) && (blob_size_location_to_extract != 0)) begin
 							tracking_output_temp_data = data_read;
-							x_centroids_array[X_CENTROIDS_WORD_5 : 1+X_CENTROIDS_WORD_4] = tracking_output_temp_data[31:24];
-							y_centroids_array[Y_CENTROIDS_WORD_5 : 1+Y_CENTROIDS_WORD_4] = tracking_output_temp_data[23:16];
-							s_centroids_array[S_CENTROIDS_WORD_5 : 1+S_CENTROIDS_WORD_4] = tracking_output_temp_data[15:0];
+							centroids_data_write[31:24] = tracking_output_temp_data[31:24]; // x data
+							centroids_data_write[31:16] = tracking_output_temp_data[23:16]; // y data
+							centroids_data_write[15:0] = tracking_output_temp_data[15:0];   // s data
+							centroids_write_addr = centroids_write_addr + 1;
+							wren_centroids = 1'b1;
+							
 							tracking_output_temp_data[15:0] = 0;
 							address = tracking_output_blob_location[location_to_extract] + 199998;
 							data_write = tracking_output_temp_data;
@@ -409,6 +587,7 @@ module tracking_output(
 							wren = 0;
 						end else begin
 							tracking_output_counter_tog = tracking_output_counter_tog + 1;
+							wren_centroids = 1'b0;
 						end
 					end
 				end
