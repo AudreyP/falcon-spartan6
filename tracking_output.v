@@ -42,7 +42,7 @@ module tracking_output(
  	output wire [15:0] blob_sizes_data_read_b,
 	output reg tracking_output_done
 	);
-		
+
 	initial tracking_output_done = 0;
 	
 	//-----Instantiate block ram for x, y, s centroids

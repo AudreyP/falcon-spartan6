@@ -1,7 +1,7 @@
 `timescale 1ns / 1ps
 /**********************************************************************
  Copyright (c) 2007-2014 Timothy Pearson <kb9vqf@pearsoncomputing.net>
- Copyright (c) 2014 Audrey Pearson <aud.pearson@gmail.com> 
+ Copyright (c) 2014 Audrey Pearson <aud.pearson@gmail.com>
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -17,6 +17,20 @@
  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
  02111-1307, USA
 **********************************************************************/
+
+// This module writes a complete list of all detected blobs in the image to a region in memory starting at BlobStorageOffset
+// Each blob is represented by a data structure with the following format:
+// Bit fields	|         31 - 24         |         23 - 16         |         15 - 8         |        7 - 0         |
+// -------------+-------------------------+-------------------------+------------------------+----------------------+
+// Word 0:	|       red average       |      green average      |      blue average      | matching color slot  |
+// Word 1:	|  centroid x coordinate  |  centroid y coordinate  |                    blob size                  |
+// Word 2:	|   leftmost blob pixel   |    lowest blob pixel    |  rightmost blob pixel  |  topmost blob pixel  |
+//
+// Blob information is stored continuously starting at BlobStorageOffset:
+// <blob0><blob1><blob2>...
+// Blobs are not stored in any particular order
+// End of blob data area is denotated by thee consecutive data words with value 0xffffffff, starting with Word 0
+// The pixel values in Word 2 are divided by two to ensure that they fit in their respective 8-bit fields
 
 module blob_extraction(
 	//input wires
@@ -54,155 +68,157 @@ module blob_extraction(
 	parameter ImageOffset = (ImageWidth*ImageHeight)+1;
 	parameter BlobStorageOffset = 200000;
 
-		initial blob_extraction_done = 0;
+	initial blob_extraction_done = 0;
 
-		reg [3:0] enable_blob_extraction_verified = 0;
-		reg [15:0] blob_extraction_blob_counter = 0;
-		
-		reg [5:0] blob_extraction_counter_tog = 0;
-		reg [5:0] blob_extraction_counter_togg = 0;
-		reg [5:0] blob_extraction_counter_toggle = 0;
-		reg [31:0] blob_extraction_counter_temp = 0;
-		
-		reg blob_extraction_holdoff = 0;
-		reg blob_extraction_main_chunk_already_loaded = 0;	//not used anywhere!
-		reg [8:0] blob_extraction_x_counter = 0;	//here only
-		reg [8:0] blob_extraction_y_counter = 0;	//here only
-		
-		reg [15:0] blob_extraction_x = 0;	//here only
-		reg [15:0] blob_extraction_y = 0;	//here only
-		
-		reg [15:0] blob_extraction_x_temp = 0;	//here only
-		reg [15:0] blob_extraction_y_temp = 0;	//here only
-		
-		reg [15:0] blob_extraction_x_temp_1 = 0; //here only
-		reg [15:0] blob_extraction_y_temp_1 = 0; //here only
-		
-		reg spanLeft = 0;	//here only
-		reg spanRight = 0;	//here only
-		
-		reg [31:0] blob_extraction_data_temp = 0; //here only
-		
-		reg blob_extraction_execution_interrupted = 0; //here only
-		
-		// Here is the stack in all of its glory...we are using 9 bit numbers for X coordinate storage here, with a max. stack depth of 16384
-		// We will be using 8 bit numbers for the Y coordinates
-		
-		//reg [31:0] stack = 0;
-		reg [15:0] stack_pointer = 0;
+	reg [3:0] enable_blob_extraction_verified = 0;
+	reg [15:0] blob_extraction_blob_counter = 0;
+	
+	reg [5:0] blob_extraction_counter_tog = 0;
+	reg [5:0] blob_extraction_counter_togg = 0;
+	reg [5:0] blob_extraction_counter_toggle = 0;
+	reg [31:0] blob_extraction_counter_temp = 0;
+	
+	reg blob_extraction_holdoff = 0;
+	reg blob_extraction_main_chunk_already_loaded = 0;	//not used anywhere!
+	reg [8:0] blob_extraction_x_counter = 0;	
+	reg [8:0] blob_extraction_y_counter = 0;	
+	
+	reg [15:0] blob_extraction_x = 0;
+	reg [15:0] blob_extraction_y = 0;
+	
+	reg [15:0] blob_extraction_x_temp = 0;
+	reg [15:0] blob_extraction_y_temp = 0;
+	
+	reg [15:0] blob_extraction_x_temp_1 = 0;
+	reg [15:0] blob_extraction_y_temp_1 = 0;
+	
+	reg spanLeft = 0;
+	reg spanRight = 0;
+	
+	reg [31:0] blob_extraction_data_temp = 0;
+	
+	reg blob_extraction_execution_interrupted = 0;
+	
+	// Here is the stack in all of its glory...we are using 9 bit numbers for X coordinate storage here, with a max. stack depth of 16384
+	// We will be using 8 bit numbers for the Y coordinates
+	
+	//reg [31:0] stack = 0;
+	reg [15:0] stack_pointer = 0;
 
-		reg [4:0] blob_extraction_toggler = 0;		//here only
-		reg [3:0] blob_extraction_inner_toggler = 0;	//here only
+	reg [4:0] blob_extraction_toggler = 0;
+	reg [3:0] blob_extraction_inner_toggler = 0;
 
-		assign debug0 = blob_extraction_x_temp;
-		assign debug1 = blob_extraction_y_temp_1;
-		assign debug2 = blob_extraction_inner_toggler;
-		assign debug3 = blob_extraction_toggler;
-		
-		reg [24:0] blob_extraction_red_average = 0;	//here only
-		reg [24:0] blob_extraction_green_average = 0;	//here only
-		reg [24:0] blob_extraction_blue_average = 0;	//here only
-		reg [24:0] blob_extraction_x_average = 0;	//here only
-		reg [24:0] blob_extraction_y_average = 0;	//here only
-		
-		reg [15:0] blob_extraction_red_average_final = 0;	//here only
-		reg [15:0] blob_extraction_green_average_final = 0;	//here only 
-		reg [15:0] blob_extraction_blue_average_final = 0;	//here only
-		reg [15:0] blob_extraction_x_average_final = 0;		//here only
-		reg [15:0] blob_extraction_y_average_final = 0;		//here only
-		
-		reg [15:0] blob_extraction_lowest_x_value = 0;	//here only
-		reg [15:0] blob_extraction_lowest_y_value = 0;	//here only
-		reg [15:0] blob_extraction_highest_x_value = 0;	//here only
-		reg [15:0] blob_extraction_highest_y_value = 0;	//here only
-		
-		reg [16:0] blob_extraction_blob_size = 0;	//here only
-		
-		reg [15:0] blob_extraction_current_difference = 0;	//here only
-		reg [15:0] blob_extraction_minimum_difference = 0;	//here only
-		reg [7:0] blob_extraction_blob_color_number = 0;	//here only
-		
-		reg [2:0] blob_extraction_color_loop = 0;	//here only
-		reg [4:0] blob_extraction_slot_loop = 0;	//here only
-		
-		reg ok_to_do_averaging = 0;
-		
-		//-----Instantiate stack_ram
-		reg [16:0] stack_ram_dina;	
-		reg [13:0] stack_ram_addra;	
-		reg stack_ram_wea;
-		wire [16:0] stack_ram_douta;
-		
-		stack_ram stack_ram(
-			.clka(clk_fast),
-			.dina(stack_ram_dina),
-			.addra(stack_ram_addra),
-			.wea(stack_ram_wea),
-			.douta(stack_ram_douta)
-			);
+	assign debug0 = blob_extraction_x_temp;
+	assign debug1 = blob_extraction_y_temp_1;
+	assign debug2 = blob_extraction_inner_toggler;
+	assign debug3 = blob_extraction_toggler;
+	
+	reg [24:0] blob_extraction_red_average = 0;
+	reg [24:0] blob_extraction_green_average = 0;
+	reg [24:0] blob_extraction_blue_average = 0;
+	reg [24:0] blob_extraction_x_average = 0;
+	reg [24:0] blob_extraction_y_average = 0;
+	
+	reg [15:0] blob_extraction_red_average_final = 0;
+	reg [15:0] blob_extraction_green_average_final = 0;
+	reg [15:0] blob_extraction_blue_average_final = 0;
+	reg [15:0] blob_extraction_x_average_final = 0;
+	reg [15:0] blob_extraction_y_average_final = 0;
+	
+	reg [15:0] blob_extraction_lowest_x_value = 0;
+	reg [15:0] blob_extraction_lowest_y_value = 0;
+	reg [15:0] blob_extraction_highest_x_value = 0;
+	reg [15:0] blob_extraction_highest_y_value = 0;
+	
+	reg [16:0] blob_extraction_blob_size = 0;
+	
+	reg [15:0] blob_extraction_current_difference = 0;
+	reg [15:0] blob_extraction_minimum_difference = 0;
+	reg [7:0] blob_extraction_blob_color_number = 0;
+	
+	reg [2:0] blob_extraction_color_loop = 0;
+	reg [4:0] blob_extraction_slot_loop = 0;
 
-		//-----Instantiate block ram for primary_color_slots
-		reg [4:0] primary_color_slots_addrb;
-		wire [23:0] primary_color_slots_doutb;
-		
-		primary_color_slots primary_color_slots (
-		  .clka(primary_color_slots_clka), // input clka
-		  .wea(wren_primary_color_slots), // input [0 : 0] wea
-		  .addra(address_primary_color_slots), // input [4 : 0] addra
-		  .dina(data_write_primary_color_slots), // input [23 : 0] dina
-		  .douta(), // output [23 : 0] douta (--NOT USED--)
-		  .clkb(clk_fast), // input clkb
-		  .web(0), // input [0 : 0] web
-		  .addrb(primary_color_slots_addrb), // input [4 : 0] addrb
-		  .dinb(), // input [23 : 0] dinb (--NOT USED--)
-		  .doutb(primary_color_slots_doutb) // output [23 : 0] doutb
+	reg [2:0] blob_extractor_termination_record_loop = 0;
+	
+	reg ok_to_do_averaging = 0;
+	
+	//-----Instantiate stack_ram
+	reg [16:0] stack_ram_dina;	
+	reg [13:0] stack_ram_addra;	
+	reg stack_ram_wea;
+	wire [16:0] stack_ram_douta;
+	
+	stack_ram stack_ram(
+		.clka(clk_fast),
+		.dina(stack_ram_dina),
+		.addra(stack_ram_addra),
+		.wea(stack_ram_wea),
+		.douta(stack_ram_douta)
 		);
 
-		// Instantiate division modules
-		reg [17:0] divider_dividend_red;
-		reg [17:0] divider_divisor_red;
-		wire [17:0] divider_quotient_red;
-		wire [17:0] divider_remainder_red;
-		wire divider_zeroflag_red;
-		
-		reg [17:0] divider_dividend_green;
-		reg [17:0] divider_divisor_green;
-		wire [17:0] divider_quotient_green;
-		wire [17:0] divider_remainder_green;
-		wire divider_zeroflag_green;
+	//-----Instantiate block ram for primary_color_slots
+	reg [4:0] primary_color_slots_addrb;
+	wire [23:0] primary_color_slots_doutb;
+	
+	primary_color_slots primary_color_slots (
+		.clka(primary_color_slots_clka), // input clka
+		.wea(wren_primary_color_slots), // input [0 : 0] wea
+		.addra(address_primary_color_slots), // input [4 : 0] addra
+		.dina(data_write_primary_color_slots), // input [23 : 0] dina
+		.douta(), // output [23 : 0] douta (--NOT USED--)
+		.clkb(clk_fast), // input clkb
+		.web(0), // input [0 : 0] web
+		.addrb(primary_color_slots_addrb), // input [4 : 0] addrb
+		.dinb(), // input [23 : 0] dinb (--NOT USED--)
+		.doutb(primary_color_slots_doutb) // output [23 : 0] doutb
+	);
 
-		reg [17:0] divider_dividend_blue;
-		reg [17:0] divider_divisor_blue;
-		wire [17:0] divider_quotient_blue;
-		wire [17:0] divider_remainder_blue;
-		wire divider_zeroflag_blue;
+	// Instantiate division modules
+	reg [17:0] divider_dividend_red;
+	reg [17:0] divider_divisor_red;
+	wire [17:0] divider_quotient_red;
+	wire [17:0] divider_remainder_red;
+	wire divider_zeroflag_red;
+	
+	reg [17:0] divider_dividend_green;
+	reg [17:0] divider_divisor_green;
+	wire [17:0] divider_quotient_green;
+	wire [17:0] divider_remainder_green;
+	wire divider_zeroflag_green;
 
-		reg [17:0] divider_dividend_x;
-		reg [17:0] divider_divisor_x;
-		wire [17:0] divider_quotient_x;
-		wire [17:0] divider_remainder_x;
-		wire divider_zeroflag_x;
+	reg [17:0] divider_dividend_blue;
+	reg [17:0] divider_divisor_blue;
+	wire [17:0] divider_quotient_blue;
+	wire [17:0] divider_remainder_blue;
+	wire divider_zeroflag_blue;
 
-		reg [17:0] divider_dividend_y;
-		reg [17:0] divider_divisor_y;
-		wire [17:0] divider_quotient_y;
-		wire [17:0] divider_remainder_y;
-		wire divider_zeroflag_y;
+	reg [17:0] divider_dividend_x;
+	reg [17:0] divider_divisor_x;
+	wire [17:0] divider_quotient_x;
+	wire [17:0] divider_remainder_x;
+	wire divider_zeroflag_x;
 
-		serial_divide_uu serial_divide_uu_red (.dividend(divider_dividend_red), .divisor(divider_divisor_red), .quotient(divider_quotient_red), .remainder(divider_remainder_red), .zeroflag(divider_zeroflag_red));
-		serial_divide_uu serial_divide_uu_green (.dividend(divider_dividend_green), .divisor(divider_divisor_green), .quotient(divider_quotient_green), .remainder(divider_remainder_green), .zeroflag(divider_zeroflag_green));
-		serial_divide_uu serial_divide_uu_blue (.dividend(divider_dividend_blue), .divisor(divider_divisor_blue), .quotient(divider_quotient_blue), .remainder(divider_remainder_blue), .zeroflag(divider_zeroflag_blue));
-		serial_divide_uu serial_divide_uu_x (.dividend(divider_dividend_x), .divisor(divider_divisor_x), .quotient(divider_quotient_x), .remainder(divider_remainder_x), .zeroflag(divider_zeroflag_x));
-		serial_divide_uu serial_divide_uu_y (.dividend(divider_dividend_y), .divisor(divider_divisor_y), .quotient(divider_quotient_y), .remainder(divider_remainder_y), .zeroflag(divider_zeroflag_y));
-		
-		// Now it's time to find and extract the blobs
-		//always @(posedge clk_div_by_four) begin
-		//always @(posedge crystal_clk_div_by_two) begin
-		//always @(posedge clk_div_by_two) begin
-		//always @(posedge modified_clock) begin
-		//always @(posedge clk) begin
-		//always @(posedge clk_fast) begin
-		always @(posedge clk) begin
+	reg [17:0] divider_dividend_y;
+	reg [17:0] divider_divisor_y;
+	wire [17:0] divider_quotient_y;
+	wire [17:0] divider_remainder_y;
+	wire divider_zeroflag_y;
+
+	serial_divide_uu serial_divide_uu_red (.dividend(divider_dividend_red), .divisor(divider_divisor_red), .quotient(divider_quotient_red), .remainder(divider_remainder_red), .zeroflag(divider_zeroflag_red));
+	serial_divide_uu serial_divide_uu_green (.dividend(divider_dividend_green), .divisor(divider_divisor_green), .quotient(divider_quotient_green), .remainder(divider_remainder_green), .zeroflag(divider_zeroflag_green));
+	serial_divide_uu serial_divide_uu_blue (.dividend(divider_dividend_blue), .divisor(divider_divisor_blue), .quotient(divider_quotient_blue), .remainder(divider_remainder_blue), .zeroflag(divider_zeroflag_blue));
+	serial_divide_uu serial_divide_uu_x (.dividend(divider_dividend_x), .divisor(divider_divisor_x), .quotient(divider_quotient_x), .remainder(divider_remainder_x), .zeroflag(divider_zeroflag_x));
+	serial_divide_uu serial_divide_uu_y (.dividend(divider_dividend_y), .divisor(divider_divisor_y), .quotient(divider_quotient_y), .remainder(divider_remainder_y), .zeroflag(divider_zeroflag_y));
+	
+	// Now it's time to find and extract the blobs
+	//always @(posedge clk_div_by_four) begin
+	//always @(posedge crystal_clk_div_by_two) begin
+	//always @(posedge clk_div_by_two) begin
+	//always @(posedge modified_clock) begin
+	//always @(posedge clk) begin
+	//always @(posedge clk_fast) begin
+	always @(posedge clk) begin
 		if (pause == 0) begin
 			//leds[5:0] = blob_extraction_toggler + 1;
 			
@@ -277,14 +293,38 @@ module blob_extraction(
 								blob_extraction_y = blob_extraction_y + 1;
 							end
 						end else begin
-							// Done!
-							blob_extraction_y = 0;
-							blob_extraction_counter_tog = 0;
-							blob_extraction_counter_togg = 0;
-							blob_extraction_counter_toggle = 0;
-							blob_extraction_done = 1;
-							blob_extraction_holdoff = 0;
-							wren = 0;
+							// Write end-of-data words
+							case (blob_extractor_termination_record_loop)
+								0: begin
+									address = address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+0));
+									data_write = 32'hffffffff;
+									wren = 1;
+									blob_extractor_termination_record_loop = 1;
+								end
+								1: begin
+									address = address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+1));
+									data_write = 32'hffffffff;
+									wren = 1;
+									blob_extractor_termination_record_loop = 2;
+								end
+								2: begin
+									address = address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+2));
+									data_write = 32'hffffffff;
+									wren = 1;
+									blob_extractor_termination_record_loop = 3;
+								end
+								3: begin
+									// Done!
+									blob_extraction_y = 0;
+									blob_extraction_counter_tog = 0;
+									blob_extraction_counter_togg = 0;
+									blob_extraction_counter_toggle = 0;
+									blob_extraction_done = 1;
+									blob_extraction_holdoff = 0;
+									blob_extractor_termination_record_loop = 0;
+									wren = 0;
+								end
+							endcase
 						end
 					end else begin		// Interrupted
 						if (blob_extraction_toggler == 0) begin
@@ -331,7 +371,7 @@ module blob_extraction(
 							// Set up a read operation for the pixel at (blob_extraction_x_temp, blob_extraction_y_temp)
 							address = ((blob_extraction_y_temp_1 * ImageWidth) + blob_extraction_x_temp);
 						end
-
+	
 						if (blob_extraction_toggler == 4) begin
 							blob_extraction_toggler = 5;
 						end
@@ -365,7 +405,7 @@ module blob_extraction(
 								wren = 0;
 								address = (((blob_extraction_y_temp_1 * ImageWidth) + blob_extraction_x_temp) + ImageOffset);
 							end
-
+	
 							if (blob_extraction_inner_toggler == 3) begin
 								// And compute the running average, lowest pixel, centroid, etc.
 								if (ok_to_do_averaging == 1) begin
@@ -475,7 +515,7 @@ module blob_extraction(
 								
 								// Read the green averaging result
 								blob_extraction_green_average_final = divider_quotient_green;
-
+	
 								// Set up the blue averaging
 								if (blob_extraction_blue_average < 65535) begin
 									divider_dividend_blue = blob_extraction_blue_average;
@@ -547,7 +587,7 @@ module blob_extraction(
 								
 								// Read the X averaging result
 								blob_extraction_x_average_final = divider_quotient_x;
-
+	
 								// Set up the Y averaging
 								if (blob_extraction_y_average < 65535) begin
 									divider_dividend_y = blob_extraction_y_average;
@@ -654,9 +694,7 @@ module blob_extraction(
 							blob_extraction_minimum_difference = color_similarity_threshold;
 							blob_extraction_blob_color_number = 0;		// Default to 'not found'
 						end
-														
-						//array_spec = (PRIMARY_COLOR_SLOTS_WORD_SIZE*(ARRAY_SPEC_1_MAX*blob_extraction_slot_loop + blob_extraction_color_loop + blob_extraction_slot_loop)) - 1;
-														
+	
 						if (blob_extraction_toggler == 7) begin
 							// Before we can fill the last data slot, we need to find which color slot this is!
 							// We will be calculating the sum of the errors for each color, winner takes all and is then compared against the threshold
@@ -825,10 +863,9 @@ module blob_extraction(
 				address = 18'b0;
 				data_write = 32'b0;
 				wren = 1'b0;
-
+	
 				debug3_display = 0;
 			end
 		end	//end if pause = 0
-		end
-		
-endmodule 
+	end
+endmodule
