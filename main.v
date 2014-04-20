@@ -210,6 +210,9 @@ module main(
 	reg enable_blob_extraction = 0;
 	wire blob_extraction_done;
 	
+	reg enable_blob_sorting = 0;
+	wire blob_sorting_done;
+	
 	reg enable_tracking_output = 0;
 	wire tracking_output_done;
 	
@@ -433,19 +436,46 @@ module main(
 		.edge_detection_done(edge_detection_done)
 		);
 	
+	parameter BlobStorageOffset = 200000;
+	
+	//------------------BLOB SORTING module
+	wire [15:0] blob_extraction_blob_counter;
+	reg [7:0] minimum_blob_size = 0;
+	reg [2:0] centroids_read_addr = 0;
+	wire [31:0] centroids_data_read;	// xys centroids array
+	
+	reg [4:0] blob_sizes_read_addr_b = 0;
+	wire [15:0] blob_sizes_data_read_b;
+	
+	reg find_highest = 0;
+	reg find_biggest = 1;
+	
+	blob_sorting blob_sorting(
+		//input wires (as seen by module)
+		.clk(clk),
+		.pause(global_pause),
+ 		.blob_extraction_blob_counter(blob_extraction_blob_counter),
+		.enable_blob_sorting(enable_blob_sorting),
+// 		.find_biggest(find_biggest),
+// 		.find_highest(find_highest),
+		.minimum_blob_size(minimum_blob_size),	
+		.slide_switches(slide_switches),
+		.data_read(data_read),
+		// centroid array connections
+		.centroids_read_addr(centroids_read_addr), //main-->module
+		.centroids_data_read(centroids_data_read), //module-->main
+		// blob sizes
+		.blob_data_read_addr_b(blob_sizes_read_addr_b),
+		.blob_data_data_read_b(blob_sizes_data_read_b),
+		.blob_sorting_done(blob_sorting_done)
+		);
 	
 	//------------------TRACKING OUTPUT module
 	wire wren_tracking_output;
 	wire [17:0] address_tracking_output;
 	wire [31:0] data_write_tracking_output;
-	
-	reg find_highest = 0;
-	reg find_biggest = 1;
-	
-	wire [15:0] blob_extraction_blob_counter;
 
 	reg [7:0] color_similarity_threshold = 0;
-	reg [7:0] minimum_blob_size = 0;
 
 	reg [5:0] test_value_state = 0;
 	reg [15:0] tracking_output_blob_sizes_word0 = 0;
@@ -455,34 +485,29 @@ module main(
 	reg [15:0] tracking_output_blob_sizes_word4 = 0;
 	reg [15:0] tracking_output_blob_sizes_word5 = 0;
 	
-	reg [2:0] centroids_read_addr = 0;
-	wire [31:0] centroids_data_read;	// xys centroids array
 	
-	reg [4:0] blob_sizes_read_addr_b = 0;
-	wire [15:0] blob_sizes_data_read_b;
-	
-	tracking_output tracking_output(
+	tracking_output_assembly tracking_output(
 		//input wires (as seen by module)
 		.clk(clk),
 		.pause(global_pause),
-		.blob_extraction_blob_counter(blob_extraction_blob_counter),
+// 		.blob_extraction_blob_counter(blob_extraction_blob_counter),
 		.enable_tracking_output(enable_tracking_output),
-		.find_biggest(find_biggest),
-		.find_highest(find_highest),
-		.minimum_blob_size(minimum_blob_size),	
-		.slide_switches(slide_switches),
-		.data_read(data_read),
+// 		.find_biggest(find_biggest),
+// 		.find_highest(find_highest),
+// 		.minimum_blob_size(minimum_blob_size),	
+// 		.slide_switches(slide_switches),
+// 		.data_read(data_read),
 		// centroid array connections
-		.centroids_read_addr(centroids_read_addr), //main-->module
-		.centroids_data_read(centroids_data_read), //module-->main
+// 		.centroids_read_addr(centroids_read_addr), //main-->module
+// 		.centroids_data_read(centroids_data_read), //module-->main
 		//output regs
 		.wren(wren_tracking_output),
 		.data_write(data_write_tracking_output),
-		.address(address_tracking_output),
+		.address(address_tracking_output)
 		// tracking output blob sizes
-		.blob_sizes_read_addr_b(blob_sizes_read_addr_b),
-		.blob_sizes_data_read_b(blob_sizes_data_read_b),
-		.tracking_output_done(tracking_output_done)
+// 		.blob_sizes_read_addr_b(blob_sizes_read_addr_b),
+// 		.blob_sizes_data_read_b(blob_sizes_data_read_b),
+// 		.tracking_output_done(tracking_output_done)
 		);
 	
 	//first centroids array (used in main state machine)
@@ -584,6 +609,7 @@ module main(
 		.wren_primary_color_slots(wren_primary_color_slots),
 		.address_primary_color_slots(address_primary_color_slots),
 		.data_write_primary_color_slots(data_write_primary_color_slots),
+		.blob_count(blob_extraction_blob_counter),
 		.debug_display(blob_debug),
 		.debug2_display(blob_debug2),
 		.debug3_display(blob_debug3)
@@ -913,13 +939,14 @@ module main(
 	STATE_Y_PIXEL_FILLING = 7,
 	STATE_BORDER_DRAWING = 8,
 	STATE_BLOB_EXTRACTION = 9,
-	STATE_TRACKING_OUTPUT = 10,
-	STATE_ASSEMBLE_DATA = 11,
-	STATE_TRACKING_OUTPUT_TWO = 12,
-	STATE_DATA_OUTPUT_CTL = 13,
-	STATE_FRAME_DUMP = 14,
-	STATE_SINGLE_SHOT = 15,
-	STATE_ONLINE_RECOGNITION = 16;
+	STATE_BLOB_SORTING = 10,
+	STATE_TRACKING_OUTPUT = 11,
+	STATE_ASSEMBLE_DATA = 12,
+	STATE_TRACKING_OUTPUT_TWO = 13,
+	STATE_DATA_OUTPUT_CTL = 14,
+	STATE_FRAME_DUMP = 15,
+	STATE_SINGLE_SHOT = 16,
+	STATE_ONLINE_RECOGNITION = 17;
 
 	always @(posedge clk) begin
 // 		if (global_pause == 0) begin
@@ -1039,8 +1066,16 @@ module main(
 					enable_blob_extraction = 1;
 					if (blob_extraction_done == 1) begin
 						enable_blob_extraction = 0;
-						current_main_processing_state = STATE_TRACKING_OUTPUT;
+						current_main_processing_state = STATE_BLOB_SORTING;
 // 						current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY****
+					end
+				end
+				
+				else if (current_main_processing_state == STATE_BLOB_SORTING) begin
+					enable_blob_sorting = 1;
+					if (blob_sorting_done == 1) begin
+						enable_blob_sorting = 0;
+						current_main_processing_state = STATE_TRACKING_OUTPUT;
 					end
 				end
 				
@@ -1734,7 +1769,7 @@ module main(
 		end else begin
 			serial_receiver_timer = serial_receiver_timer + 1;
 		end
-				
+		
 		if (RxD_data_ready == 1) begin
 			if (serial_character_received == 0) begin
 				// Parse the command and see what it is
