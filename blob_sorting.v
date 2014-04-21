@@ -25,19 +25,17 @@ module blob_sorting(
 	input wire enable_blob_sorting,	
 	input wire [7:0] minimum_blob_size,
 	input wire [7:0] slide_switches,
-	input wire [31:0] data_read,
 	input wire [15:0] blob_extraction_blob_counter,
 	
-	//output regs
-	output reg wren,
+	input reg [4:0] pointer_memory_addr_b,
+	output wire [18:0] pointer_memory_data_read_b,
+		
+	// main memory interface
+	input wire [31:0] data_read,
 	output reg [31:0] data_write,
 	output reg [17:0] address,
-	// centroids
-	input wire [2:0] centroids_read_addr,
- 	output wire [31:0] centroids_data_read,
- 	//blob sizes
-// 	input wire [4:0] blob_data_read_addr_b,
-//  	output wire [15:0] blob_data_data_read_b,
+	output reg wren,
+	
 	output reg blob_sorting_done
 	);
 	
@@ -75,17 +73,22 @@ module blob_sorting(
 	
 	
 	//-----Instantiate block ram for address pointers to blobs of interest
-	reg [4:0] pointer_memory_addr;
+	reg [4:0] pointer_memory_addr_a;
 	reg [18:0]pointer_memory_data_write;
- 	wire [18:0] pointer_memory_data_read;
+ 	wire [18:0] pointer_memory_data_read_a;
 	reg wren_pointer_memory;
 	
 	pointer_memory pointer_memory (
 		.clka(clk_fast), // input clk
 		.wea(wren_pointer_memory), // input [0 : 0] wea
-		.addra(pointer_memory_addr), // input [4 : 0] addra
+		.addra(pointer_memory_addr_a), // input [4 : 0] addra
 		.dina(pointer_memory_data_write), // input [18 : 0] dina
-		.douta(pointer_memory_data_read) // output [18 : 0] douta
+		.douta(pointer_memory_data_read_a) // output [18 : 0] douta
+		.clkb(clk_fast), // input clkbf
+		.web(1'b0), // input [0 : 0] web
+		.addrb(pointer_memory_addr_b), // input [4 : 0] addrb
+		.dinb(), // input [18 : 0] dinb (--NOT USED--)
+		.doutb(pointer_memory_data_read_b) // output [18 : 0] doutb
 		);
 	
 	reg [18:0] new_blob_ptr;
@@ -95,9 +98,10 @@ module blob_sorting(
 	reg [15:0] new_blob_size;
 	reg [3:0] comparison_type;
 	
+	reg [4:0] number_of_valid_blobs = 0;
+	
 	//state machine counters
 	reg [5:0] main_state = 0;
-	reg [2:0] centroids_initialization = 0;
 	reg [2:0] blob_data_initialization = 0;
 	reg [2:0] pointer_memory_initialization = 0;
 	reg [2:0] get_new_blob_data = 0;
@@ -161,6 +165,7 @@ module blob_sorting(
 					//initialize to zero
 					INITIALIZATION: begin
 						blob_sorting_done = 0;
+						number_of_valid_blobs = 0;
 						
 						//write zeros to the 0-17 slots in the blob sizes array
 						case (blob_data_initialization) 
@@ -185,27 +190,26 @@ module blob_sorting(
 								blob_data_initialization = 1; //bounce between states 1 and 2 (0 state is initial only)
 							end
 						endcase
-						// initialize pointer memory to zero
+						// initialize pointer memory to all ones (7fff)
 						case (pointer_memory_initialization) 
 							0: begin
 								wren_pointer_memory = 1'b0;
-								pointer_memory_addr = 0;
-								pointer_memory_data_write = 0;
+								pointer_memory_addr_a = 0;
+								pointer_memory_data_write = 19'h7fff;
 								pointer_memory_initialization = 1;
 							end
 							1: begin
-								pointer_memory_data_write = 0;
+								pointer_memory_data_write = 19'h7fff;
 								wren_pointer_memory = 1'b1;
-								pointer_memory_addr = pointer_memory_addr + 1;
+								pointer_memory_addr_a = pointer_memory_addr_a + 1;
 								pointer_memory_initialization = 2;
 							end
 							2: begin
 								wren_pointer_memory = 1'b0;
 								//reset addresses after words 0-19 written
-								if (pointer_memory_addr > 19) begin
-									pointer_memory_addr = 0;
+								if (pointer_memory_addr_a > 19) begin
+									pointer_memory_addr_a = 0;
 									blob_data_addr_a = 0;
-									centroids_write_addr = 0;
 									main_state = GET_NEW_BLOB_DATA;
 								end
 								pointer_memory_initialization = 1; //bounce between states 1 and 2 (0 state is initial only)
@@ -229,11 +233,13 @@ module blob_sorting(
 									// only relevant information from first word is matching color slot data. 
 									matching_color_slot = data_read[7:0];
 									if (matching_color_slot == 0) begin
-										// blob is "not interesting"
+										// blob is NOT of interest and will not be stored. Get new.
 										main_state = GET_NEW_BLOB_DATA;
 										tracking_output_pointer = tracking_output_pointer + 3;
 									end else begin
+										// blob is of interest
 										get_new_blob_data = 2;
+										number_of_valid_blobs = number_of_valid_blobs + 1;
 										tracking_output_pointer = tracking_output_pointer + 1;
 									end
 									address = tracking_output_pointer + BlobStorageOffset;
@@ -424,7 +430,7 @@ module blob_sorting(
 								wren_blob_data = 0;
 								wren_pointer_memory = 0;
 								blob_data_addr_a = RANK_TWO_BLOB_ADDR + matching_color_slot - 1;
-								pointer_memory_addr = RANK_TWO_BLOB_ADDR + matching_color_slot - 1;
+								pointer_memory_addr_a = RANK_TWO_BLOB_ADDR + matching_color_slot - 1;
 								replace_rank_one = 1;
 							end
 							1: begin
@@ -434,14 +440,14 @@ module blob_sorting(
 								end else begin
 									blob_data_temp = blob_data_data_read_a; // data to compare is blob size
 								end
-								pointer_temp = pointer_memory_data_read;
+								pointer_temp = pointer_memory_data_read_a;
 								replace_rank_one = 2;
 							end
 							// write old rank 2 data to rank 3 position
 							2: begin
 								// set addr lines
 								blob_data_addr_a = RANK_THREE_BLOB_ADDR + matching_color_slot - 1; 
-								pointer_memory_addr = RANK_THREE_BLOB_ADDR + matching_color_slot - 1;
+								pointer_memory_addr_a = RANK_THREE_BLOB_ADDR + matching_color_slot - 1;
 								// set data lines
 								if (comparison_type < BLOB_BIGGEST) begin
 									blob_data_data_write[7:0] = blob_data_temp[7:0];
@@ -463,7 +469,7 @@ module blob_sorting(
 								wren_blob_data = 0;
 								wren_pointer_memory = 0;
 								blob_data_addr_a = RANK_ONE_BLOB_ADDR + matching_color_slot - 1;
-								pointer_memory_addr = RANK_ONE_BLOB_ADDR + matching_color_slot - 1;
+								pointer_memory_addr_a = RANK_ONE_BLOB_ADDR + matching_color_slot - 1;
 								replace_rank_one = 5;
 							end
 							5: begin
@@ -473,14 +479,14 @@ module blob_sorting(
 								end else begin
 									blob_data_temp = blob_data_data_read_a; // data to compare is blob size
 								end
-								pointer_temp = pointer_memory_data_read;
+								pointer_temp = pointer_memory_data_read_a;
 								replace_rank_one = 6;
 							end
 							// write to old rank 1 data to rank 2 position
 							6: begin
 								// set addr lines
 								blob_data_addr_a = RANK_TWO_BLOB_ADDR + matching_color_slot - 1;
-								pointer_memory_addr = RANK_TWO_BLOB_ADDR + matching_color_slot - 1;
+								pointer_memory_addr_a = RANK_TWO_BLOB_ADDR + matching_color_slot - 1;
 								// set data lines
 								if (comparison_type < BLOB_BIGGEST) begin
 									blob_data_data_write[7:0] = blob_data_temp[7:0];
@@ -503,7 +509,7 @@ module blob_sorting(
 								wren_pointer_memory = 0;
 								// set addr lines 
 								blob_data_addr_a = RANK_ONE_BLOB_ADDR + matching_color_slot - 1;
-								pointer_memory_addr = RANK_ONE_BLOB_ADDR + matching_color_slot - 1;
+								pointer_memory_addr_a = RANK_ONE_BLOB_ADDR + matching_color_slot - 1;
 								// set data lines
 								if (comparison_type < BLOB_BIGGEST) begin
 									//that is, if the comparison type is X or Y centroid
@@ -536,7 +542,7 @@ module blob_sorting(
 								wren_blob_data = 0;
 								wren_pointer_memory = 0;
 								blob_data_addr_a = RANK_TWO_BLOB_ADDR + matching_color_slot - 1;
-								pointer_memory_addr = RANK_TWO_BLOB_ADDR + matching_color_slot - 1;
+								pointer_memory_addr_a = RANK_TWO_BLOB_ADDR + matching_color_slot - 1;
 								replace_rank_two = 1;
 							end
 							1: begin
@@ -546,13 +552,13 @@ module blob_sorting(
 								end else begin
 									blob_data_temp = blob_data_data_read_a; // data to compare is blob size
 								end
-								pointer_temp = pointer_memory_data_read;
+								pointer_temp = pointer_memory_data_read_a;
 								replace_rank_two = 2;
 							end
 							2: begin
 								//set addr
 								blob_data_addr_a = RANK_THREE_BLOB_ADDR + matching_color_slot - 1;
-								pointer_memory_addr = RANK_THREE_BLOB_ADDR + matching_color_slot - 1;
+								pointer_memory_addr_a = RANK_THREE_BLOB_ADDR + matching_color_slot - 1;
 								// set data lines
 								if (comparison_type < BLOB_BIGGEST) begin
 									blob_data_data_write[7:0] = blob_data_temp[7:0];
@@ -575,7 +581,7 @@ module blob_sorting(
 								wren_pointer_memory = 0;
 								//set addr lines
 								blob_data_addr_a = RANK_TWO_BLOB_ADDR + matching_color_slot - 1;
-								pointer_memory_addr = RANK_TWO_BLOB_ADDR + matching_color_slot - 1;
+								pointer_memory_addr_a = RANK_TWO_BLOB_ADDR + matching_color_slot - 1;
 								// set data lines
 								if (comparison_type < BLOB_BIGGEST) begin
 									//that is, if the comparison type is X or Y centroid
@@ -609,7 +615,7 @@ module blob_sorting(
 								wren_pointer_memory = 0;
 								// set addr lines
 								blob_data_addr_a = RANK_THREE_BLOB_ADDR + matching_color_slot - 1;
-								pointer_memory_addr = RANK_THREE_BLOB_ADDR + matching_color_slot - 1;
+								pointer_memory_addr_a = RANK_THREE_BLOB_ADDR + matching_color_slot - 1;
 								// set data lines
 								if (comparison_type < BLOB_BIGGEST) begin
 									//that is, if the comparison type is X or Y centroid

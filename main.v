@@ -439,13 +439,15 @@ module main(
 	parameter BlobStorageOffset = 200000;
 	
 	//------------------BLOB SORTING module
+	wire wren_blob_sorting;
+	wire [17:0] address_blob_sorting;
+	wire [31:0] data_write_blob_sorting;
+	
 	wire [15:0] blob_extraction_blob_counter;
 	reg [7:0] minimum_blob_size = 0;
-	reg [2:0] centroids_read_addr = 0;
-	wire [31:0] centroids_data_read;	// xys centroids array
 	
-	reg [4:0] blob_sizes_read_addr_b = 0;
-	wire [15:0] blob_sizes_data_read_b;
+	reg [4:0] blob_pointer = 0;
+	wire [18:0] pointer_memory_data_read_b;
 	
 	reg find_highest = 0;
 	reg find_biggest = 1;
@@ -453,20 +455,19 @@ module main(
 	blob_sorting blob_sorting(
 		//input wires (as seen by module)
 		.clk(clk),
+		.clk_fast(modified_clock_fast)
 		.pause(global_pause),
  		.blob_extraction_blob_counter(blob_extraction_blob_counter),
 		.enable_blob_sorting(enable_blob_sorting),
-// 		.find_biggest(find_biggest),
-// 		.find_highest(find_highest),
 		.minimum_blob_size(minimum_blob_size),	
 		.slide_switches(slide_switches),
-		.data_read(data_read),
-		// centroid array connections
-		.centroids_read_addr(centroids_read_addr), //main-->module
-		.centroids_data_read(centroids_data_read), //module-->main
-		// blob sizes
-		.blob_data_read_addr_b(blob_sizes_read_addr_b),
-		.blob_data_data_read_b(blob_sizes_data_read_b),
+		.wren(wren_blob_sorting),
+		.data_write(data_write_blob_sorting),
+		.address(address_blob_sorting),
+		.number_of_valid_blobs(number_of_valid_blobs),
+		// pointer memory
+		.pointer_memory_read_addr_b(blob_pointer_addr),
+		.pointer_memory_data_read_b(blob_pointer)
 		.blob_sorting_done(blob_sorting_done)
 		);
 	
@@ -487,27 +488,14 @@ module main(
 	
 	
 	tracking_output_assembly tracking_output(
-		//input wires (as seen by module)
 		.clk(clk),
 		.pause(global_pause),
-// 		.blob_extraction_blob_counter(blob_extraction_blob_counter),
 		.enable_tracking_output(enable_tracking_output),
-// 		.find_biggest(find_biggest),
-// 		.find_highest(find_highest),
-// 		.minimum_blob_size(minimum_blob_size),	
-// 		.slide_switches(slide_switches),
-// 		.data_read(data_read),
-		// centroid array connections
-// 		.centroids_read_addr(centroids_read_addr), //main-->module
-// 		.centroids_data_read(centroids_data_read), //module-->main
-		//output regs
 		.wren(wren_tracking_output),
+		.data_read(data_read),
 		.data_write(data_write_tracking_output),
 		.address(address_tracking_output)
-		// tracking output blob sizes
-// 		.blob_sizes_read_addr_b(blob_sizes_read_addr_b),
-// 		.blob_sizes_data_read_b(blob_sizes_data_read_b),
-// 		.tracking_output_done(tracking_output_done)
+		.tracking_output_done(tracking_output_done)
 		);
 	
 	//first centroids array (used in main state machine)
@@ -906,14 +894,14 @@ module main(
 
 	reg [17:0] frame_dump_origin_address = 76801;
 
-	assign address = address_edge_detection | address_tracking_output | address_x_pixel_filling 
+	assign address = address_edge_detection | address_blob_sorting | address_tracking_output | address_x_pixel_filling 
 							| address_y_pixel_filling | address_blob_extraction | address_camera_capture | address_memory_blanking 
 							| address_single_shot | address_frame_dump /*| address_median_filtering*/;
 						
-	assign wren = wren_edge_detection | wren_tracking_output | wren_x_pixel_filling | wren_y_pixel_filling 
+	assign wren = wren_edge_detection | wren_blob_sorting | wren_tracking_output | wren_x_pixel_filling | wren_y_pixel_filling 
 							| wren_blob_extraction | wren_camera_capture | wren_memory_blanking /*| wren_median_filtering*/;
 						
-	assign data_write = data_write_edge_detection | data_write_tracking_output | data_write_x_pixel_filling | data_write_y_pixel_filling 
+	assign data_write = data_write_edge_detection | data_write_blob_sorting | data_write_tracking_output | data_write_x_pixel_filling | data_write_y_pixel_filling 
 							| data_write_blob_extraction | data_write_camera_capture | data_write_memory_blanking /*| data_write_median_filtering*/;
 
 // 	always @(posedge modified_clock_sram) begin
