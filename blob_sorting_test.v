@@ -61,7 +61,7 @@ module blob_sorting_test;
 		clk = 0;
 		clk_fast = 0;
 		pause = 0;
-		blob_extraction_blob_counter = 6;
+		blob_extraction_blob_counter = 12;
 		enable_blob_sorting = 0;
 		minimum_blob_size = 0;
 		slide_switches = 0; //0: find biggest blob; 1: find smallest blob; 2: find highest blob; 3: find lowest blob
@@ -72,7 +72,7 @@ module blob_sorting_test;
         
 		// Add stimulus here
 		enable_blob_sorting = 1;
-		#3000;
+		#6000;
 		$finish;
 
 	end
@@ -93,29 +93,53 @@ module blob_sorting_test;
 			200001: data_read = 32'h10101010;
 			200002: data_read = 32'h10103030;
 			// blob 2
-			200003: data_read = 32'h10102000;
-			200004: data_read = 32'h20202020;
+			200003: data_read = 32'h10102001;
+			200004: data_read = 32'h20202120;
 			200005: data_read = 32'h37236955;
 			// blob 3
 			200006: data_read = 32'h15253006;
-			200007: data_read = 32'h30303030;
+			200007: data_read = 32'h30303430;
 			200008: data_read = 32'h37236955;
 			// blob 4
 			200009: data_read = 32'h10204005;
-			200010: data_read = 32'h40404040;
+			200010: data_read = 32'h40404540;
 			200011: data_read = 32'ha07803e8;
 			// blob 5
 			200012: data_read = 32'h10205001;
-			200013: data_read = 32'h60606060;
+			200013: data_read = 32'h60606260;
 			200014: data_read = 32'h37236955;
 			// blob 6
-			200015: data_read = 32'h10206001;
-			200016: data_read = 32'h50501050;
+			200015: data_read = 32'h10206003;
+			200016: data_read = 32'h50501250;
 			200017: data_read = 32'h37236955;
+			// blob 7
+			200018: data_read = 32'h20201001;
+			200019: data_read = 32'h10101310;
+			200020: data_read = 32'h10103030;
+			// blob 8
+			200021: data_read = 32'h10102002;
+			200022: data_read = 32'h20203620;
+			200023: data_read = 32'h37236955;
+			// blob 9
+			200024: data_read = 32'h15253002;
+			200025: data_read = 32'h30303730;
+			200026: data_read = 32'h37236955;
+			// blob 10
+			200027: data_read = 32'h10204002;
+			200028: data_read = 32'h40404940;
+			200029: data_read = 32'ha07803e8;
+			// blob 11
+			200030: data_read = 32'h10205003;
+			200031: data_read = 32'h60606568;
+			200032: data_read = 32'h37236955;
+			// blob 12
+			200033: data_read = 32'h10206003;
+			200034: data_read = 32'h50501555;
+			200035: data_read = 32'h37236955;
 			// termination
-			200018: data_read = 32'hffffffff;
-			200019: data_read = 32'hffffffff;
-			200020: data_read = 32'hffffffff;
+			200036: data_read = 32'hffffffff;
+			200037: data_read = 32'hffffffff;
+			200038: data_read = 32'hffffffff;
 		endcase	
 	end
 	

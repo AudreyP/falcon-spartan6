@@ -27,14 +27,16 @@ module blob_sorting(
 	input wire [7:0] slide_switches,
 	input wire [15:0] blob_extraction_blob_counter,
 	
-	input reg [4:0] pointer_memory_addr_b,
-	output wire [18:0] pointer_memory_data_read_b,
+	input wire [4:0] pointer_memory_read_addr_b,
+	output wire [17:0] pointer_memory_data_read_b,
 		
 	// main memory interface
 	input wire [31:0] data_read,
 	output reg [31:0] data_write,
 	output reg [17:0] address,
 	output reg wren,
+	
+	output reg [4:0] number_of_valid_blobs,
 	
 	output reg blob_sorting_done
 	);
@@ -74,31 +76,31 @@ module blob_sorting(
 	
 	//-----Instantiate block ram for address pointers to blobs of interest
 	reg [4:0] pointer_memory_addr_a;
-	reg [18:0]pointer_memory_data_write;
- 	wire [18:0] pointer_memory_data_read_a;
+	reg [17:0]pointer_memory_data_write;
+ 	wire [17:0] pointer_memory_data_read_a;
 	reg wren_pointer_memory;
 	
 	pointer_memory pointer_memory (
 		.clka(clk_fast), // input clk
 		.wea(wren_pointer_memory), // input [0 : 0] wea
 		.addra(pointer_memory_addr_a), // input [4 : 0] addra
-		.dina(pointer_memory_data_write), // input [18 : 0] dina
-		.douta(pointer_memory_data_read_a) // output [18 : 0] douta
+		.dina(pointer_memory_data_write), // input [17 : 0] dina
+		.douta(pointer_memory_data_read_a), // output [17 : 0] douta
 		.clkb(clk_fast), // input clkbf
 		.web(1'b0), // input [0 : 0] web
 		.addrb(pointer_memory_addr_b), // input [4 : 0] addrb
 		.dinb(), // input [18 : 0] dinb (--NOT USED--)
-		.doutb(pointer_memory_data_read_b) // output [18 : 0] doutb
+		.doutb(pointer_memory_data_read_b) // output [17 : 0] doutb
 		);
 	
-	reg [18:0] new_blob_ptr;
+	reg [17:0] new_blob_ptr;
 	reg [7:0] matching_color_slot;
 	reg [7:0] new_x_centroid_coord;
 	reg [7:0] new_y_centroid_coord;
 	reg [15:0] new_blob_size;
 	reg [3:0] comparison_type;
 	
-	reg [4:0] number_of_valid_blobs = 0;
+	initial number_of_valid_blobs = 0;
 	
 	//state machine counters
 	reg [5:0] main_state = 0;
@@ -112,7 +114,7 @@ module blob_sorting(
 	reg [4:0] replace_rank_two = 0;
 	reg [2:0] replace_rank_three = 0;
 	// address offset counter
-	reg [18:0] tracking_output_pointer = 0;
+	reg [17:0] tracking_output_pointer = 0;
 	
 	// temorary data storage registers
 	reg [7:0] rank_one_x_centroid_coord = 0;
@@ -128,7 +130,7 @@ module blob_sorting(
 	reg [15:0] rank_three_blob_size = 0;
 	
 	reg [15:0] blob_data_temp = 0;
-	reg [18:0] pointer_temp = 0;	
+	reg [17:0] pointer_temp = 0;	
 	
 	localparam BlobStorageOffset = 200000; //same def'n as in blob_extraction module
 
@@ -144,7 +146,8 @@ module blob_sorting(
 		REPLACE_RANK_TWO = 8,
 		GET_RANK_THREE_BLOB = 9,
 		COMPARE_NEW_TO_RANK_THREE = 10,
-		REPLACE_RANK_THREE = 11;
+		REPLACE_RANK_THREE = 11,
+		DONE = 12;
 	
 	localparam 
 		Y_CENTROID_LOWEST = 0,
@@ -195,19 +198,19 @@ module blob_sorting(
 							0: begin
 								wren_pointer_memory = 1'b0;
 								pointer_memory_addr_a = 0;
-								pointer_memory_data_write = 19'h7fff;
+								pointer_memory_data_write = 19'h7ffff;
 								pointer_memory_initialization = 1;
 							end
 							1: begin
-								pointer_memory_data_write = 19'h7fff;
+								pointer_memory_data_write = 19'h7ffff;
 								wren_pointer_memory = 1'b1;
 								pointer_memory_addr_a = pointer_memory_addr_a + 1;
 								pointer_memory_initialization = 2;
 							end
 							2: begin
 								wren_pointer_memory = 1'b0;
-								//reset addresses after words 0-19 written
-								if (pointer_memory_addr_a > 19) begin
+								//reset addresses after words 0-17 written
+								if (pointer_memory_addr_a > 17) begin
 									pointer_memory_addr_a = 0;
 									blob_data_addr_a = 0;
 									main_state = GET_NEW_BLOB_DATA;
@@ -258,14 +261,15 @@ module blob_sorting(
 							endcase
 							// read switches determine the type of comparison that will be done.
 							// x or y centroid or blob size? Smallest or largest?
-							case (slide_switches)
-								0: comparison_type = BLOB_BIGGEST; //default
-								1: comparison_type = BLOB_SMALLEST;
-								2: comparison_type = Y_CENTROID_HIGHEST;
-								3: comparison_type = Y_CENTROID_LOWEST;
+							case (slide_switches[3:2])
+								2'b00: comparison_type = BLOB_BIGGEST; //default
+								2'b01: comparison_type = BLOB_SMALLEST;
+								2'b10: comparison_type = Y_CENTROID_HIGHEST;
+								2'b11: comparison_type = Y_CENTROID_LOWEST;
 							endcase		
 						end else begin
 							blob_sorting_done = 1;
+							main_state = DONE;
 						end	
 							
 					end
@@ -639,9 +643,13 @@ module blob_sorting(
 							end
 						endcase
 					end	// end REPLACE_RANK_THREE state
+					DONE: begin
+						main_state = DONE;
+					end
 				endcase // end main case statement
 			end else begin //end if enable = 1
 				blob_sorting_done = 0;
+				main_state = INITIALIZATION;
 				address = 18'b0;
 				data_write = 32'b0;
 				wren = 1'b0;

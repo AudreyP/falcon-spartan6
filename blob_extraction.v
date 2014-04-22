@@ -53,6 +53,7 @@ module blob_extraction(
 	output reg [31:0] data_write,
 	output reg [17:0] address,
 	output reg blob_extraction_done,
+	output reg [15:0] blob_count,
 	
 	output wire [15:0] debug0,
 	output wire [15:0] debug1,
@@ -69,6 +70,7 @@ module blob_extraction(
 	parameter BlobStorageOffset = 200000;
 
 	initial blob_extraction_done = 0;
+	initial blob_count = 0;
 
 	reg [3:0] enable_blob_extraction_verified = 0;
 	reg [15:0] blob_extraction_blob_counter = 0;
@@ -295,25 +297,44 @@ module blob_extraction(
 						end else begin
 							// Write end-of-data words
 							case (blob_extractor_termination_record_loop)
-								0: begin
-									address = address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+0));
-									data_write = 32'hffffffff;
+								0:begin
+									address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+0));
+									data_write = 32'hff000001;
 									wren = 1;
 									blob_extractor_termination_record_loop = 1;
 								end
 								1: begin
-									address = address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+1));
-									data_write = 32'hffffffff;
+									address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+1));
+									data_write = 32'ha07803e8;
 									wren = 1;
 									blob_extractor_termination_record_loop = 2;
 								end
 								2: begin
-									address = address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+2));
-									data_write = 32'hffffffff;
+									address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+2));
+									data_write = 32'h37236955;
 									wren = 1;
 									blob_extractor_termination_record_loop = 3;
+									blob_extraction_blob_counter = blob_extraction_blob_counter + 1;
 								end
 								3: begin
+									address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+0));
+									data_write = 32'hffffffff;
+									wren = 1;
+									blob_extractor_termination_record_loop = 4;
+								end
+								4: begin
+									address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+1));
+									data_write = 32'hffffffff;
+									wren = 1;
+									blob_extractor_termination_record_loop = 5;
+								end
+								5: begin
+									address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+2));
+									data_write = 32'hffffffff;
+									wren = 1;
+									blob_extractor_termination_record_loop = 6;
+								end
+								6: begin
 									// Done!
 									blob_extraction_y = 0;
 									blob_extraction_counter_tog = 0;
@@ -322,6 +343,7 @@ module blob_extraction(
 									blob_extraction_done = 1;
 									blob_extraction_holdoff = 0;
 									blob_extractor_termination_record_loop = 0;
+									blob_count = blob_extraction_blob_counter;
 									wren = 0;
 								end
 							endcase

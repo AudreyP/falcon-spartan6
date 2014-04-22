@@ -1,7 +1,7 @@
 ##############################################################
 #
 # Xilinx Core Generator version 14.1
-# Date: Sun Apr 20 19:24:18 2014
+# Date: Tue Apr 22 01:52:45 2014
 #
 ##############################################################
 #
@@ -60,7 +60,7 @@ CSET error_injection_type=Single_Bit_Error_Injection
 CSET fill_remaining_memory_locations=false
 CSET interface_type=Native
 CSET load_init_file=false
-CSET memory_type=Single_Port_RAM
+CSET memory_type=True_Dual_Port_RAM
 CSET operating_mode_a=WRITE_FIRST
 CSET operating_mode_b=WRITE_FIRST
 CSET output_reset_value_a=0
@@ -73,12 +73,12 @@ CSET port_b_clock=100
 CSET port_b_enable_rate=100
 CSET port_b_write_rate=50
 CSET primitive=8kx2
-CSET read_width_a=19
-CSET read_width_b=19
+CSET read_width_a=18
+CSET read_width_b=18
 CSET register_porta_input_of_softecc=false
-CSET register_porta_output_of_memory_core=false
+CSET register_porta_output_of_memory_core=true
 CSET register_porta_output_of_memory_primitives=false
-CSET register_portb_output_of_memory_core=false
+CSET register_portb_output_of_memory_core=true
 CSET register_portb_output_of_memory_primitives=false
 CSET register_portb_output_of_softecc=false
 CSET remaining_memory_locations=0
@@ -96,11 +96,11 @@ CSET use_regceb_pin=false
 CSET use_rsta_pin=false
 CSET use_rstb_pin=false
 CSET write_depth_a=18
-CSET write_width_a=19
-CSET write_width_b=19
+CSET write_width_a=18
+CSET write_width_b=18
 # END Parameters
 # BEGIN Extra information
 MISC pkg_timestamp=2012-03-28T15:19:06Z
 # END Extra information
 GENERATE
-# CRC:  a5bae1d
+# CRC: 868c3415

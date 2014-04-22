@@ -136,9 +136,6 @@ module main(
 	always @(posedge modified_clock_fast) begin
 		modified_clock_fast_debug = ~modified_clock_fast_debug;
 	end
-
-
-	//reg border_drawing_holdoff = 0;	//Not used anywhere??
 	
 	reg serial_output_holdoff = 0;
 
@@ -446,8 +443,9 @@ module main(
 	wire [15:0] blob_extraction_blob_counter;
 	reg [7:0] minimum_blob_size = 0;
 	
-	reg [4:0] blob_pointer = 0;
-	wire [18:0] pointer_memory_data_read_b;
+	wire [4:0] blob_pointer;
+	wire [17:0] pointer_memory_data_read_b;
+	wire [4:0] number_of_valid_blobs;
 	
 	reg find_highest = 0;
 	reg find_biggest = 1;
@@ -455,7 +453,7 @@ module main(
 	blob_sorting blob_sorting(
 		//input wires (as seen by module)
 		.clk(clk),
-		.clk_fast(modified_clock_fast)
+		.clk_fast(modified_clock_fast),
 		.pause(global_pause),
  		.blob_extraction_blob_counter(blob_extraction_blob_counter),
 		.enable_blob_sorting(enable_blob_sorting),
@@ -467,11 +465,11 @@ module main(
 		.number_of_valid_blobs(number_of_valid_blobs),
 		// pointer memory
 		.pointer_memory_read_addr_b(blob_pointer_addr),
-		.pointer_memory_data_read_b(blob_pointer)
+		.pointer_memory_data_read_b(blob_pointer),
 		.blob_sorting_done(blob_sorting_done)
 		);
 	
-	//------------------TRACKING OUTPUT module
+	//------------------ASSEMBLE TRACKING OUTPUT module
 	wire wren_tracking_output;
 	wire [17:0] address_tracking_output;
 	wire [31:0] data_write_tracking_output;
@@ -486,44 +484,34 @@ module main(
 	reg [15:0] tracking_output_blob_sizes_word4 = 0;
 	reg [15:0] tracking_output_blob_sizes_word5 = 0;
 	
+	wire [6:0] number_of_bytes_to_transmit;
+	
+	reg [5:0] tracking_output_blob_data_addr;
+	wire [7:0] tracking_output_blob_data;
+	wire [7:0] led_wire;
+	
+	reg [6:0] read_tracking_output = 0;
 	
 	tracking_output_assembly tracking_output(
 		.clk(clk),
+		.clk_fast(modified_clock_fast),
 		.pause(global_pause),
 		.enable_tracking_output(enable_tracking_output),
+		.tracking_output_addr_b(tracking_output_blob_data_addr),
+		.tracking_output_data_read_b(tracking_output_blob_data),
+		.blob_pointer_addr(blob_pointer_addr),
+		.blob_pointer(blob_pointer),
 		.wren(wren_tracking_output),
 		.data_read(data_read),
+		.tracking_display(led_wire),
+		.slide_switches(slide_switches),
 		.data_write(data_write_tracking_output),
-		.address(address_tracking_output)
+		.address(address_tracking_output),
+		.number_of_bytes_to_transmit(number_of_bytes_to_transmit),
 		.tracking_output_done(tracking_output_done)
 		);
 	
-	//first centroids array (used in main state machine)
-	//-----Instantiate block ram for xys centroids
-	// x centroids = [31:24] centroids
-	// y centroids = [23:16] centroids
-	// s centroids = [15:0] centroids
-	reg [2:0] centroid_array_state = 0;
 	
-	reg [2:0] first_centroids_write_addr = 0;
-	reg [2:0] first_centroids_read_addr = 0;
-	reg [31:0] first_centroids_data_write;
-	wire [31:0] first_centroids_data_read;
-	reg first_centroids_wren;
-	
-	// written to here, read from in main. 
-	centroids xys_first_centroids_array(
-		.clka(clk), 	// input clka
-		.wea(first_centroids_wren), // input [0 : 0] wea
-		.addra(first_centroids_write_addr), // input [2 : 0] addra
-		.dina(first_centroids_data_write), 	// input [31 : 0] dina
-		.douta(), // output [31 : 0] douta (--NOT USED--)
-		.clkb(clk),	 // input clkb
-		.web(0), 	// input [0 : 0] web
-		.addrb(first_centroids_read_addr), // input [2 : 0] addrb
-		.dinb(),	 // input [31 : 0] dinb (--NOT USED--)
-		.doutb(first_centroids_data_read) // output [31 : 0] doutb
-		);
 	
 	//------------------X PIXEL FILLING module
 	wire wren_x_pixel_filling;
@@ -811,7 +799,9 @@ module main(
 		end
 		if (slide_switches[4:0] == 9) begin
 // 			display_value = sram_debug0;
-			display_value = blob_debug[15:8];	//red slot, green
+// 			display_value = blob_debug[15:8];	//red slot, green
+// 			display_value = tracking_output_blob_data;
+ 			display_value = blob_extraction_blob_counter;
 		end
 		if (slide_switches[4:0] == 10) begin
  			display_value = blob_debug[23:16];	// red slot, blue
@@ -823,7 +813,8 @@ module main(
  			display_value = blob_debug3;		// number of blobs detected that match any of the color slots
 		end
 		if (slide_switches[4:0] == 13) begin
-			display_value = data_write_primary_color_slots[7:0];	// red slot, red input
+// 			display_value = data_write_primary_color_slots[7:0];	// red slot, red input
+ 			display_value = tracking_output_blob_data_addr;
 		end
 		if (slide_switches[4:0] == 14) begin
 			display_value = data_write_primary_color_slots[15:8];	//red slot, green input
@@ -929,14 +920,16 @@ module main(
 	STATE_BLOB_EXTRACTION = 9,
 	STATE_BLOB_SORTING = 10,
 	STATE_TRACKING_OUTPUT = 11,
-	STATE_ASSEMBLE_DATA = 12,
-	STATE_TRACKING_OUTPUT_TWO = 13,
-	STATE_DATA_OUTPUT_CTL = 14,
-	STATE_FRAME_DUMP = 15,
-	STATE_SINGLE_SHOT = 16,
-	STATE_ONLINE_RECOGNITION = 17;
+	STATE_TRACKING_OUTPUT_TWO = 12,
+	STATE_DATA_OUTPUT_CTL = 13,
+	STATE_FRAME_DUMP = 14,
+	STATE_SINGLE_SHOT = 15,
+	STATE_ONLINE_RECOGNITION = 16;
 
 	always @(posedge clk) begin
+		//FIXME
+		//tracking output debugging only
+		leds = led_wire;
 // 		if (global_pause == 0) begin
 			//if ((processing_done_internal == 0)) begin
 			//if (camera_transfer_done == 1) begin
@@ -1072,93 +1065,7 @@ module main(
 					enable_tracking_output = 1;
 					if (tracking_output_done == 1) begin
 						enable_tracking_output = 0;
-						current_main_processing_state = STATE_ASSEMBLE_DATA;
-					end
-					
-					leds[0] = 0;
-					leds[1] = 0;
-					leds[2] = 0;
-					leds[3] = 0;
-					leds[4] = 0;
-					leds[5] = 0;
-				end
-				
-				else if (current_main_processing_state == STATE_ASSEMBLE_DATA) begin
-					//read contents of xys centroids array into first xys centroids array.
-					case (centroid_array_state)
-						0: begin
-							first_centroids_wren = 1'b0;
-							first_centroids_write_addr = 0;
-							centroids_read_addr = 0;
-							centroid_array_state = centroid_array_state + 1;
-						end
-						1: begin
-							first_centroids_data_write = centroids_data_read;
-							first_centroids_wren = 1'b1;
-							first_centroids_write_addr = first_centroids_write_addr + 1;
-							centroids_read_addr = centroids_read_addr + 1;
-							centroid_array_state = centroid_array_state + 1;
-						end
-						2: begin
-							first_centroids_wren = 1'b0;
-							//reset addresses after words 0-5 written
-							if (first_centroids_write_addr > 5) begin
-								first_centroids_write_addr = 0;
-								centroids_read_addr = 0;
-							end
-							centroid_array_state = centroid_array_state - 1; //bounce between states 1 and 2 (0 state is initial only)
-						end
-					endcase					
-					
-					// port b on the blob sizes ram is kept in a constant read state (wren = 0)
-					// therefore only need to change address each time
-					case(test_value_state) 
-						0: begin
-							blob_sizes_read_addr_b = 0;
-							test_value_state = test_value_state + 1;
-						end
-						1: begin
-							tracking_output_blob_sizes_word0 = blob_sizes_data_read_b;
-							blob_sizes_read_addr_b = 1;
-							test_value_state = test_value_state + 1;
-						end
-						2: begin
-							tracking_output_blob_sizes_word1 = blob_sizes_data_read_b;
-							blob_sizes_read_addr_b = 2;
-							test_value_state = test_value_state + 1;
-						end
-						3: begin
-							tracking_output_blob_sizes_word2 = blob_sizes_data_read_b;
-							blob_sizes_read_addr_b = 3;
-							test_value_state = test_value_state + 1;
-						end
-						4: begin
-							tracking_output_blob_sizes_word3 = blob_sizes_data_read_b;
-							blob_sizes_read_addr_b = 4;
-							test_value_state = test_value_state + 1;
-						end
-						5: begin
-							tracking_output_blob_sizes_word4 = blob_sizes_data_read_b;
-							blob_sizes_read_addr_b = 5;
-							test_value_state = test_value_state + 1;
-						end
-						6: begin
-							tracking_output_blob_sizes_word5 = blob_sizes_data_read_b;
-							blob_sizes_read_addr_b = 0;
-							test_value_state = 0;
-						end
-					endcase
-					
-					if (tracking_output_blob_sizes_word0 != 0) leds[0] = 1;
-					if (tracking_output_blob_sizes_word1 != 0) leds[1] = 1;
-					if (tracking_output_blob_sizes_word2 != 0) leds[2] = 1;
-					if (tracking_output_blob_sizes_word3 != 0) leds[3] = 1;
-					if (tracking_output_blob_sizes_word4 != 0) leds[4] = 1;
-					if (tracking_output_blob_sizes_word5 != 0) leds[5] = 1;
-					
-					if (tracking_output_done == 0) begin		// Wait for the module to reset before continuing
 						current_main_processing_state = STATE_TRACKING_OUTPUT_TWO;
-						pleasedelayhere = 1;
 					end
 				end
 				
@@ -1285,6 +1192,7 @@ module main(
 				
 				else if (current_main_processing_state == STATE_SINGLE_SHOT) begin
 					leds[7] = 1;
+					leds[5:1] = TxD_data;
 					serial_output_enabled = 1;
 					
 					if (serial_output_holdoff == 0) begin
@@ -1399,291 +1307,20 @@ module main(
 						serial_output_index = 0;
 						processing_ended = 1;
 						serial_output_index = 0;
+						tracking_output_blob_data_addr = 0;
 					end else begin
 						if ((serial_output_enabled == 1) && (global_pause == 0)) begin
 							processing_ended = 0;		// We only needed to pulse this
 									
-							// Transmit the entire contents of the image buffer to the serial port
+							// Transmit the entire contents of the tracking data buffer to the serial port
 							if (tx_toggle == 0) begin
-								if (serial_output_index_toggle == 0) begin
-									//if (slide_switches[0] == 0) begin		// Output mode is 'less data' (compatibility mode)
-										TxD_data = 176;
-									//end else begin
-									//	TxD_data = 177;			// Signal 'more data' output mode
-									//end
-								end
-								
-								if (serial_output_index_toggle == 1) begin
-									if ((slide_switches[0] == 0) && (slide_switches[1] == 0) && (slide_switches[2] == 0)) begin
-										TxD_data = 1;
-									end
-									
-									if ((slide_switches[0] == 1) && (slide_switches[1] == 1) && (slide_switches[2] == 1)) begin
-										TxD_data = 2;
-									end
-									
-									if ((slide_switches[0] == 1) && (slide_switches[1] == 1) && (slide_switches[2] == 0)) begin
-										TxD_data = 3;
-									end
-									
-									TxD_data = TxD_data | 32;
-									
-									first_centroids_read_addr = 0;
-								end
-										
-								if (serial_output_index_toggle == 2) begin
-									TxD_data = first_centroids_data_read[31:24]; //x data, location 0
-								end
-										
-								if (serial_output_index_toggle == 3) begin
-									TxD_data =  first_centroids_data_read[23:16]; //y data, location 0
-									first_centroids_read_addr = 1;
-								end
-								
-								if (slide_switches[0] == 1) begin
-									if (serial_output_index_toggle == 4) begin
-										TxD_data =  first_centroids_data_read[31:24]; //addr location 1
-									end
-										
-									if (serial_output_index_toggle == 5) begin
-										TxD_data = first_centroids_data_read[23:16]; //addr location 1
-										first_centroids_read_addr = 2;
-									end
-											
-									if (serial_output_index_toggle == 6) begin
-										TxD_data = first_centroids_data_read[31:24]; //addr_location 2
-									end
-										
-									if (serial_output_index_toggle == 7) begin
-										TxD_data = first_centroids_data_read[23:16]; //addr_location 2
-										first_centroids_read_addr = 3;
-									end
-								end else begin
-									if (serial_output_index_toggle == 4) begin
-										serial_output_index_toggle = 8;
-										first_centroids_read_addr = 3;
-									end
-								end
-										
-								if (serial_output_index_toggle == 8) begin
-									TxD_data = first_centroids_data_read[31:24]; //x data, addr location 3
-								end
-										
-								if (serial_output_index_toggle == 9) begin
-									TxD_data = first_centroids_data_read[23:16]; //y data, addr location 3
-									first_centroids_read_addr = 4;
-								end
-										
-								if (serial_output_index_toggle == 10) begin
-									TxD_data = first_centroids_data_read[31:24]; //x data, location 4
-								end
-								
-								if (serial_output_index_toggle == 11) begin
-									TxD_data = first_centroids_data_read[23:16]; // y data, location 4
-									first_centroids_read_addr = 5;
-								end
-										
-								if (slide_switches[0] == 1) begin
-									if (serial_output_index_toggle == 12) begin
-										TxD_data = first_centroids_data_read[31:24]; // x data, location 5
-									end
-									
-									if (serial_output_index_toggle == 13) begin
-										TxD_data = first_centroids_data_read[23:16]; // y data, location 5
-										first_centroids_read_addr = 0;
-									end
-								end else begin
-									if (serial_output_index_toggle == 12) begin
-										serial_output_index_toggle = 14;
-									end
-								end
-										
-								// ---  Second set of centroids
-										
-								if (serial_output_index_toggle == 14) begin
-									TxD_data = centroids_data_read[31:24]; // x data, addr 0
-								end
-										
-								if (serial_output_index_toggle == 15) begin
-									TxD_data = centroids_data_read[23:16]; //y data, addr 0
-									centroids_read_addr = 1;
-								end
-										
-								if (slide_switches[0] == 1) begin
-									if (serial_output_index_toggle == 16) begin
-										TxD_data = centroids_data_read[31:24]; // x data, addr 1
-									end
-											
-									if (serial_output_index_toggle == 17) begin
-										TxD_data = centroids_data_read[23:16]; //y data, addr 1
-										centroids_read_addr = 2;
-									end
-											
-									if (serial_output_index_toggle == 18) begin
-										TxD_data = centroids_data_read[31:24]; //x data, addr 2
-									end
-											
-									if (serial_output_index_toggle == 19) begin
-										TxD_data = centroids_data_read[23:16]; //y data, addr 2
-										centroids_read_addr = 3;
-									end
-								end else begin
-									if (serial_output_index_toggle == 16) begin
-										serial_output_index_toggle = 20;
-										centroids_read_addr = 3;
-									end
-								end
-										
-								if (serial_output_index_toggle == 20) begin
-									TxD_data = centroids_data_read[31:24]; //x data, addr 3
-								end
-										
-								if (serial_output_index_toggle == 21) begin
-									TxD_data = centroids_data_read[23:16]; //y data, addr 3
-									centroids_read_addr = 4;
-								end
-										
-								if (serial_output_index_toggle == 22) begin
-									TxD_data = centroids_data_read[31:24]; // x data, addr 4
-								end
-										
-								if (serial_output_index_toggle == 23) begin
-									TxD_data = centroids_data_read[23:16]; //y data, addr 4
-									centroids_read_addr = 5;
-								end
-										
-								if (slide_switches[0] == 1) begin
-									if (serial_output_index_toggle == 24) begin
-										TxD_data = centroids_data_read[31:24]; //x data, addr 5
-									end
-											
-									if (serial_output_index_toggle == 25) begin
-										TxD_data = centroids_data_read[23:16]; //y data, addr 5
-										centroids_read_addr = 0;
-									end
-								end else begin
-									if (serial_output_index_toggle == 24) begin
-										serial_output_index_toggle = 26;
-										centroids_read_addr = 0;
-									end
-								end
-								
-								// -- Now the size data
-								// -- First ones
-								
-								if (serial_output_index_toggle == 26) begin
-									TxD_data = first_centroids_data_read[15:8];	//s data upper byte addr 0
-								end
-								
-								if (serial_output_index_toggle == 27) begin
-									TxD_data = first_centroids_data_read[7:0];	//s data lower byte addr 0
-									first_centroids_read_addr = 1;
-								end
-								
-								if (serial_output_index_toggle == 28) begin
-									TxD_data = first_centroids_data_read[15:8];	//upper byte
-								end
-								
-								if (serial_output_index_toggle == 29) begin
-									TxD_data = first_centroids_data_read[7:0];		//lower byte
-									first_centroids_read_addr = 2;
-								end
-								
-								if (serial_output_index_toggle == 30) begin
-									TxD_data = first_centroids_data_read[15:8];
-								end
-								
-								if (serial_output_index_toggle == 31) begin
-									TxD_data = first_centroids_data_read[7:0];
-									first_centroids_read_addr = 3;
-								end
-								
-								if (serial_output_index_toggle == 32) begin
-									TxD_data = first_centroids_data_read[15:8];
-								end
-								
-								if (serial_output_index_toggle == 33) begin
-									TxD_data = first_centroids_data_read[7:0];
-									first_centroids_read_addr = 4;
-								end
-								
-								if (serial_output_index_toggle == 34) begin
-									TxD_data = first_centroids_data_read[15:8];
-								end
-								
-								if (serial_output_index_toggle == 35) begin
-									TxD_data = first_centroids_data_read[7:0];
-									first_centroids_read_addr = 5;
-								end
-								
-								if (serial_output_index_toggle == 36) begin
-									TxD_data = first_centroids_data_read[15:8];
-								end
-								
-								if (serial_output_index_toggle == 37) begin
-									TxD_data = first_centroids_data_read[7:0];
-									first_centroids_read_addr = 0;
-									centroids_read_addr = 0;
-								end
-								
-								// -- Last ones
-								if (serial_output_index_toggle == 38) begin
-									TxD_data = centroids_data_read[15:8];
-								end
-								
-								if (serial_output_index_toggle == 39) begin
-									TxD_data = centroids_data_read[7:0];
-									centroids_read_addr = 1;
-								end
-								
-								if (serial_output_index_toggle == 40) begin
-									TxD_data = centroids_data_read[15:8];
-								end
-								
-								if (serial_output_index_toggle == 41) begin
-									TxD_data = centroids_data_read[7:0];
-									centroids_read_addr = 2;
-								end
-								
-								if (serial_output_index_toggle == 42) begin
-									TxD_data = centroids_data_read[15:8];
-								end
-								
-								if (serial_output_index_toggle == 43) begin
-									TxD_data = centroids_data_read[7:0];
-									centroids_read_addr = 3;
-								end
-								
-								if (serial_output_index_toggle == 44) begin
-									TxD_data = centroids_data_read[15:8];
-								end
-								
-								if (serial_output_index_toggle == 45) begin
-									TxD_data = centroids_data_read[7:0];
-									centroids_read_addr = 4;
-								end
-								
-								if (serial_output_index_toggle == 46) begin
-									TxD_data = centroids_data_read[15:8];
-								end
-								
-								if (serial_output_index_toggle == 47) begin
-									TxD_data = centroids_data_read[7:0];
-									centroids_read_addr = 5;
-								end
-								
-								if (serial_output_index_toggle == 48) begin
-									TxD_data = centroids_data_read[15:8];
-								end
-								
-								if (serial_output_index_toggle == 49) begin
-									TxD_data = centroids_data_read[7:0];
-									centroids_read_addr = 0;
-								end
+								//pull in data word from tracking output assembly into TxD_data
+								TxD_data = tracking_output_blob_data;
+								tracking_output_blob_data_addr = serial_output_index_toggle + 1;
 								
 								// -- Done!
 										
-								if (serial_output_index_toggle != 50) begin
+								if (serial_output_index_toggle != number_of_bytes_to_transmit) begin
 									TxD_start = 1;
 									tx_toggle = 1;
 								end
@@ -1697,7 +1334,7 @@ module main(
 								end
 							end
 				
-							if (serial_output_index_toggle > 49) begin
+							if (serial_output_index_toggle >= number_of_bytes_to_transmit) begin
 								if (TxD_start == 0) begin	// Wait for transmission of byte to complete
 									TxD_start = 0;
 									tx_toggle = 0;
@@ -1707,6 +1344,7 @@ module main(
 									//serial_output_index_toggle = 0;
 									serial_output_enabled = 0;
 									serial_output_index_toggle = 0;
+									tracking_output_blob_data_addr = 0;
 									//leds[5:1] = 0;
 									leds[7] = 0;
 		
