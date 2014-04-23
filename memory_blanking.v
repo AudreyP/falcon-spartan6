@@ -38,6 +38,7 @@ module memory_blanking(
 				if (pause == 0) begin
 					address = counter;
 					data_write = 32'h77553311;
+					//data_write = {24'h775533, address[7:0]};
 					wren = 1;
 					counter = counter + 1;
 					if (counter >= 262142) begin

@@ -158,8 +158,15 @@ module lpddr_s6 #
 // Chapter-2 of ug388.pdf in the /docs directory for further details.
    localparam C3_PORT_ENABLE              = 6'b000001;
    localparam C3_PORT_CONFIG             =  "B32_B32_R32_R32_R32_R32";
-   localparam C3_CLKOUT0_DIVIDE       = 3;       
-   localparam C3_CLKOUT1_DIVIDE       = 3;       
+
+//    // 133MHz
+//    localparam C3_CLKOUT0_DIVIDE       = 3;       
+//    localparam C3_CLKOUT1_DIVIDE       = 3;
+
+   // 100 MHz
+   localparam C3_CLKOUT0_DIVIDE       = 4;       
+   localparam C3_CLKOUT1_DIVIDE       = 4;       
+
    localparam C3_CLKOUT2_DIVIDE       = 32;       
    localparam C3_CLKOUT3_DIVIDE       = 16;       
    localparam C3_CLKFBOUT_MULT        = 8;       
