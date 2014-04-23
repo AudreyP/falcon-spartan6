@@ -19,7 +19,7 @@ module tracking_output_assembly (
 	output wire [7:0] tracking_output_data_read_b,
 	
 	output reg [6:0] number_of_bytes_to_transmit,
-	output reg [7:0] tracking_display,
+	output reg [5:0] tracking_display,
 	
 	output reg tracking_output_done
 	);
@@ -117,7 +117,7 @@ module tracking_output_assembly (
 					case (main_state) 
 						INITIALIZATION: begin
 							tracking_display = 8'b0;
-							//write zeros to the 0-51 slots in the tracking_output array
+							//write zeros to the 0-5 slots in the tracking_output array
 							case (tracking_output_initialization) 
 								0: begin
 									wren_tracking_output = 1'b0;
@@ -230,7 +230,7 @@ module tracking_output_assembly (
 								
 								if (tracking_mode == 1 && blob_rank >= 2) begin
 									tracking_output_done = 1;
-									main_state = 0;
+									main_state = DONE;
 									address = 18'b0;
 									data_write = 32'b0;
 									wren = 1'b0;
@@ -238,7 +238,7 @@ module tracking_output_assembly (
 								end
 								else if (tracking_mode == 2 && blob_rank >= 3) begin
 									tracking_output_done = 1;
-									main_state = 0;
+									main_state = DONE;
 									address = 18'b0;
 									data_write = 32'b0;
 									wren = 1'b0;
@@ -300,7 +300,7 @@ module tracking_output_assembly (
 							
 							case (store_blobs_mode1)
 							//in mode one, only Red, Green, and Blue colors are used.
-								1: begin
+								0: begin
 									wren_tracking_output = 0;
 									// set address and data lines according to blob rank and blob color.
 									// the first data written for each blob is the x-centroid coordinate.
@@ -339,11 +339,11 @@ module tracking_output_assembly (
 										store_blobs_mode1 = store_blobs_mode1 + 1;
 									end
 								end
-								2: begin
+								1: begin
 									wren_tracking_output = 1;	
 									store_blobs_mode1 = store_blobs_mode1 + 1;
 								end
-								3: begin
+								2: begin
 									wren_tracking_output = 0;
 									// set address and data lines according to blob rank and blob color.
 									// the second data written for each blob is the y-centroid coordinate.
@@ -381,11 +381,11 @@ module tracking_output_assembly (
 									end
 									store_blobs_mode1 = store_blobs_mode1 + 1;
 								end
-								4: begin
+								3: begin
 									wren_tracking_output = 1;	
 									store_blobs_mode1 = store_blobs_mode1 + 1;
 								end
-								5: begin
+								4: begin
 									wren_tracking_output = 0;
 									// set address and data lines according to blob rank and blob color.
 									// the third data written for each blob is the upper 8 bits of the blob size.
@@ -423,11 +423,11 @@ module tracking_output_assembly (
 									end
 									store_blobs_mode1 = store_blobs_mode1 + 1;
 								end
-								6: begin
+								5: begin
 									wren_tracking_output = 1;	
 									store_blobs_mode1 = store_blobs_mode1 + 1;
 								end
-								7: begin
+								6: begin
 									wren_tracking_output = 0;
 									// set address and data lines according to blob rank and blob color.
 									// the final data written for each blob is the lower 8 bits of the blob size.
@@ -465,11 +465,11 @@ module tracking_output_assembly (
 									end
 									store_blobs_mode1 = store_blobs_mode1 + 1;
 								end
-								8: begin
+								7: begin
 									wren_tracking_output = 1;	
 									store_blobs_mode1 = store_blobs_mode1 + 1;
 								end
-								9: begin
+								8: begin
 									wren_tracking_output = 0;
 									store_blobs_mode1 = 0;
 									blobs_written = blobs_written + 1;
@@ -763,7 +763,7 @@ module tracking_output_assembly (
 							end else begin
 								// if this is reached, we have read all of the pointers in the pointer address memory.
 								tracking_output_done = 1;
-								main_state = 0;
+								main_state = DONE;
 								address = 18'b0;
 								data_write = 32'b0;
 								wren = 1'b0;
@@ -783,7 +783,7 @@ module tracking_output_assembly (
 					data_write = 32'b0;
 					wren = 1'b0;
 				end // end else
-			end else begin // end if enable == 1, else
+			end else begin // end if enable == 1, else (if enable == 0)
 				tracking_output_done = 0;
 				main_state = INITIALIZATION;
 				address = 18'b0;

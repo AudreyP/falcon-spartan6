@@ -61,7 +61,7 @@ module blob_sorting_test;
 		clk = 0;
 		clk_fast = 0;
 		pause = 0;
-		blob_extraction_blob_counter = 12;
+		blob_extraction_blob_counter = 1;
 		enable_blob_sorting = 0;
 		minimum_blob_size = 0;
 		slide_switches = 0; //0: find biggest blob; 1: find smallest blob; 2: find highest blob; 3: find lowest blob
@@ -89,9 +89,9 @@ module blob_sorting_test;
 	always @ (negedge clk) begin
 		case (address)
 			// blob 1
-			200000: data_read = 32'h10201001;
-			200001: data_read = 32'h10101010;
-			200002: data_read = 32'h10103030;
+			200000: data_read = 32'hff000001;
+			200001: data_read = 32'ha07803e8;
+			200002: data_read = 32'h37236955;
 			// blob 2
 			200003: data_read = 32'h10102001;
 			200004: data_read = 32'h20202120;

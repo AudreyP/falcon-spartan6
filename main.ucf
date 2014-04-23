@@ -49,6 +49,10 @@ NET "clock_manager/modified_clock_fast_bufg_in" TNM_NET = modified_clock_fast;
 NET "clock_manager/modified_clock_sram_bufg_in" TNM_NET = modified_clock_sram;
 
 TIMESPEC TS_memory_controller_to_main_processor = FROM "modified_clock_sram" TO "modified_clock" 20 ns;
+TIMESPEC TS_main_processor_to_memory_controller = FROM "modified_clock" TO "modified_clock_sram" 10 ns;
+
+#TIMESPEC TS_main_processor_to_fast_clock = FROM "modified_clock" TO "modified_clock_fast" 40 ns;
+#TIMESPEC TS_fast_clock_to_main_processor = FROM "modified_clock_fast" TO "modified_clock" 40 ns;
 
 TIMESPEC TS_modified_clock_sram = PERIOD "modified_clock_sram" 10 ns HIGH 50%;
 

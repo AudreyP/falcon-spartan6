@@ -488,7 +488,7 @@ module main(
 	
 	reg [5:0] tracking_output_blob_data_addr;
 	wire [7:0] tracking_output_blob_data;
-	wire [7:0] led_wire;
+	wire [5:0] led_wire;
 	
 	reg [6:0] read_tracking_output = 0;
 	
@@ -567,7 +567,7 @@ module main(
 	
 	blob_extraction blob_extraction(
 		//input wires
-		.clk(modified_clock),
+		.clk(clk),
 		.clk_fast(modified_clock_fast),	//for stack ram
 // 		.clk(clk_div_by_two),
 // 		.clk_fast(clk),	//for stack ram
@@ -895,15 +895,15 @@ module main(
 	assign data_write = data_write_edge_detection | data_write_blob_sorting | data_write_tracking_output | data_write_x_pixel_filling | data_write_y_pixel_filling 
 							| data_write_blob_extraction | data_write_camera_capture | data_write_memory_blanking /*| data_write_median_filtering*/;
 
-// 	always @(posedge modified_clock_sram) begin
-// 		address <= address_edge_detection | address_tracking_output | address_x_pixel_filling 
+// 	always @(negedge modified_clock_sram) begin
+// 		address <= address_edge_detection | address_blob_sorting | address_tracking_output | address_x_pixel_filling 
 // 								| address_y_pixel_filling | address_blob_extraction | address_camera_capture | address_memory_blanking 
 // 								| address_single_shot | address_frame_dump /*| address_median_filtering*/;
 // 							
-// 		wren <= wren_edge_detection | wren_tracking_output | wren_x_pixel_filling | wren_y_pixel_filling 
+// 		wren <= wren_edge_detection | wren_blob_sorting | wren_tracking_output | wren_x_pixel_filling | wren_y_pixel_filling 
 // 								| wren_blob_extraction | wren_camera_capture | wren_memory_blanking /*| wren_median_filtering*/;
 // 							
-// 		data_write <= data_write_edge_detection | data_write_tracking_output | data_write_x_pixel_filling | data_write_y_pixel_filling 
+// 		data_write <= data_write_edge_detection | data_write_blob_sorting | data_write_tracking_output | data_write_x_pixel_filling | data_write_y_pixel_filling 
 // 								| data_write_blob_extraction | data_write_camera_capture | data_write_memory_blanking /*| data_write_median_filtering*/;
 // 	end
 
@@ -929,7 +929,8 @@ module main(
 	always @(posedge clk) begin
 		//FIXME
 		//tracking output debugging only
-		leds = led_wire;
+		leds[5:0] = led_wire;
+		leds[6] = 0;
 // 		if (global_pause == 0) begin
 			//if ((processing_done_internal == 0)) begin
 			//if (camera_transfer_done == 1) begin
@@ -1047,8 +1048,11 @@ module main(
 					enable_blob_extraction = 1;
 					if (blob_extraction_done == 1) begin
 						enable_blob_extraction = 0;
-						current_main_processing_state = STATE_BLOB_SORTING;
-// 						current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY****
+						if (slide_switches[6] == 0) begin
+							current_main_processing_state = STATE_BLOB_SORTING;
+						end else begin
+							current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY****
+						end
 					end
 				end
 				
@@ -1192,7 +1196,6 @@ module main(
 				
 				else if (current_main_processing_state == STATE_SINGLE_SHOT) begin
 					leds[7] = 1;
-					leds[5:1] = TxD_data;
 					serial_output_enabled = 1;
 					
 					if (serial_output_holdoff == 0) begin
@@ -1210,7 +1213,7 @@ module main(
 							// Transmit the entire contents of the image buffer to the serial port
 							if (tx_toggle == 0) begin
 								if (serial_output_index_toggle == 0) begin
-									address_single_shot = ((data_read * 3) + 200000);
+									address_single_shot = ((data_read * 3) + BlobStorageOffset);
 									//address = address + 76801;
 									if (data_read == 1) begin
 										thisiswhite = 1;
@@ -1364,13 +1367,6 @@ module main(
 			//end	//end if(processing_done_internal == 0)
 // 		end
 	end	//end of always 
-
-	//for the primary_color_slots array
-	localparam [5:0] PRIMARY_COLOR_SLOTS_WORD_SIZE = 24; 
-	
-	localparam [3:0] 	ARRAY_SPEC_1_MAX = 5, 	//don't actually know whether it's 5 or 3, just picked one.
-				ARRAY_SPEC_2_MAX = 3;	//fortunately, in the formula where it's used, it doesn't matter 		
-
 
 	async_transmit #(.ClkFrequency(InternalClkFrequency)) asyncTX(.clk(clk), .TxD_start(TxD_start), .TxD_data(TxD_data), .TxD(TxD), .TxD_busy(TxD_busy), .state(TxD_state));
 	async_receiver #(.ClkFrequency(InternalClkFrequency)) asyncRX(.clk(clk), .RxD(RxD), .RxD_data_ready(RxD_data_ready), .RxD_data(RxD_data), .RxD_endofpacket(RxD_endofpacket), .RxD_idle(RxD_idle));
