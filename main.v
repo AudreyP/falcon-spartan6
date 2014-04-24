@@ -102,9 +102,10 @@ module main(
 	
 	// '<=' is a nonblocking set operation (like '=') 
 
+	//parameter InternalClkFrequency = 6250000;	// 6.25MHz
 	//parameter InternalClkFrequency = 6666666;	// 6.66MHz
-	//parameter InternalClkFrequency = 10000000;	// 10MHz
-	parameter InternalClkFrequency = 12500000;	// 12.5MHz
+	parameter InternalClkFrequency = 10000000;	// 10MHz
+	//parameter InternalClkFrequency = 12500000;	// 12.5MHz
 	//parameter InternalClkFrequency = 13333333;	// 13.33MHz
 	//parameter InternalClkFrequency = 20000000;	// 20MHz
 	//parameter InternalClkFrequency = 50000000;	// 50MHz
@@ -433,7 +434,13 @@ module main(
 		.edge_detection_done(edge_detection_done)
 		);
 	
-	parameter BlobStorageOffset = 200000;
+	parameter BUFFER0_OFFSET = 0;
+	parameter BUFFER1_OFFSET = 76801;
+	parameter BUFFER2_OFFSET = 153602;
+	parameter BUFFER3_OFFSET = 230403;
+
+	//parameter BlobStorageOffset = 200000; // used in blob_extraction and blob_sorting modules
+	parameter BlobStorageOffset = BUFFER2_OFFSET + 6400; // used in blob_extraction and blob_sorting modules
 	
 	//------------------BLOB SORTING module
 	wire wren_blob_sorting;
@@ -442,15 +449,24 @@ module main(
 	
 	wire [15:0] blob_extraction_blob_counter;
 	reg [7:0] minimum_blob_size = 0;
-	
-	wire [4:0] blob_pointer;
-	wire [17:0] pointer_memory_data_read_b;
+
+	wire [4:0] blob_pointer_addr;
+	wire [17:0] blob_pointer;
 	wire [4:0] number_of_valid_blobs;
 	
 	reg find_highest = 0;
 	reg find_biggest = 1;
 	
-	blob_sorting blob_sorting(
+	//debugging
+	wire [15:0] blob_sort_debug_display;
+	
+	blob_sorting #(
+		.BlobStorageOffset(BlobStorageOffset),
+		.BUFFER0_OFFSET(BUFFER0_OFFSET),
+		.BUFFER1_OFFSET(BUFFER1_OFFSET),
+		.BUFFER2_OFFSET(BUFFER2_OFFSET),
+		.BUFFER3_OFFSET(BUFFER3_OFFSET))
+		blob_sorting(
 		//input wires (as seen by module)
 		.clk(clk),
 		.clk_fast(modified_clock_fast),
@@ -462,11 +478,13 @@ module main(
 		.wren(wren_blob_sorting),
 		.data_write(data_write_blob_sorting),
 		.address(address_blob_sorting),
+		.data_read(data_read),
 		.number_of_valid_blobs(number_of_valid_blobs),
 		// pointer memory
 		.pointer_memory_read_addr_b(blob_pointer_addr),
 		.pointer_memory_data_read_b(blob_pointer),
-		.blob_sorting_done(blob_sorting_done)
+		.blob_sorting_done(blob_sorting_done),
+		.debug_display(blob_sort_debug_display)
 		);
 	
 	//------------------ASSEMBLE TRACKING OUTPUT module
@@ -510,7 +528,6 @@ module main(
 		.number_of_bytes_to_transmit(number_of_bytes_to_transmit),
 		.tracking_output_done(tracking_output_done)
 		);
-	
 	
 	
 	//------------------X PIXEL FILLING module
@@ -565,7 +582,9 @@ module main(
 	reg [23:0] data_write_primary_color_slots;
 	reg wren_primary_color_slots;
 	
-	blob_extraction blob_extraction(
+	blob_extraction #(
+		.BlobStorageOffset(BlobStorageOffset))
+		blob_extraction(
 		//input wires
 		.clk(clk),
 		.clk_fast(modified_clock_fast),	//for stack ram
@@ -814,7 +833,8 @@ module main(
 		end
 		if (slide_switches[4:0] == 13) begin
 // 			display_value = data_write_primary_color_slots[7:0];	// red slot, red input
- 			display_value = tracking_output_blob_data_addr;
+//  			display_value = tracking_output_blob_data_addr;
+  			display_value = blob_sort_debug_display;
 		end
 		if (slide_switches[4:0] == 14) begin
 			display_value = data_write_primary_color_slots[15:8];	//red slot, green input
@@ -1118,13 +1138,13 @@ module main(
 
 						// Debug
 						if (slide_switches[1:0] == 0) begin
-							frame_dump_origin_address = 0;
+							frame_dump_origin_address = BUFFER0_OFFSET;
 						end else if (slide_switches[1:0] == 1) begin
-							frame_dump_origin_address = 76801;
+							frame_dump_origin_address = BUFFER1_OFFSET;
 						end else if (slide_switches[1:0] == 2) begin
-							frame_dump_origin_address = 153602;
+							frame_dump_origin_address = BUFFER2_OFFSET;
 						end else if (slide_switches[1:0] == 3) begin
-							frame_dump_origin_address = 230403;
+							frame_dump_origin_address = BUFFER3_OFFSET;
 						end
 
 // 						// Normal operation
@@ -1322,7 +1342,7 @@ module main(
 								tracking_output_blob_data_addr = serial_output_index_toggle + 1;
 								
 								// -- Done!
-										
+
 								if (serial_output_index_toggle != number_of_bytes_to_transmit) begin
 									TxD_start = 1;
 									tx_toggle = 1;
@@ -1551,7 +1571,7 @@ module main(
 									display_value_user = serial_command_buffer;
 									next_byte_is_command = 2;
 								end
-																
+
 								// Color slot modify requests
 								if ((next_byte_is_command_prev_command > 90) && (next_byte_is_command_prev_command < 140)) begin
 									// Red

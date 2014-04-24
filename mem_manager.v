@@ -245,7 +245,7 @@ module mem_manager(
 
 			IDLE_STATE:	begin
 						if (clk_sync == LATCH_TIME) begin
-// 							// Rudimentary single-word data cache
+							// Rudimentary single-word data cache
 							if ((address == address_prev) && ((wren == 0) || ((wren == 1) && (wren_prev == 1) && (data_write == data_write_prev)))) begin
 								// Do nothing!
 								ddr_op_in_progress <= 1;

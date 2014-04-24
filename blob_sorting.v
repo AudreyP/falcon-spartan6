@@ -29,7 +29,7 @@ module blob_sorting(
 	
 	input wire [4:0] pointer_memory_read_addr_b,
 	output wire [17:0] pointer_memory_data_read_b,
-		
+
 	// main memory interface
 	input wire [31:0] data_read,
 	output reg [31:0] data_write,
@@ -37,11 +37,20 @@ module blob_sorting(
 	output reg wren,
 	
 	output reg [4:0] number_of_valid_blobs,
+	output reg [15:0] debug_display,
 	
 	output reg blob_sorting_done
 	);
 	
+	parameter BlobStorageOffset = 200000; //same def'n as in blob_extraction module
+	parameter BUFFER0_OFFSET = 0;
+	parameter BUFFER1_OFFSET = 76801;
+	parameter BUFFER2_OFFSET = 153602;
+	parameter BUFFER3_OFFSET = 230403;
+	
 	initial blob_sorting_done = 0;
+	initial debug_display = 1010;
+	initial number_of_valid_blobs = 0;
 	
 	//-----Instantiate block ram for x, y, s centroids
 	// x centroids = [31:24] centroids
@@ -76,7 +85,7 @@ module blob_sorting(
 	
 	//-----Instantiate block ram for address pointers to blobs of interest
 	reg [4:0] pointer_memory_addr_a;
-	reg [17:0]pointer_memory_data_write;
+	reg [17:0] pointer_memory_data_write;
  	wire [17:0] pointer_memory_data_read_a;
 	reg wren_pointer_memory;
 	
@@ -88,7 +97,7 @@ module blob_sorting(
 		.douta(pointer_memory_data_read_a), // output [17 : 0] douta
 		.clkb(clk_fast), // input clkbf
 		.web(1'b0), // input [0 : 0] web
-		.addrb(pointer_memory_addr_b), // input [4 : 0] addrb
+		.addrb(pointer_memory_read_addr_b), // input [4 : 0] addrb
 		.dinb(), // input [18 : 0] dinb (--NOT USED--)
 		.doutb(pointer_memory_data_read_b) // output [17 : 0] doutb
 		);
@@ -99,8 +108,6 @@ module blob_sorting(
 	reg [7:0] new_y_centroid_coord;
 	reg [15:0] new_blob_size;
 	reg [3:0] comparison_type;
-	
-	initial number_of_valid_blobs = 0;
 	
 	//state machine counters
 	reg [5:0] main_state = 0;
@@ -113,6 +120,9 @@ module blob_sorting(
 	reg [5:0] replace_rank_one = 0;
 	reg [4:0] replace_rank_two = 0;
 	reg [2:0] replace_rank_three = 0;
+	reg [3:0] debug1_state = 0;
+	reg [3:0] debug2_state = 0;
+	reg [3:0] debug3_state = 0;
 	// address offset counter
 	reg [17:0] tracking_output_pointer = 0;
 	
@@ -130,9 +140,7 @@ module blob_sorting(
 	reg [15:0] rank_three_blob_size = 0;
 	
 	reg [15:0] blob_data_temp = 0;
-	reg [17:0] pointer_temp = 0;	
-	
-	localparam BlobStorageOffset = 200000; //same def'n as in blob_extraction module
+	reg [17:0] pointer_temp = 0;
 
 	localparam 
 		INITIALIZATION = 0,
@@ -147,7 +155,10 @@ module blob_sorting(
 		GET_RANK_THREE_BLOB = 9,
 		COMPARE_NEW_TO_RANK_THREE = 10,
 		REPLACE_RANK_THREE = 11,
-		DONE = 12;
+		DEBUG1 = 12,
+		DEBUG2 = 13,
+		DEBUG3 = 14,
+		DONE = 15;
 	
 	localparam 
 		Y_CENTROID_LOWEST = 0,
@@ -181,11 +192,11 @@ module blob_sorting(
 							1: begin
 								blob_data_data_write = 0;
 								wren_blob_data = 1'b1;
-								blob_data_addr_a = blob_data_addr_a + 1;
 								blob_data_initialization = 2;
 							end
 							2: begin
 								wren_blob_data = 1'b0;
+								blob_data_addr_a = blob_data_addr_a + 1;
 								//reset addresses after words 0-17 written
 								if (blob_data_addr_a > 17) begin
 									blob_data_addr_a = 0;
@@ -198,17 +209,17 @@ module blob_sorting(
 							0: begin
 								wren_pointer_memory = 1'b0;
 								pointer_memory_addr_a = 0;
-								pointer_memory_data_write = 19'h7ffff;
+								pointer_memory_data_write = 18'h7ffff;
 								pointer_memory_initialization = 1;
 							end
 							1: begin
-								pointer_memory_data_write = 19'h7ffff;
+								pointer_memory_data_write = 18'h7ffff;
 								wren_pointer_memory = 1'b1;
-								pointer_memory_addr_a = pointer_memory_addr_a + 1;
 								pointer_memory_initialization = 2;
 							end
 							2: begin
 								wren_pointer_memory = 1'b0;
+								pointer_memory_addr_a = pointer_memory_addr_a + 1;
 								//reset addresses after words 0-17 written
 								if (pointer_memory_addr_a > 17) begin
 									pointer_memory_addr_a = 0;
@@ -228,33 +239,45 @@ module blob_sorting(
 									//set address
 									wren = 0;
 									address = tracking_output_pointer + BlobStorageOffset;
-									new_blob_ptr = address; //points to the beginning of the blob's info in main memory
 									get_new_blob_data = 1;
 								end
 								1: begin
 									//read new blob data from first word into registers
-									// only relevant information from first word is matching color slot data. 
-									matching_color_slot = data_read[7:0];
-									if (matching_color_slot == 0) begin
+									
+									// debugging
+// 									if (address == 200000) begin
+// 										debug_display = data_read[7:0];
+// 									end
+									
+									if (data_read[7:0] == 0) begin // this is the color slot data from blob word one. 
 										// blob is NOT of interest and will not be stored. Get new.
-										main_state = GET_NEW_BLOB_DATA;
-										tracking_output_pointer = tracking_output_pointer + 3;
+										tracking_output_pointer = tracking_output_pointer + 3; // increment to next blob
+										get_new_blob_data = 0; //return to initial state in GET_NEW_BLOB_DATA with new pointer
 									end else begin
 										// blob is of interest
-										get_new_blob_data = 2;
+										matching_color_slot = data_read[7:0];
+										new_blob_ptr = address; //points to the beginning of the blob's info in main memory (allows for signal propogation from state 0)
 										number_of_valid_blobs = number_of_valid_blobs + 1;
 										tracking_output_pointer = tracking_output_pointer + 1;
+										get_new_blob_data = 2;
 									end
-									address = tracking_output_pointer + BlobStorageOffset;
 								end
 								2: begin
+									address = tracking_output_pointer + BlobStorageOffset; // set address with new tracking output pointer value.
+									get_new_blob_data = 3;
+								end
+								3: begin
+									// debugging
+									if (address == 200001) begin
+										debug_display = data_read[7:0];
+									end
 									// read new blob data from second word
 									new_x_centroid_coord = data_read[31:24];
 									new_y_centroid_coord = data_read[23:16];
 									new_blob_size = data_read[15:0];
 									// increment address by two (skip 3rd blob data word)
 									tracking_output_pointer = tracking_output_pointer + 2;
-									address = tracking_output_pointer + BlobStorageOffset;
+// 									address = tracking_output_pointer + BlobStorageOffset;
 									get_new_blob_data = 0;
 									main_state = GET_RANK_ONE_BLOB;
 								end
@@ -268,8 +291,9 @@ module blob_sorting(
 								2'b11: comparison_type = Y_CENTROID_LOWEST;
 							endcase		
 						end else begin
-							blob_sorting_done = 1;
-							main_state = DONE;
+// 							blob_sorting_done = 1;
+// 							main_state = DONE;
+ 							main_state = DEBUG1;
 						end	
 							
 					end
@@ -643,13 +667,145 @@ module blob_sorting(
 							end
 						endcase
 					end	// end REPLACE_RANK_THREE state
+					DEBUG1: begin
+						//write contents of   blob data memory   to main memory, starting at address BUFFER1_OFFSET + 320	
+						case (debug1_state)
+							// set read address line
+							0: begin
+								wren = 1'b0;
+								wren_blob_data = 1'b0;
+								blob_data_addr_a = 0;
+								address = BUFFER2_OFFSET + 320;
+								blob_data_data_write = 0;
+								debug1_state = 1;
+							end
+							// set write address and data lines to main memory
+							1: begin
+								wren = 1'b1;
+								data_write = {12'hFFF, blob_data_data_read_a};
+								debug1_state = 2;
+							end
+							// write to main memory
+							// increment read address 
+							// return to write state until counter reached
+							2: begin
+								wren = 1'b0;
+								address = address + 1;
+								blob_data_addr_a = blob_data_addr_a + 1;
+								//reset addresses after words 0-17 read
+								if (blob_data_addr_a > 17) begin
+									blob_data_addr_a = 0;
+									main_state = DEBUG2;
+								end else begin
+									debug1_state = 1; //bounce between states 1 and 2 (0 state is initial only)
+								end
+							end
+						endcase
+					end
+					DEBUG2: begin
+						//write contents of pointer memory to main memory, starting at address BUFFER1_OFFSET + 3200	
+						case (debug2_state)
+							// set read address line
+							0: begin
+								wren = 1'b0;
+								wren_pointer_memory = 1'b0;
+								pointer_memory_addr_a = 0;
+								address = BUFFER2_OFFSET + 3200;
+								pointer_memory_data_write = 18'h7ffff;
+								debug2_state = 1;
+							end
+							// set write address and data lines to main memory
+							1: begin
+								wren = 1'b1;
+								data_write = {12'hFFF, pointer_memory_data_read_a};
+								debug2_state = 2;
+							end
+							// write to main memory
+							// increment read address 
+							// return to write state until counter reached
+							2: begin
+								wren = 1'b0;
+								//reset addresses after words 0-17 read
+								address = address + 1;
+								pointer_memory_addr_a = pointer_memory_addr_a + 1;
+								if (pointer_memory_addr_a > 17) begin
+									pointer_memory_addr_a = 0;
+									main_state = DONE;
+								end else begin
+									debug2_state = 1; //bounce between states 1 and 2 (0 state is initial only)
+								end
+							end
+						endcase
+					end
+// 					DEBUG3: begin
+// 						//check data stored at main memory location 200000 (BlobStorageOffset)
+// 						case (debug3_state)
+// 							0: begin
+// 								//set address and wren
+// 								address = BlobStorageOffset + 1;
+// 								wren = 0;
+// 								debug3_state = 1;
+// 							end
+// 							1: begin
+// 								//read
+// 								debug_display = data_read[15:0];
+// 								debug3_state = 0;
+// 								main_state = DONE;
+// 							end
+// 						endcase
+// 					end
 					DONE: begin
+						blob_sorting_done = 1;
+						
+						// Reset all registers for next pass
+						main_state = INITIALIZATION;
+						blob_data_addr_a = 0;
+						pointer_memory_addr_a = 0;
+						blob_data_initialization = 0;
+						pointer_memory_initialization = 0;
+						tracking_output_pointer = 0;
+						blob_data_initialization = 0;
+						pointer_memory_initialization = 0;
+						get_new_blob_data = 0;
+						get_rank_one_blob = 0;
+						get_rank_two_blob = 0;
+						get_rank_three_blob = 0;
+						replace_rank_one = 0;
+						replace_rank_two = 0;
+						replace_rank_three = 0;
+						debug1_state = 0;
+						debug2_state = 0;
+						debug3_state = 0;
+				
+						data_write = 32'b0;
+						address = 18'b0;
+						wren = 1'b0;
 						main_state = DONE;
 					end
 				endcase // end main case statement
 			end else begin //end if enable = 1
 				blob_sorting_done = 0;
+
+				// Reset all registers for next pass
 				main_state = INITIALIZATION;
+				blob_data_addr_a = 0;
+				pointer_memory_addr_a = 0;
+				blob_data_initialization = 0;
+				pointer_memory_initialization = 0;
+				tracking_output_pointer = 0;
+				blob_data_initialization = 0;
+				pointer_memory_initialization = 0;
+				get_new_blob_data = 0;
+				get_rank_one_blob = 0;
+				get_rank_two_blob = 0;
+				get_rank_three_blob = 0;
+				replace_rank_one = 0;
+				replace_rank_two = 0;
+				replace_rank_three = 0;
+				debug1_state = 0;
+				debug2_state = 0;
+				debug3_state = 0;
+
 				address = 18'b0;
 				data_write = 32'b0;
 				wren = 1'b0;

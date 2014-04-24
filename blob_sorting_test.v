@@ -73,6 +73,12 @@ module blob_sorting_test;
 		// Add stimulus here
 		enable_blob_sorting = 1;
 		#6000;
+		enable_blob_sorting = 0;
+		#1000
+		enable_blob_sorting = 1;
+		#6000;
+		enable_blob_sorting = 0;
+		#1000
 		$finish;
 
 	end
@@ -140,6 +146,7 @@ module blob_sorting_test;
 			200036: data_read = 32'hffffffff;
 			200037: data_read = 32'hffffffff;
 			200038: data_read = 32'hffffffff;
+			default: data_read = 0;
 		endcase	
 	end
 	

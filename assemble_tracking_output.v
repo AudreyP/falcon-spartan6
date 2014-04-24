@@ -12,7 +12,7 @@ module tracking_output_assembly (
 	output reg [17:0] address,
 	
 	output reg [4:0] blob_pointer_addr,
-	input wire [18:0] blob_pointer,
+	input wire [17:0] blob_pointer,
 	input wire [4:0] number_of_valid_blobs,
 	
 	input wire [5:0] tracking_output_addr_b,
@@ -67,7 +67,7 @@ module tracking_output_assembly (
 	reg [31:0] blob_data_word_two = 0;
 	reg [31:0] blob_data_word_three = 0;
 	
-	
+	//main states
 	localparam
 		INITIALIZATION = 0,
 		SET_MARKERS_AND_PROTOCOL = 1,
@@ -785,6 +785,8 @@ module tracking_output_assembly (
 				end // end else
 			end else begin // end if enable == 1, else (if enable == 0)
 				tracking_output_done = 0;
+				blobs_written = 0;
+				blob_pointer_addr = 0;
 				main_state = INITIALIZATION;
 				address = 18'b0;
 				data_write = 32'b0;

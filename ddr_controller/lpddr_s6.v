@@ -167,6 +167,10 @@ module lpddr_s6 #
    localparam C3_CLKOUT0_DIVIDE       = 4;       
    localparam C3_CLKOUT1_DIVIDE       = 4;       
 
+//    // 50 MHz
+//    localparam C3_CLKOUT0_DIVIDE       = 8;       
+//    localparam C3_CLKOUT1_DIVIDE       = 8;       
+
    localparam C3_CLKOUT2_DIVIDE       = 32;       
    localparam C3_CLKOUT3_DIVIDE       = 16;       
    localparam C3_CLKFBOUT_MULT        = 8;       
