@@ -165,6 +165,20 @@ module main(
 
 	reg processing_done_internal = 0;
 
+	parameter BUFFER0_OFFSET = 0;
+	parameter BUFFER1_OFFSET = 76801;
+	parameter BUFFER2_OFFSET = 153602;
+	parameter BUFFER3_OFFSET = 230403;
+
+	parameter ImageBufferRGB = BUFFER1_OFFSET;
+	parameter ImageBufferHSV = BUFFER2_OFFSET;
+
+	parameter ImageWidth = 320;
+	parameter ImageHeight = 240;
+	parameter BlobStorageOffset = BUFFER3_OFFSET;	// used in blob_extraction and blob_sorting modules
+
+	reg [17:0] base_image_buffer_pointer = ImageBufferRGB;
+
 	//--------------------------------------------------------------------------
 	// Auxiliary clock generation
 	//--------------------------------------------------------------------------
@@ -193,6 +207,9 @@ module main(
 
 	reg enable_median_filtering = 0;
 	reg median_filtering_done = 0;
+
+	reg enable_rgb_to_hsv = 0;
+	wire rgb_to_hsv_done;
 	
 	reg enable_edge_detection = 0;
 	wire edge_detection_done ;
@@ -296,6 +313,22 @@ module main(
 		.enable(enable_memory_blanking),
 		.done(memory_blanking_done)
 		);
+
+	//------RGB TO HSV module
+	wire wren_rgb_to_hsv;
+	wire [17:0] address_rgb_to_hsv;
+	wire [31:0] data_write_rgb_to_hsv;
+
+	convert_rgb_to_hsv convert_rgb_to_hsv(
+		.clk(clk),
+		.pause(global_pause),
+		.address(address_rgb_to_hsv),
+		.data_write(data_write_rgb_to_hsv),
+		.wren(wren_rgb_to_hsv),
+		.data_read(data_read),
+		.enable(enable_rgb_to_hsv),
+		.done(rgb_to_hsv_done)
+		);
 	
 	//------CAMERA CLOCK MANAGER module
 	wire camera_dcm_locked;
@@ -390,16 +423,12 @@ module main(
 	wire [7:0] special_i2c_command_register;
 	wire camera_data_sda_rnw;
 	
-	reg enable_rgb = 1;
-	reg enable_ycrcb = 0;
-	
 	i2c_module #(.InternalClkFrequency(InternalClkFrequency)) 
 	i2c_module (
 		.startup_sequencer(startup_sequencer),
 		.send_special_i2c_command(send_special_i2c_command),
 		.camera_data_sda_sw(camera_data_sda_sw),
 		.camera_data_scl(camera_data_scl),
-		.enable_ycrcb(enable_ycrcb),
 		.special_i2c_command_register(special_i2c_command_register),
 		.special_i2c_command_data(special_i2c_command_data),
 		.clk(clk)
@@ -419,11 +448,15 @@ module main(
 	reg [7:0] edge_detection_threshold_green = 30;
 	reg [7:0] edge_detection_threshold_blue = 0;
 	
-	edge_detection edge_detection(
+	edge_detection #(
+		.ImageWidth(ImageWidth),
+		.ImageHeight(ImageHeight))
+		edge_detection(
 		//input wires (as seen by module)
 		.clk(clk),
 		.pause(global_pause),
 		.data_read(data_read),
+		.base_image_buffer_pointer(base_image_buffer_pointer),
 		.enable_edge_detection(enable_edge_detection),
 		.edge_detection_threshold_red(edge_detection_threshold_red),
 		.edge_detection_threshold_green(edge_detection_threshold_green),
@@ -434,14 +467,6 @@ module main(
 		.address(address_edge_detection),
 		.edge_detection_done(edge_detection_done)
 		);
-	
-	parameter BUFFER0_OFFSET = 0;
-	parameter BUFFER1_OFFSET = 76801;
-	parameter BUFFER2_OFFSET = 153602;
-	parameter BUFFER3_OFFSET = 230403;
-
-	parameter BlobStorageOffset = 200000; // used in blob_extraction and blob_sorting modules
-	//parameter BlobStorageOffset = BUFFER2_OFFSET + 6400; // used in blob_extraction and blob_sorting modules
 	
 	//------------------BLOB SORTING module
 	wire wren_blob_sorting;
@@ -474,13 +499,14 @@ module main(
 		.pause(global_pause),
  		.blob_extraction_blob_counter(blob_extraction_blob_counter),
 		.enable_blob_sorting(enable_blob_sorting),
-		.minimum_blob_size(minimum_blob_size),	
-		.slide_switches(slide_switches),
+		.minimum_blob_size(minimum_blob_size),
 		.wren(wren_blob_sorting),
 		.data_write(data_write_blob_sorting),
 		.address(address_blob_sorting),
 		.data_read(data_read),
 		.number_of_valid_blobs(number_of_valid_blobs),
+		.find_highest(find_highest),
+		.find_biggest(find_biggest),
 		// pointer memory
 		.pointer_memory_read_addr_b(blob_pointer_addr),
 		.pointer_memory_data_read_b(blob_pointer),
@@ -523,7 +549,7 @@ module main(
 		.wren(wren_tracking_output),
 		.data_read(data_read),
 		.tracking_display(led_wire),
-		.slide_switches(slide_switches),
+		.tracking_mode_select(slide_switches[1:0]),
 		.data_write(data_write_tracking_output),
 		.address(address_tracking_output),
 		.number_of_bytes_to_transmit(number_of_bytes_to_transmit),
@@ -582,8 +608,12 @@ module main(
 	reg [4:0] address_primary_color_slots;
 	reg [23:0] data_write_primary_color_slots;
 	reg wren_primary_color_slots;
+
+	reg [2:0] ignore_color_field_in_match = 3'b000;
 	
 	blob_extraction #(
+		.ImageWidth(ImageWidth),
+		.ImageHeight(ImageHeight),
 		.BlobStorageOffset(BlobStorageOffset))
 		blob_extraction(
 		//input wires
@@ -594,7 +624,9 @@ module main(
 		.pause(global_pause),
 		.enable_blob_extraction(enable_blob_extraction),
 		.data_read(data_read),
+		.base_image_buffer_pointer(base_image_buffer_pointer),
 		.color_similarity_threshold(color_similarity_threshold),
+		.ignore_color_field_in_match(ignore_color_field_in_match),
 		//.primary_color_slots(primary_color_slots),	//[23:0] by [5:0][3:0] ==> [575:0]
 		//output regs
 		.wren(wren_blob_extraction),
@@ -680,18 +712,19 @@ module main(
 	STATE_MEMORY_BLANKING = 2,
 	STATE_CAMERA_CAPTURE = 3,
 	STATE_MEDIAN_FILTERING = 4,
-	STATE_EDGE_DETECTION = 5,
-	STATE_X_PIXEL_FILLING = 6,
-	STATE_Y_PIXEL_FILLING = 7,
-	STATE_BORDER_DRAWING = 8,
-	STATE_BLOB_EXTRACTION = 9,
-	STATE_BLOB_SORTING = 10,
-	STATE_TRACKING_OUTPUT = 11,
-	STATE_TRACKING_OUTPUT_TWO = 12,
-	STATE_DATA_OUTPUT_CTL = 13,
-	STATE_FRAME_DUMP = 14,
-	STATE_SINGLE_SHOT = 15,
-	STATE_ONLINE_RECOGNITION = 16;
+	STATE_RGB_TO_HSV = 5,
+	STATE_EDGE_DETECTION = 6,
+	STATE_X_PIXEL_FILLING = 7,
+	STATE_Y_PIXEL_FILLING = 8,
+	STATE_BORDER_DRAWING = 9,
+	STATE_BLOB_EXTRACTION = 10,
+	STATE_BLOB_SORTING = 11,
+	STATE_TRACKING_OUTPUT = 12,
+	STATE_TRACKING_OUTPUT_TWO = 13,
+	STATE_DATA_OUTPUT_CTL = 14,
+	STATE_FRAME_DUMP = 15,
+	STATE_SINGLE_SHOT = 16,
+	STATE_ONLINE_RECOGNITION = 17;
 
 	reg [7:0] current_main_processing_state = STATE_POWERUP;
 	
@@ -727,9 +760,6 @@ module main(
 	assign LD5 = leds[5];
 	assign LD6 = leds[6];
 	assign LD7 = leds[7];
-	
-//	reg enable_rgb = 0;
-//	reg enable_ycrcb = 1;
 
 	assign all_dcms_locked = dcm_locked && dcm_locked_sram && camera_dcm_locked;
 	
@@ -926,24 +956,24 @@ module main(
 	reg [17:0] frame_dump_origin_address = 76801;
 
 	assign address = address_edge_detection | address_blob_sorting | address_tracking_output | address_x_pixel_filling 
-							| address_y_pixel_filling | address_blob_extraction | address_camera_capture | address_memory_blanking 
+							| address_y_pixel_filling | address_blob_extraction | address_camera_capture | address_memory_blanking | address_rgb_to_hsv
 							| address_single_shot | address_frame_dump /*| address_median_filtering*/;
 						
-	assign wren = wren_edge_detection | wren_blob_sorting | wren_tracking_output | wren_x_pixel_filling | wren_y_pixel_filling 
+	assign wren = wren_edge_detection | wren_blob_sorting | wren_tracking_output | wren_x_pixel_filling | wren_y_pixel_filling | wren_rgb_to_hsv
 							| wren_blob_extraction | wren_camera_capture | wren_memory_blanking /*| wren_median_filtering*/;
 						
-	assign data_write = data_write_edge_detection | data_write_blob_sorting | data_write_tracking_output | data_write_x_pixel_filling | data_write_y_pixel_filling 
+	assign data_write = data_write_edge_detection | data_write_blob_sorting | data_write_tracking_output | data_write_x_pixel_filling | data_write_y_pixel_filling | data_write_rgb_to_hsv
 							| data_write_blob_extraction | data_write_camera_capture | data_write_memory_blanking /*| data_write_median_filtering*/;
 
 // 	always @(negedge modified_clock_sram) begin
-// 		address <= address_edge_detection | address_blob_sorting | address_tracking_output | address_x_pixel_filling 
+// 		address <= address_edge_detection | address_blob_sorting | address_tracking_output | address_x_pixel_filling  | address_x_pixel_filling 
 // 								| address_y_pixel_filling | address_blob_extraction | address_camera_capture | address_memory_blanking 
 // 								| address_single_shot | address_frame_dump /*| address_median_filtering*/;
 // 							
-// 		wren <= wren_edge_detection | wren_blob_sorting | wren_tracking_output | wren_x_pixel_filling | wren_y_pixel_filling 
+// 		wren <= wren_edge_detection | wren_blob_sorting | wren_tracking_output | wren_x_pixel_filling | wren_y_pixel_filling  | wren_rgb_to_hsv
 // 								| wren_blob_extraction | wren_camera_capture | wren_memory_blanking /*| wren_median_filtering*/;
 // 							
-// 		data_write <= data_write_edge_detection | data_write_blob_sorting | data_write_tracking_output | data_write_x_pixel_filling | data_write_y_pixel_filling 
+// 		data_write <= data_write_edge_detection | data_write_blob_sorting | data_write_tracking_output | data_write_x_pixel_filling | data_write_y_pixel_filling | data_write_rgb_to_hsv
 // 								| data_write_blob_extraction | data_write_camera_capture | data_write_memory_blanking /*| data_write_median_filtering*/;
 // 	end
 
@@ -1016,9 +1046,18 @@ module main(
 					//enable_median_filtering = 1;
 					//if (median_filtering_done == 1) begin
 					//	enable_median_filtering = 0;
-						current_main_processing_state = STATE_EDGE_DETECTION;
+						current_main_processing_state = STATE_RGB_TO_HSV;
 					//end
-				end					
+				end
+
+				else if (current_main_processing_state == STATE_RGB_TO_HSV) begin
+					//leds[5] = 1;
+					enable_rgb_to_hsv = 1;
+					if (rgb_to_hsv_done == 1) begin
+						enable_rgb_to_hsv = 0;
+						current_main_processing_state = STATE_EDGE_DETECTION;
+					end
+				end
 				
 				else if (current_main_processing_state == STATE_EDGE_DETECTION) begin
 					//leds[5] = 1;
@@ -1138,13 +1177,13 @@ module main(
 						serial_output_holdoff = 1;
 
 						// Debug
-						if (slide_switches[1:0] == 0) begin
+						if (slide_switches[3:2] == 0) begin
 							frame_dump_origin_address = BUFFER0_OFFSET;
-						end else if (slide_switches[1:0] == 1) begin
+						end else if (slide_switches[3:2] == 1) begin
 							frame_dump_origin_address = BUFFER1_OFFSET;
-						end else if (slide_switches[1:0] == 2) begin
+						end else if (slide_switches[3:2] == 2) begin
 							frame_dump_origin_address = BUFFER2_OFFSET;
-						end else if (slide_switches[1:0] == 3) begin
+						end else if (slide_switches[3:2] == 3) begin
 							frame_dump_origin_address = BUFFER3_OFFSET;
 						end
 
@@ -1160,15 +1199,15 @@ module main(
 							// Transmit the entire contents of the image buffer to the serial port
 							if (tx_toggle == 0) begin
 								if (serial_output_index_toggle == 0) begin
-									TxD_data = data_read[31:24];
+									TxD_data = data_read[31:24];	// Blue
 								end
 								
 								if (serial_output_index_toggle == 1) begin
-									TxD_data = data_read[15:8];
+									TxD_data = data_read[15:8];	// Green
 								end
 								
 								if (serial_output_index_toggle == 2) begin
-									TxD_data = data_read[7:0];
+									TxD_data = data_read[7:0];	// Red
 								end
 								
 								TxD_start = 1;
@@ -1222,9 +1261,9 @@ module main(
 					if (serial_output_holdoff == 0) begin
 						serial_output_holdoff = 1;
 						address_single_shot = 0;
-						//address = 76801;
-						//address = 153602;
-						//address = 230403;
+						//address_single_shot = 76801;
+						//address_single_shot = 153602;
+						//address_single_shot = 230403;
 						serial_output_index_toggle = 0;
 						serial_output_index = 0;
 						thisiswhite = 0;
@@ -1447,16 +1486,14 @@ module main(
 							end
 							
 							if (serial_command_buffer == 74) begin		// Enable RGB mode
-								enable_rgb = 1;
-								enable_ycrcb = 0;
-								reset_system = 1;
+								base_image_buffer_pointer = ImageBufferRGB;
+								ignore_color_field_in_match = 3'b000;	// Do not ignore any color values when matching [BGR]
 								serial_receiver_timer = 0;
 							end
 							
-							if (serial_command_buffer == 75) begin		// Enable YCrCb mode
-								enable_rgb = 0;
-								enable_ycrcb = 1;
-								reset_system = 1;
+							if (serial_command_buffer == 75) begin		// Enable HSV mode
+								base_image_buffer_pointer = ImageBufferHSV;
+								ignore_color_field_in_match = 3'b001;	// Ignore intensity value (V) when matching [HSV]
 								serial_receiver_timer = 0;
 							end
 							

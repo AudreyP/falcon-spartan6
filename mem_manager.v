@@ -87,6 +87,23 @@ module mem_manager(
 		.dina(bram_data_write), // input [31 : 0] dina
 		.douta(bram_data_read) // output [31 : 0] douta
 		);
+
+	//--------------------------------------------
+	// INSTANTIATE SINGLE PORT BRAM BUFFER 
+	// (This is used for storing hue data)
+	//--------------------------------------------	
+	reg hue_bram_wren = 0;
+	reg [7:0] hue_bram_data_write = 0;
+	reg [16:0] hue_bram_addr = 0;
+	wire [7:0] hue_bram_data_read;
+	
+	hue_bram hue_bram (
+		.clka(modified_clock_sram), // input clka (double-clocked)
+		.wea(hue_bram_wren), // input [0 : 0] wea
+		.addra(hue_bram_addr), // input [14 : 0] addra
+		.dina(hue_bram_data_write), // input [31 : 0] dina
+		.douta(hue_bram_data_read) // output [31 : 0] douta
+		);
 		
 	//--------------------------------------------
 	// INSTANTIATE DDR SDRAM CONTROLLER CORE
@@ -222,16 +239,20 @@ module mem_manager(
 			BRAM_DATA_WRITE = 2,
 			BRAM_DATA_READ = 3,
 			BRAM_DATA_READ_READY = 4,
+
+			HUE_BRAM_DATA_WRITE = 5,
+			HUE_BRAM_DATA_READ = 6,
+			HUE_BRAM_DATA_READ_READY = 7,
 			
-			WRITE_DELAY_STATE = 5,
-			WRITE_COMMIT_STATE = 6,
-			WRITE_TRANSITION_STATE = 7,
+			WRITE_DELAY_STATE = 8,
+			WRITE_COMMIT_STATE = 9,
+			WRITE_TRANSITION_STATE = 10,
 			
-			READ_STATE = 8,
+			READ_STATE = 11,
 			
-			DDR_DATA_VALID_STATE = 9,
-			NO_RETURN_WAIT_STATE = 10,
-			NO_RETURN_RELEASE_STATE = 11;
+			DDR_DATA_VALID_STATE = 12,
+			NO_RETURN_WAIT_STATE = 13,
+			NO_RETURN_RELEASE_STATE = 14;
 
 	reg word_read = 0;
 
@@ -269,13 +290,13 @@ module mem_manager(
 
 			IDLE_STATE:	begin
 						if (clk_sync == LATCH_TIME) begin
-// 							// Rudimentary single-word data cache
-// 							if ((address == address_prev) && ((wren == 0) || ((wren == 1) && (wren_prev == 1) && (data_write == data_write_prev)))) begin
-// 								// Do nothing!
-// 								ddr_op_in_progress <= 1;
-// 								pause_unbuffered <= 0;
-// 								state <= DDR_DATA_VALID_STATE;
-// 							end else begin
+							// Rudimentary single-word data cache
+							if ((address == address_prev) && ((wren == 0) || ((wren == 1) && (wren_prev == 1) && (data_write == data_write_prev)))) begin
+								// Do nothing!
+								ddr_op_in_progress <= 1;
+								pause_unbuffered <= 0;
+								state <= DDR_DATA_VALID_STATE;
+							end else begin
 								// DEACTIVATED--see below
 								//cmd_addr[29:2] <= address;	//starting address 17 bits--shove into upper 28b of 30b addr to leave room for two 0's
 								//cmd_addr[1:0] <= 0;
@@ -286,14 +307,22 @@ module mem_manager(
 
 								//determine read or write operation
 								if (wren == 1) begin	//if a write signal is received, begin write
-									if ((address >= 200000) && (address < 232768)) begin // if in this range, write data to fast single-port bram
-										bram_addr <= address - 200000;
+									if ((address >= 230403) && (address < 246787)) begin // if in this range, write data to fast single-port bram
+										bram_addr <= address - 230403;
 										bram_data_write <= data_write;
 										data_read_unbuffered <= data_write;	// When writing, pass the write data through to the read port.  This allows proper operation of the same-address write-->read turnaround portion of the data cache above
 										bram_wren <= 1'b1;
 										pause_unbuffered <= 1;
 										pause <= 1;
 										state <= BRAM_DATA_WRITE;
+// 									end else if ((address >= 153602) && (address < 230402)) begin // if in this range, write data to hue bram
+// 										hue_bram_addr <= address - 153602;
+// 										hue_bram_data_write <= data_write[31:24];
+// 										data_read_unbuffered <= {24'h000000, data_write[31:24]};	// When writing, pass the write data through to the read port.  This allows proper operation of the same-address write-->read turnaround portion of the data cache above
+// 										hue_bram_wren <= 1'b1;
+// 										pause_unbuffered <= 1;
+// 										pause <= 1;
+// 										state <= HUE_BRAM_DATA_WRITE;
 									end else begin // otherwise, write to main ddr memory.
 										wr_data <= data_write;	//write whole 32-bit word
 										//wr_data <= 32'hf0806020;
@@ -305,12 +334,18 @@ module mem_manager(
 										pause <= 1;		// Set the actual pause signal as well--if the memory controller comes up with the data before the no return time pause will be deasserted as if it was never set.  Without this "bypass" assignment pause is not set when it needs to be and data transfers fail.
 									end
 								end else begin	//wren == 0
-									if ((address >= 200000) && (address < 232768)) begin // if in this range, read data from fast single-port bram
-										bram_addr <= address - 200000;
+									if ((address >= 230403) && (address < 246787)) begin // if in this range, read data from fast single-port bram
+										bram_addr <= address - 230403;
 										bram_wren <= 1'b0;
 										pause_unbuffered <= 1;
 										pause <= 1;
 										state <= BRAM_DATA_READ;
+// 									end else if ((address >= 153602) && (address < 230402)) begin // if in this range, read data from fast single-port bram
+// 										hue_bram_addr <= address - 153602;
+// 										hue_bram_wren <= 1'b0;
+// 										pause_unbuffered <= 1;
+// 										pause <= 1;
+// 										state <= HUE_BRAM_DATA_READ;
 									end else begin
 										cmd_instr <= READ;
 										//burst length set to constant 1
@@ -324,7 +359,7 @@ module mem_manager(
 										pause <= 1;		// Set the actual pause signal as well--if the memory controller comes up with the data before the no return time pause will be deasserted as if it was never set.  Without this "bypass" assignment pause is not set when it needs to be and data transfers fail.
 									end
 								end // end else
-// 							end
+							end
 		
 							wren_prev <= wren;
 							data_write_prev <= data_write;
@@ -346,6 +381,22 @@ module mem_manager(
 			
 			BRAM_DATA_READ_READY: begin
 						data_read_unbuffered <= bram_data_read;
+						pause_unbuffered <= 0;
+						state <= DDR_DATA_VALID_STATE;
+					end
+
+			HUE_BRAM_DATA_WRITE: begin
+						hue_bram_wren <= 1'b0;
+						pause_unbuffered <= 0;
+						state <= DDR_DATA_VALID_STATE;
+					end
+
+			HUE_BRAM_DATA_READ: begin
+						state <= HUE_BRAM_DATA_READ_READY;
+					end
+			
+			HUE_BRAM_DATA_READ_READY: begin
+						data_read_unbuffered <= {24'h000000, hue_bram_data_read};
 						pause_unbuffered <= 0;
 						state <= DDR_DATA_VALID_STATE;
 					end

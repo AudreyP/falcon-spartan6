@@ -45,7 +45,9 @@ module blob_extraction(
 	input wire pause,
 	input wire enable_blob_extraction,
 	input wire [31:0] data_read,
+	input wire [17:0] base_image_buffer_pointer,
 	input wire [7:0] color_similarity_threshold,
+	input wire [2:0] ignore_color_field_in_match,
 	//input wire [575:0] primary_color_slots,	
 
 	//output regs
@@ -66,7 +68,6 @@ module blob_extraction(
 
 	parameter ImageWidth = 320;
 	parameter ImageHeight = 240;
-	parameter ImageOffset = (ImageWidth*ImageHeight)+1;
 	parameter BlobStorageOffset = 200000;
 
 	initial blob_extraction_done = 0;
@@ -176,41 +177,46 @@ module blob_extraction(
 	);
 
 	// Instantiate division modules
-	reg [17:0] divider_dividend_red;
-	reg [17:0] divider_divisor_red;
-	wire [17:0] divider_quotient_red;
-	wire [17:0] divider_remainder_red;
+	//localparam divider_size = 16;
+	//localparam divider_size = 18;
+	localparam divider_size = 20;
+	//localparam divider_size = 22;
+	//localparam divider_size = 24;
+	reg [(divider_size-1):0] divider_dividend_red;
+	reg [(divider_size-1):0] divider_divisor_red;
+	wire [(divider_size-1):0] divider_quotient_red;
+	wire [(divider_size-1):0] divider_remainder_red;
 	wire divider_zeroflag_red;
 	
-	reg [17:0] divider_dividend_green;
-	reg [17:0] divider_divisor_green;
-	wire [17:0] divider_quotient_green;
-	wire [17:0] divider_remainder_green;
+	reg [(divider_size-1):0] divider_dividend_green;
+	reg [(divider_size-1):0] divider_divisor_green;
+	wire [(divider_size-1):0] divider_quotient_green;
+	wire [(divider_size-1):0] divider_remainder_green;
 	wire divider_zeroflag_green;
 
-	reg [17:0] divider_dividend_blue;
-	reg [17:0] divider_divisor_blue;
-	wire [17:0] divider_quotient_blue;
-	wire [17:0] divider_remainder_blue;
+	reg [(divider_size-1):0] divider_dividend_blue;
+	reg [(divider_size-1):0] divider_divisor_blue;
+	wire [(divider_size-1):0] divider_quotient_blue;
+	wire [(divider_size-1):0] divider_remainder_blue;
 	wire divider_zeroflag_blue;
 
-	reg [17:0] divider_dividend_x;
-	reg [17:0] divider_divisor_x;
-	wire [17:0] divider_quotient_x;
-	wire [17:0] divider_remainder_x;
+	reg [(divider_size-1):0] divider_dividend_x;
+	reg [(divider_size-1):0] divider_divisor_x;
+	wire [(divider_size-1):0] divider_quotient_x;
+	wire [(divider_size-1):0] divider_remainder_x;
 	wire divider_zeroflag_x;
 
-	reg [17:0] divider_dividend_y;
-	reg [17:0] divider_divisor_y;
-	wire [17:0] divider_quotient_y;
-	wire [17:0] divider_remainder_y;
+	reg [(divider_size-1):0] divider_dividend_y;
+	reg [(divider_size-1):0] divider_divisor_y;
+	wire [(divider_size-1):0] divider_quotient_y;
+	wire [(divider_size-1):0] divider_remainder_y;
 	wire divider_zeroflag_y;
 
-	serial_divide_uu serial_divide_uu_red (.dividend(divider_dividend_red), .divisor(divider_divisor_red), .quotient(divider_quotient_red), .remainder(divider_remainder_red), .zeroflag(divider_zeroflag_red));
-	serial_divide_uu serial_divide_uu_green (.dividend(divider_dividend_green), .divisor(divider_divisor_green), .quotient(divider_quotient_green), .remainder(divider_remainder_green), .zeroflag(divider_zeroflag_green));
-	serial_divide_uu serial_divide_uu_blue (.dividend(divider_dividend_blue), .divisor(divider_divisor_blue), .quotient(divider_quotient_blue), .remainder(divider_remainder_blue), .zeroflag(divider_zeroflag_blue));
-	serial_divide_uu serial_divide_uu_x (.dividend(divider_dividend_x), .divisor(divider_divisor_x), .quotient(divider_quotient_x), .remainder(divider_remainder_x), .zeroflag(divider_zeroflag_x));
-	serial_divide_uu serial_divide_uu_y (.dividend(divider_dividend_y), .divisor(divider_divisor_y), .quotient(divider_quotient_y), .remainder(divider_remainder_y), .zeroflag(divider_zeroflag_y));
+	serial_divide_uu #(.size(divider_size)) serial_divide_uu_red (.dividend(divider_dividend_red), .divisor(divider_divisor_red), .quotient(divider_quotient_red), .remainder(divider_remainder_red), .zeroflag(divider_zeroflag_red));
+	serial_divide_uu #(.size(divider_size)) serial_divide_uu_green (.dividend(divider_dividend_green), .divisor(divider_divisor_green), .quotient(divider_quotient_green), .remainder(divider_remainder_green), .zeroflag(divider_zeroflag_green));
+	serial_divide_uu #(.size(divider_size)) serial_divide_uu_blue (.dividend(divider_dividend_blue), .divisor(divider_divisor_blue), .quotient(divider_quotient_blue), .remainder(divider_remainder_blue), .zeroflag(divider_zeroflag_blue));
+	serial_divide_uu #(.size(divider_size)) serial_divide_uu_x (.dividend(divider_dividend_x), .divisor(divider_divisor_x), .quotient(divider_quotient_x), .remainder(divider_remainder_x), .zeroflag(divider_zeroflag_x));
+	serial_divide_uu #(.size(divider_size)) serial_divide_uu_y (.dividend(divider_dividend_y), .divisor(divider_divisor_y), .quotient(divider_quotient_y), .remainder(divider_remainder_y), .zeroflag(divider_zeroflag_y));
 	
 	// Now it's time to find and extract the blobs
 	//always @(posedge clk_div_by_four) begin
@@ -426,7 +432,7 @@ module blob_extraction(
 								if (blob_extraction_inner_toggler == 2) begin
 									// Switch to read; we need to read the RGB value of the median-filtered image
 									wren = 0;
-									address = (((blob_extraction_y_temp_1 * ImageWidth) + blob_extraction_x_temp) + ImageOffset);
+									address = (((blob_extraction_y_temp_1 * ImageWidth) + blob_extraction_x_temp) + base_image_buffer_pointer);
 								end
 		
 								if (blob_extraction_inner_toggler == 3) begin
@@ -472,131 +478,75 @@ module blob_extraction(
 									end
 									
 									// Set up the red averaging
-									if (blob_extraction_red_average < 65535) begin
+									if (blob_extraction_red_average < 1048576) begin
 										divider_dividend_red = blob_extraction_red_average;
 										divider_divisor_red = blob_extraction_blob_size;
 									end
-									if ((blob_extraction_red_average > 65534) && (blob_extraction_red_average < 131071)) begin
+									if ((blob_extraction_red_average > 1048575) && (blob_extraction_red_average < 2097151)) begin
 										divider_dividend_red = (blob_extraction_red_average / 2);
 										divider_divisor_red = (blob_extraction_blob_size / 2);
 									end
-									if ((blob_extraction_red_average > 131070) && (blob_extraction_red_average < 262143)) begin
+									if (blob_extraction_red_average > 2097150) begin
 										divider_dividend_red = (blob_extraction_red_average / 4);
 										divider_divisor_red = (blob_extraction_blob_size / 4);
 									end
-									if ((blob_extraction_red_average > 262142) && (blob_extraction_red_average < 524287)) begin
-										divider_dividend_red = (blob_extraction_red_average / 8);
-										divider_divisor_red = (blob_extraction_blob_size / 8);
-									end
-									if ((blob_extraction_red_average > 524286) && (blob_extraction_red_average < 1048575)) begin
-										divider_dividend_red = (blob_extraction_red_average / 16);
-										divider_divisor_red = (blob_extraction_blob_size / 16);
-									end
-									if ((blob_extraction_red_average > 1048575) && (blob_extraction_red_average < 2097151)) begin
-										divider_dividend_red = (blob_extraction_red_average / 32);
-										divider_divisor_red = (blob_extraction_blob_size / 32);
-									end
-									if (blob_extraction_red_average > 2097150) begin
-										divider_dividend_red = (blob_extraction_red_average / 128);
-										divider_divisor_red = (blob_extraction_blob_size / 128);
-									end
 									
 									// Set up the green averaging
-									if (blob_extraction_green_average < 65535) begin
+									if (blob_extraction_green_average < 1048576) begin
 										divider_dividend_green = blob_extraction_green_average;
 										divider_divisor_green = blob_extraction_blob_size;
 									end
-									if ((blob_extraction_green_average > 65534) && (blob_extraction_green_average < 131071)) begin
+									if ((blob_extraction_green_average > 1048575) && (blob_extraction_green_average < 2097151)) begin
 										divider_dividend_green = (blob_extraction_green_average / 2);
 										divider_divisor_green = (blob_extraction_blob_size / 2);
 									end
-									if ((blob_extraction_green_average > 131070) && (blob_extraction_green_average < 262143)) begin
+									if (blob_extraction_green_average > 2097150) begin
 										divider_dividend_green = (blob_extraction_green_average / 4);
 										divider_divisor_green = (blob_extraction_blob_size / 4);
-									end
-									if ((blob_extraction_green_average > 262142) && (blob_extraction_green_average < 524287)) begin
-										divider_dividend_green = (blob_extraction_green_average / 8);
-										divider_divisor_green = (blob_extraction_blob_size / 8);
-									end
-									if ((blob_extraction_green_average > 524286) && (blob_extraction_green_average < 1048575)) begin
-										divider_dividend_green = (blob_extraction_green_average / 16);
-										divider_divisor_green = (blob_extraction_blob_size / 16);
-									end
-									if ((blob_extraction_green_average > 1048575) && (blob_extraction_green_average < 2097151)) begin
-										divider_dividend_green = (blob_extraction_green_average / 32);
-										divider_divisor_green = (blob_extraction_blob_size / 32);
-									end
-									if (blob_extraction_green_average > 2097150) begin
-										divider_dividend_green = (blob_extraction_green_average / 128);
-										divider_divisor_green = (blob_extraction_blob_size / 128);
 									end
 								end
 									
 								if (blob_extraction_inner_toggler == 4) begin
 									// Read the red averaging result
-									blob_extraction_red_average_final = divider_quotient_red;
+									if (divider_zeroflag_red == 0) begin
+										blob_extraction_red_average_final = divider_quotient_red;
+									end else begin
+										blob_extraction_red_average_final = 0;
+									end
 									
 									// Read the green averaging result
-									blob_extraction_green_average_final = divider_quotient_green;
+									if (divider_zeroflag_green == 0) begin
+										blob_extraction_green_average_final = divider_quotient_green;
+									end else begin
+										blob_extraction_green_average_final = 0;
+									end
 		
 									// Set up the blue averaging
-									if (blob_extraction_blue_average < 65535) begin
+									if (blob_extraction_blue_average < 1048576) begin
 										divider_dividend_blue = blob_extraction_blue_average;
 										divider_divisor_blue = blob_extraction_blob_size;
 									end
-									if ((blob_extraction_blue_average > 65534) && (blob_extraction_blue_average < 131071)) begin
+									if ((blob_extraction_blue_average > 1048575) && (blob_extraction_blue_average < 2097151)) begin
 										divider_dividend_blue = (blob_extraction_blue_average / 2);
 										divider_divisor_blue = (blob_extraction_blob_size / 2);
 									end
-									if ((blob_extraction_blue_average > 131070) && (blob_extraction_blue_average < 262143)) begin
+									if (blob_extraction_blue_average > 2097150) begin
 										divider_dividend_blue = (blob_extraction_blue_average / 4);
 										divider_divisor_blue = (blob_extraction_blob_size / 4);
 									end
-									if ((blob_extraction_blue_average > 262142) && (blob_extraction_blue_average < 524287)) begin
-										divider_dividend_blue = (blob_extraction_blue_average / 8);
-										divider_divisor_blue = (blob_extraction_blob_size / 8);
-									end
-									if ((blob_extraction_blue_average > 524286) && (blob_extraction_blue_average < 1048575)) begin
-										divider_dividend_blue = (blob_extraction_blue_average / 16);
-										divider_divisor_blue = (blob_extraction_blob_size / 16);
-									end
-									if ((blob_extraction_blue_average > 1048575) && (blob_extraction_blue_average < 2097151)) begin
-										divider_dividend_blue = (blob_extraction_blue_average / 32);
-										divider_divisor_blue = (blob_extraction_blob_size / 32);
-									end
-									if (blob_extraction_blue_average > 2097150) begin
-										divider_dividend_blue = (blob_extraction_blue_average / 128);
-										divider_divisor_blue = (blob_extraction_blob_size / 128);
-									end
 									
 									// Set up the X averaging
-									if (blob_extraction_x_average < 65535) begin
+									if (blob_extraction_x_average < 1048576) begin
 										divider_dividend_x = blob_extraction_x_average;
 										divider_divisor_x = blob_extraction_blob_size;
 									end
-									if ((blob_extraction_x_average > 65534) && (blob_extraction_x_average < 131071)) begin
+									if ((blob_extraction_x_average > 1048575) && (blob_extraction_x_average < 2097151)) begin
 										divider_dividend_x = (blob_extraction_x_average / 2);
 										divider_divisor_x = (blob_extraction_blob_size / 2);
 									end
-									if ((blob_extraction_x_average > 131070) && (blob_extraction_x_average < 262143)) begin
+									if (blob_extraction_x_average > 2097150) begin
 										divider_dividend_x = (blob_extraction_x_average / 4);
 										divider_divisor_x = (blob_extraction_blob_size / 4);
-									end
-									if ((blob_extraction_x_average > 262142) && (blob_extraction_x_average < 524287)) begin
-										divider_dividend_x = (blob_extraction_x_average / 8);
-										divider_divisor_x = (blob_extraction_blob_size / 8);
-									end
-									if ((blob_extraction_x_average > 524286) && (blob_extraction_x_average < 1048575)) begin
-										divider_dividend_x = (blob_extraction_x_average / 16);
-										divider_divisor_x = (blob_extraction_blob_size / 16);
-									end
-									if ((blob_extraction_x_average > 1048575) && (blob_extraction_x_average < 2097151)) begin
-										divider_dividend_x = (blob_extraction_x_average / 32);
-										divider_divisor_x = (blob_extraction_blob_size / 32);
-									end
-									if (blob_extraction_x_average > 2097150) begin
-										divider_dividend_x = (blob_extraction_x_average / 512);
-										divider_divisor_x = (blob_extraction_blob_size / 512);
 									end
 									
 									// We need to read data from the image here, so set up another read cycle
@@ -606,39 +556,31 @@ module blob_extraction(
 								
 								if (blob_extraction_inner_toggler == 5) begin
 									// Read the blue averaging result
-									blob_extraction_blue_average_final = divider_quotient_blue;
+									if (divider_zeroflag_blue == 0) begin
+										blob_extraction_blue_average_final = divider_quotient_blue;
+									end else begin
+										blob_extraction_blue_average_final = 0;
+									end
 									
 									// Read the X averaging result
-									blob_extraction_x_average_final = divider_quotient_x;
+									if (divider_zeroflag_x == 0) begin
+										blob_extraction_x_average_final = divider_quotient_x;
+									end else begin
+										blob_extraction_x_average_final = 0;
+									end
 		
 									// Set up the Y averaging
-									if (blob_extraction_y_average < 65535) begin
+									if (blob_extraction_y_average < 1048576) begin
 										divider_dividend_y = blob_extraction_y_average;
 										divider_divisor_y = blob_extraction_blob_size;
 									end
-									if ((blob_extraction_y_average > 65534) && (blob_extraction_y_average < 131071)) begin
+									if ((blob_extraction_y_average > 1048575) && (blob_extraction_y_average < 2097151)) begin
 										divider_dividend_y = (blob_extraction_y_average / 2);
 										divider_divisor_y = (blob_extraction_blob_size / 2);
 									end
-									if ((blob_extraction_y_average > 131070) && (blob_extraction_y_average < 262143)) begin
+									if (blob_extraction_y_average > 2097150) begin
 										divider_dividend_y = (blob_extraction_y_average / 4);
 										divider_divisor_y = (blob_extraction_blob_size / 4);
-									end
-									if ((blob_extraction_y_average > 262142) && (blob_extraction_y_average < 524287)) begin
-										divider_dividend_y = (blob_extraction_y_average / 8);
-										divider_divisor_y = (blob_extraction_blob_size / 8);
-									end
-									if ((blob_extraction_y_average > 524286) && (blob_extraction_y_average < 1048575)) begin
-										divider_dividend_y = (blob_extraction_y_average / 16);
-										divider_divisor_y = (blob_extraction_blob_size / 16);
-									end
-									if ((blob_extraction_y_average > 1048575) && (blob_extraction_y_average < 2097151)) begin
-										divider_dividend_y = (blob_extraction_y_average / 32);
-										divider_divisor_y = (blob_extraction_blob_size / 32);
-									end
-									if (blob_extraction_y_average > 2097150) begin
-										divider_dividend_y = (blob_extraction_y_average / 128);
-										divider_divisor_y = (blob_extraction_blob_size / 128);
 									end
 									
 									// Now read in the data
@@ -671,7 +613,11 @@ module blob_extraction(
 									
 								if (blob_extraction_inner_toggler == 7) begin
 									// Read the Y averaging result...done!
-									blob_extraction_y_average_final = divider_quotient_y;
+									if (divider_zeroflag_y == 0) begin
+										blob_extraction_y_average_final = divider_quotient_y;
+									end else begin
+										blob_extraction_y_average_final = 0;
+									end
 									
 									// Now read in the data
 									if ((spanRight == 0) && (data_read == 0)) begin
@@ -725,35 +671,41 @@ module blob_extraction(
 								//for (blob_extraction_color_loop = 0; blob_extraction_color_loop < 6; blob_extraction_color_loop = blob_extraction_color_loop + 1) begin
 									//for (blob_extraction_slot_loop = 0; blob_extraction_slot_loop < 8; blob_extraction_slot_loop = blob_extraction_slot_loop + 1) begin
 										// Red
-										if (blob_extraction_red_average_final > primary_color_slots_doutb[7:0]) begin
-											//old syntax was primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][7:0] 
-											
-											blob_extraction_current_difference = blob_extraction_red_average_final - primary_color_slots_doutb[7:0];
-										end else begin
-											blob_extraction_current_difference = primary_color_slots_doutb[7:0] - blob_extraction_red_average_final;
+										if (ignore_color_field_in_match[0] == 1'b0) begin
+											if (blob_extraction_red_average_final > primary_color_slots_doutb[7:0]) begin
+												//old syntax was primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][7:0] 
+												
+												blob_extraction_current_difference = blob_extraction_red_average_final - primary_color_slots_doutb[7:0];
+											end else begin
+												blob_extraction_current_difference = primary_color_slots_doutb[7:0] - blob_extraction_red_average_final;
+											end
 										end
 										
 										// Green
-										if (blob_extraction_green_average_final > primary_color_slots_doutb[15:8]) begin
-											//old syntax was primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][15:8]
-												
-											blob_extraction_current_difference = 
-											(blob_extraction_current_difference + (blob_extraction_green_average_final - primary_color_slots_doutb[15:8]));
-										end else begin
-											blob_extraction_current_difference = (blob_extraction_current_difference + (primary_color_slots_doutb[15:8] - blob_extraction_green_average_final));
+										if (ignore_color_field_in_match[1] == 1'b0) begin
+											if (blob_extraction_green_average_final > primary_color_slots_doutb[15:8]) begin
+												//old syntax was primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][15:8]
+													
+												blob_extraction_current_difference = 
+												(blob_extraction_current_difference + (blob_extraction_green_average_final - primary_color_slots_doutb[15:8]));
+											end else begin
+												blob_extraction_current_difference = (blob_extraction_current_difference + (primary_color_slots_doutb[15:8] - blob_extraction_green_average_final));
+											end
 										end
 										
 										// Blue
-										if (blob_extraction_blue_average_final > primary_color_slots_doutb[23:16]) begin
-											//old syntax was primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][23:16]
-											
-											blob_extraction_current_difference = 
-											(blob_extraction_current_difference + (blob_extraction_blue_average_final 
-												- primary_color_slots_doutb[23:16]));
-										end else begin
-											blob_extraction_current_difference = 
-											(blob_extraction_current_difference 
-												+ (primary_color_slots_doutb[23:16] - blob_extraction_blue_average_final));
+										if (ignore_color_field_in_match[2] == 1'b0) begin
+											if (blob_extraction_blue_average_final > primary_color_slots_doutb[23:16]) begin
+												//old syntax was primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][23:16]
+												
+												blob_extraction_current_difference = 
+												(blob_extraction_current_difference + (blob_extraction_blue_average_final 
+													- primary_color_slots_doutb[23:16]));
+											end else begin
+												blob_extraction_current_difference = 
+												(blob_extraction_current_difference 
+													+ (primary_color_slots_doutb[23:16] - blob_extraction_blue_average_final));
+											end
 										end
 										
 										// debugging
@@ -850,7 +802,7 @@ module blob_extraction(
 							
 							if (blob_extraction_toggler == 14) begin
 								// Put a little red dot dot where the centroid is
-								address = ((blob_extraction_y_average_final * ImageWidth) + blob_extraction_x_average_final) + ImageOffset;	// Set up the next write
+								address = ((blob_extraction_y_average_final * ImageWidth) + blob_extraction_x_average_final) + base_image_buffer_pointer;	// Set up the next write
 								blob_extraction_data_temp = 255;
 								blob_extraction_data_temp[31:24] = blob_extraction_blob_color_number;
 								data_write = blob_extraction_data_temp;

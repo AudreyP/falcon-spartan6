@@ -35,7 +35,6 @@ module i2c_module(
 	input send_special_i2c_command,
 	output reg camera_data_sda_sw,
 	output reg camera_data_scl = 1'bz,
-	input enable_ycrcb,
 	input [7:0] special_i2c_command_register,
 	input [15:0] special_i2c_command_data,
 	input clk);

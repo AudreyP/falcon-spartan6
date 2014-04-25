@@ -1,10 +1,31 @@
+`timescale 1ns / 1ps
+/**********************************************************************
+ Copyright (C) 2014 Audrey Pearson <aud.pearson@gmail.com>
+ Copyright (c) 2014 Timothy Pearson <kb9vqf@pearsoncomputing.net>
+
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 2.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+ 02111-1307, USA
+
+**********************************************************************/
+
 module tracking_output_assembly (
 	//input wires
 	input wire clk,
 	input wire clk_fast,
 	input wire pause,
 	input wire enable_tracking_output,	
-	input wire [7:0] slide_switches,
+	input wire [1:0] tracking_mode_select,
 	input wire [31:0] data_read,
 	//output regs
 	output reg wren,
@@ -99,7 +120,7 @@ module tracking_output_assembly (
 			if (enable_tracking_output == 1) begin
 				if (blobs_written <= number_of_valid_blobs) begin
 					// get tracking mode)
-					case (slide_switches[1:0])
+					case (tracking_mode_select)
 						2'b01: begin 
 							tracking_mode = 1;
 							number_of_bytes_to_transmit = 28;

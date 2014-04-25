@@ -1,10 +1,8 @@
 // Non-restoring division module
+// From: http://larc.ee.nthu.edu.tw/~hhwu/divider.htm
 
 module serial_divide_uu(dividend, divisor, quotient, remainder, zeroflag);
 	parameter size = 16 ; //4bit, 8bit or 16bit
-	//parameter size = 17 ; //4bit, 8bit or 16bit
-	//parameter size = 18 ; //4bit, 8bit or 16bit
-	//parameter size = 20 ; //4bit, 8bit or 16bit
 	
 	input    [size-1:0]dividend;
 	input    [size-1:0]divisor;
@@ -18,13 +16,13 @@ module serial_divide_uu(dividend, divisor, quotient, remainder, zeroflag);
 	
 	integer i;
 	
-	assign zeroflag = divisor==16'h0000 ? 1'b1 : 1'b0; //zero detection
+	assign zeroflag = divisor==32'h00000000 ? 1'b1 : 1'b0; //zero detection
 	
 	always@(dividend or divisor)
 	begin
 		 quotient = dividend;
 		 div = divisor;
-		 p = {16'h0000,1'b0};
+		 p = {32'h00000000,1'b0};
 		 sign = 1'b0;
 	
 		 for(i=0;i<size;i=i+1)

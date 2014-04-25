@@ -23,6 +23,7 @@ module edge_detection(
 	input wire clk,
 	input wire pause,
 	input wire [31:0] data_read,
+	input wire [17:0] base_image_buffer_pointer,
 	input wire enable_edge_detection,
 	input wire [7:0] edge_detection_threshold_red,
 	input wire [7:0] edge_detection_threshold_green,
@@ -34,6 +35,9 @@ module edge_detection(
 	output reg [17:0] address,
 	output reg edge_detection_done
 	);
+
+	parameter ImageWidth = 320;
+	parameter ImageHeight = 240;
 	
 	initial edge_detection_done = 0;
 	
@@ -69,9 +73,9 @@ module edge_detection(
 			if (enable_edge_detection == 1) begin
 				if (edge_detection_holdoff == 0) begin
 					wren = 0;
-					address = 79041;								// Skip the topmost 7 lines of the image
-					edge_detection_counter_tog = 79041;
-					edge_detection_counter_togg = 2240;
+					address = (base_image_buffer_pointer+(ImageWidth*7));								// Skip the topmost 7 lines of the image
+					edge_detection_counter_tog = (base_image_buffer_pointer+(ImageWidth*7));
+					edge_detection_counter_togg = (ImageWidth*7);
 					edge_detection_holdoff = 1;
 					edge_detection_counter_toggle = 1;
 					edge_detection_main_chunk_already_loaded = 0;
@@ -88,9 +92,9 @@ module edge_detection(
 									if (edge_detection_y_counter < edge_detector_averaging_window) begin
 										// Set up the next read operation
 										if (edge_detection_y_counter != (edge_detector_averaging_window - 2)) begin
-											address = (((edge_detection_counter_tog - (edge_detector_averaging_window / 2)) + (edge_detection_y_counter * 320)) - (((edge_detector_averaging_window / 2) - 2) * 320));
+											address = (((edge_detection_counter_tog - (edge_detector_averaging_window / 2)) + (edge_detection_y_counter * ImageWidth)) - (((edge_detector_averaging_window / 2) - 2) * ImageWidth));
 										end else begin
-											address = ((edge_detection_counter_tog + (edge_detector_averaging_window / 2)) - (((edge_detector_averaging_window / 2) - 1) * 320));
+											address = ((edge_detection_counter_tog + (edge_detector_averaging_window / 2)) - (((edge_detector_averaging_window / 2) - 1) * ImageWidth));
 										end
 										
 										// Load the leftmost column and subtract each value from the accumulators
@@ -99,7 +103,7 @@ module edge_detection(
 										edge_detection_running_total_blue = edge_detection_running_total_blue - data_read[31:24];
 									end else begin
 										// Set up the next read operation
-										address = (((edge_detection_counter_tog + (edge_detector_averaging_window / 2)) + ((edge_detection_y_counter - edge_detector_averaging_window) * 320)) - (((edge_detector_averaging_window / 2) - 2) * 320));
+										address = (((edge_detection_counter_tog + (edge_detector_averaging_window / 2)) + ((edge_detection_y_counter - edge_detector_averaging_window) * ImageWidth)) - (((edge_detector_averaging_window / 2) - 2) * ImageWidth));
 										
 										// Load the rightmost column and add each value to the accumulators
 										edge_detection_running_total_red = edge_detection_running_total_red + data_read[7:0];	// This is whatever pixel I previously loaded in!
@@ -122,7 +126,7 @@ module edge_detection(
 								// for y=0 to 16
 								if (edge_detection_y_counter < edge_detector_averaging_window) begin
 									// Set up the next read operation...
-									address = ((((edge_detection_counter_tog + edge_detection_x_counter) - ((edge_detector_averaging_window / 2) - 1)) + (edge_detection_y_counter * 320)) - (((edge_detector_averaging_window / 2) - 1) * 320));
+									address = ((((edge_detection_counter_tog + edge_detection_x_counter) - ((edge_detector_averaging_window / 2) - 1)) + (edge_detection_y_counter * ImageWidth)) - (((edge_detector_averaging_window / 2) - 1) * ImageWidth));
 									wren = 0;
 	
 									// Keep a running total of all the points that I visit...
@@ -227,9 +231,9 @@ module edge_detection(
 						edge_detection_counter_buffer_green[23:16] = data_read[15:8];
 						edge_detection_counter_buffer_blue[23:16] = data_read[31:24];
 						if (edge_detection_main_chunk_already_loaded == 0) begin
-							address = edge_detection_counter_tog + (((edge_detector_averaging_window / 2) * 320) + (edge_detector_averaging_window / 2));			// Set next read address (8 down and 8 to the right)
+							address = edge_detection_counter_tog + (((edge_detector_averaging_window / 2) * ImageWidth) + (edge_detector_averaging_window / 2));			// Set next read address (8 down and 8 to the right)
 						end else begin
-							address = edge_detection_counter_tog - ((((edge_detector_averaging_window / 2) - 1) * 320) + (edge_detector_averaging_window / 2));		// Set next read address (7 up and 8 to the left)
+							address = edge_detection_counter_tog - ((((edge_detector_averaging_window / 2) - 1) * ImageWidth) + (edge_detector_averaging_window / 2));		// Set next read address (7 up and 8 to the left)
 						end
 						edge_detection_counter_toggle = edge_detection_counter_toggle + 1;	// Next stage, please!
 						edge_detection_x_counter = 0;
@@ -241,7 +245,7 @@ module edge_detection(
 						edge_detection_counter_buffer_red[15:8] = data_read[7:0];			// This is the rightmost pixel
 						edge_detection_counter_buffer_green[15:8] = data_read[15:8];
 						edge_detection_counter_buffer_blue[15:8] = data_read[31:24];
-						address = edge_detection_counter_tog + 320;			// Set next read address (1 down)
+						address = edge_detection_counter_tog + ImageWidth;			// Set next read address (1 down)
 						edge_detection_counter_toggle = edge_detection_counter_toggle + 1;	// Next stage, please!
 						edge_detection_x_counter = 0;
 						edge_detection_y_counter = 0;
@@ -258,7 +262,7 @@ module edge_detection(
 						edge_detection_y_counter = 0;
 					end
 					
-					if (edge_detection_counter_togg == 74561) begin		// All done!	It is 74561 because we don't need to process the last 7 lines of the image, as they would just be garbage anyway!
+					if (edge_detection_counter_togg == ((ImageWidth*(ImageHeight-7))+1)) begin		// All done!	We don't need to process the last 7 lines of the image, as they would just be garbage anyway!
 						edge_detection_counter_tog = 0;
 						edge_detection_counter_togg = 0;
 						edge_detection_counter_toggle = 0;
