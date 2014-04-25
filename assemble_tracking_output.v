@@ -148,20 +148,19 @@ module tracking_output_assembly (
 							case (markers_and_protocol)
 								0: begin
 									// this is written regardless of blob rank.
-									wren_tracking_output = 0;
 									tracking_output_addr_a = 0;
+									wren_tracking_output = 1;
 									tracking_output_data_write = ASCII_176;
 									markers_and_protocol = markers_and_protocol + 1;
 								end
 								1: begin
-									// write pulse
-									wren_tracking_output = 1;
+									// Wait for no reason whatsoever because I really like to WASTE TIME...hehehe...
 									markers_and_protocol = markers_and_protocol + 1;
 								end
 								2: begin
 									// this is written regardless of blob rank.
-									wren_tracking_output = 0;
 									tracking_output_addr_a = 1;
+									wren_tracking_output = 1;
 									case (tracking_mode)
 										1: tracking_output_data_write = PROTOCOL_VERSION_1;
 										2: tracking_output_data_write = PROTOCOL_VERSION_2;
@@ -170,13 +169,12 @@ module tracking_output_assembly (
 									markers_and_protocol = markers_and_protocol + 1;
 								end
 								3: begin
-									// write pulse
-									wren_tracking_output = 1;
+									// Wait for no reason whatsoever because I really like to WASTE TIME...hehehe...
 									markers_and_protocol = markers_and_protocol + 1;
 								end
 								4: begin
 									// this is written regardless of blob rank.
-									wren_tracking_output = 0;
+									wren_tracking_output = 1;
 									case (tracking_mode)
 										1: tracking_output_addr_a = 26;
 										2: tracking_output_addr_a = 50;
@@ -186,13 +184,12 @@ module tracking_output_assembly (
 									markers_and_protocol = markers_and_protocol + 1;
 								end
 								5: begin
-									// write pulse
-									wren_tracking_output = 1;
+									// Wait for no reason whatsoever because I really like to WASTE TIME...hehehe...
 									markers_and_protocol = markers_and_protocol + 1;
 								end
 								6: begin
 									// this is written regardless of blob rank.
-									wren_tracking_output = 0;
+									wren_tracking_output = 1;
 									case (tracking_mode)
 										1: tracking_output_addr_a = 27;
 										2: tracking_output_addr_a = 51;
@@ -202,8 +199,7 @@ module tracking_output_assembly (
 									markers_and_protocol = markers_and_protocol + 1;
 								end
 								7: begin
-									// write pulse
-									wren_tracking_output = 1;
+									// Wait for no reason whatsoever because I really like to WASTE TIME...hehehe...
 									markers_and_protocol = markers_and_protocol + 1;
 								end
 								8: begin

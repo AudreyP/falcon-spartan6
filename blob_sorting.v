@@ -675,8 +675,8 @@ module blob_sorting(
 								wren = 1'b0;
 								wren_blob_data = 1'b0;
 								blob_data_addr_a = 0;
-								address = BUFFER2_OFFSET + 320;
-								blob_data_data_write = 0;
+								//address = BUFFER2_OFFSET + 320;
+								address = 209602 + 320;
 								debug1_state = 1;
 							end
 							// set write address and data lines to main memory
@@ -710,8 +710,8 @@ module blob_sorting(
 								wren = 1'b0;
 								wren_pointer_memory = 1'b0;
 								pointer_memory_addr_a = 0;
-								address = BUFFER2_OFFSET + 3200;
-								pointer_memory_data_write = 18'h7ffff;
+								//address = BUFFER2_OFFSET + 3200;
+								address = 209602 + 3200;
 								debug2_state = 1;
 							end
 							// set write address and data lines to main memory

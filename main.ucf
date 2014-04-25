@@ -477,5 +477,6 @@ NET dram_we_n PULLUP;
 # DEBUG
 NET "modified_clock_debug"      LOC = "A3" | IOSTANDARD = "LVCMOS33";
 #NET "modified_clock_sync_debug" LOC = "B3" | IOSTANDARD = "LVCMOS33";
+NET "global_pause" LOC = "B3" | IOSTANDARD = "LVCMOS33";
 NET "modified_clock_sram_debug" LOC = "A2" | IOSTANDARD = "LVCMOS33";
 NET "modified_clock_fast_debug" LOC = "B2" | IOSTANDARD = "LVCMOS33";

@@ -91,6 +91,7 @@ module main(
 	, output reg modified_clock_debug
 	, output reg modified_clock_sram_debug
 	, output reg modified_clock_fast_debug
+	, output wire global_pause	//comes from ddr memory, goes to all modules
 	);
 
 	wire c3_clk0;
@@ -104,8 +105,8 @@ module main(
 
 	//parameter InternalClkFrequency = 6250000;	// 6.25MHz
 	//parameter InternalClkFrequency = 6666666;	// 6.66MHz
-	parameter InternalClkFrequency = 10000000;	// 10MHz
-	//parameter InternalClkFrequency = 12500000;	// 12.5MHz
+	//parameter InternalClkFrequency = 10000000;	// 10MHz
+	parameter InternalClkFrequency = 12500000;	// 12.5MHz
 	//parameter InternalClkFrequency = 13333333;	// 13.33MHz
 	//parameter InternalClkFrequency = 20000000;	// 20MHz
 	//parameter InternalClkFrequency = 50000000;	// 50MHz
@@ -237,7 +238,7 @@ module main(
 	wire mem_read_error;
 	wire memory_controller_ready;
 
-	wire global_pause;	//comes from ddr memory, goes to all modules
+// 	wire global_pause;	//comes from ddr memory, goes to all modules
 
 	wire [7:0] modified_clock_phase;
 
@@ -439,8 +440,8 @@ module main(
 	parameter BUFFER2_OFFSET = 153602;
 	parameter BUFFER3_OFFSET = 230403;
 
-	//parameter BlobStorageOffset = 200000; // used in blob_extraction and blob_sorting modules
-	parameter BlobStorageOffset = BUFFER2_OFFSET + 6400; // used in blob_extraction and blob_sorting modules
+	parameter BlobStorageOffset = 200000; // used in blob_extraction and blob_sorting modules
+	//parameter BlobStorageOffset = BUFFER2_OFFSET + 6400; // used in blob_extraction and blob_sorting modules
 	
 	//------------------BLOB SORTING module
 	wire wren_blob_sorting;
@@ -648,9 +649,6 @@ module main(
 	reg [15:0] databuffer;
 	reg [31:0] databuffer_mem;
 
-
-	reg [7:0] current_main_processing_state = STATE_INITIAL;
-
 	reg [17:0] median_filtering_coun = 0;
 	reg [17:0] median_filtering_counter_t = 0;
 	reg [17:0] median_filtering_counter_to = 0;
@@ -675,6 +673,27 @@ module main(
 	reg run_frame_dump_internal = 0;
 	reg run_single_shot_test_internal = 0;
 	reg run_online_recognition_internal = 0;
+
+	localparam
+	STATE_POWERUP = 0,
+	STATE_INITIAL = 1,
+	STATE_MEMORY_BLANKING = 2,
+	STATE_CAMERA_CAPTURE = 3,
+	STATE_MEDIAN_FILTERING = 4,
+	STATE_EDGE_DETECTION = 5,
+	STATE_X_PIXEL_FILLING = 6,
+	STATE_Y_PIXEL_FILLING = 7,
+	STATE_BORDER_DRAWING = 8,
+	STATE_BLOB_EXTRACTION = 9,
+	STATE_BLOB_SORTING = 10,
+	STATE_TRACKING_OUTPUT = 11,
+	STATE_TRACKING_OUTPUT_TWO = 12,
+	STATE_DATA_OUTPUT_CTL = 13,
+	STATE_FRAME_DUMP = 14,
+	STATE_SINGLE_SHOT = 15,
+	STATE_ONLINE_RECOGNITION = 16;
+
+	reg [7:0] current_main_processing_state = STATE_POWERUP;
 	
 	assign SEG0 = sseg[0];	
 	assign SEG1 = sseg[1];
@@ -817,13 +836,14 @@ module main(
 			display_value = blob_debug[7:0];	// red slot, red
 		end
 		if (slide_switches[4:0] == 9) begin
-// 			display_value = sram_debug0;
+			display_value = sram_debug0;
 // 			display_value = blob_debug[15:8];	//red slot, green
 // 			display_value = tracking_output_blob_data;
- 			display_value = blob_extraction_blob_counter;
+//  			display_value = blob_extraction_blob_counter;
 		end
 		if (slide_switches[4:0] == 10) begin
- 			display_value = blob_debug[23:16];	// red slot, blue
+//  			display_value = blob_debug[23:16];	// red slot, blue
+ 			display_value = global_pause;
 		end
 		if (slide_switches[4:0] == 11) begin
  			display_value = blob_debug2;		// address
@@ -927,30 +947,11 @@ module main(
 // 								| data_write_blob_extraction | data_write_camera_capture | data_write_memory_blanking /*| data_write_median_filtering*/;
 // 	end
 
-	localparam
-	STATE_POWERUP = 0,
-	STATE_INITIAL = 1,
-	STATE_MEMORY_BLANKING = 2,
-	STATE_CAMERA_CAPTURE = 3,
-	STATE_MEDIAN_FILTERING = 4,
-	STATE_EDGE_DETECTION = 5,
-	STATE_X_PIXEL_FILLING = 6,
-	STATE_Y_PIXEL_FILLING = 7,
-	STATE_BORDER_DRAWING = 8,
-	STATE_BLOB_EXTRACTION = 9,
-	STATE_BLOB_SORTING = 10,
-	STATE_TRACKING_OUTPUT = 11,
-	STATE_TRACKING_OUTPUT_TWO = 12,
-	STATE_DATA_OUTPUT_CTL = 13,
-	STATE_FRAME_DUMP = 14,
-	STATE_SINGLE_SHOT = 15,
-	STATE_ONLINE_RECOGNITION = 16;
-
 	always @(posedge clk) begin
 		//FIXME
 		//tracking output debugging only
 		leds[5:0] = led_wire;
-		leds[6] = 0;
+		leds[6] = global_pause;
 // 		if (global_pause == 0) begin
 			//if ((processing_done_internal == 0)) begin
 			//if (camera_transfer_done == 1) begin
@@ -1332,7 +1333,7 @@ module main(
 						serial_output_index = 0;
 						tracking_output_blob_data_addr = 0;
 					end else begin
-						if ((serial_output_enabled == 1) && (global_pause == 0)) begin
+						if (serial_output_enabled == 1) begin
 							processing_ended = 0;		// We only needed to pulse this
 									
 							// Transmit the entire contents of the tracking data buffer to the serial port

@@ -64,11 +64,30 @@ module mem_manager(
 	output wire [15:0] debug2
 	 );
 
+	initial pause = 0;
+
 	parameter MemoryToSystemClockRatio = 10;
 
 	wire calib_done;
 	assign controller_ready = calib_done;	
 
+	//--------------------------------------------
+	// INSTANTIATE SINGLE PORT BRAM BUFFER 
+	// (This is used for high-transistion r/w ops taking place in addresses 200000-232768)
+	//--------------------------------------------	
+	reg bram_wren = 0;
+	reg [31:0] bram_data_write = 0;
+	reg [14:0] bram_addr = 0;
+	wire [31:0] bram_data_read;
+	
+	main_memory_bram bram (
+		.clka(modified_clock_sram), // input clka (double-clocked)
+		.wea(bram_wren), // input [0 : 0] wea
+		.addra(bram_addr), // input [14 : 0] addra
+		.dina(bram_data_write), // input [31 : 0] dina
+		.douta(bram_data_read) // output [31 : 0] douta
+		);
+		
 	//--------------------------------------------
 	// INSTANTIATE DDR SDRAM CONTROLLER CORE
 	//--------------------------------------------	
@@ -185,6 +204,7 @@ module mem_manager(
 	//registers
 	reg [15:0] data_out_upper, data_out_lower;
 	reg [3:0] state = 0;
+// reg [3:0] state = 1;	// simulation only
 	reg [15:0] data_to_ram;
 	reg ddr_op_in_progress;
 
@@ -199,15 +219,19 @@ module mem_manager(
 	localparam	INIT_STATE = 0,
 			IDLE_STATE = 1,
 
-			WRITE_DELAY_STATE = 2,
-			WRITE_COMMIT_STATE = 3,
-			WRITE_TRANSITION_STATE = 4,
+			BRAM_DATA_WRITE = 2,
+			BRAM_DATA_READ = 3,
+			BRAM_DATA_READ_READY = 4,
 			
-			READ_STATE = 5,
+			WRITE_DELAY_STATE = 5,
+			WRITE_COMMIT_STATE = 6,
+			WRITE_TRANSITION_STATE = 7,
 			
-			DDR_DATA_VALID_STATE = 6,
-			NO_RETURN_WAIT_STATE = 7,
-			NO_RETURN_RELEASE_STATE = 8;
+			READ_STATE = 8,
+			
+			DDR_DATA_VALID_STATE = 9,
+			NO_RETURN_WAIT_STATE = 10,
+			NO_RETURN_RELEASE_STATE = 11;
 
 	reg word_read = 0;
 
@@ -245,13 +269,13 @@ module mem_manager(
 
 			IDLE_STATE:	begin
 						if (clk_sync == LATCH_TIME) begin
-							// Rudimentary single-word data cache
-							if ((address == address_prev) && ((wren == 0) || ((wren == 1) && (wren_prev == 1) && (data_write == data_write_prev)))) begin
-								// Do nothing!
-								ddr_op_in_progress <= 1;
-								pause_unbuffered <= 0;
-								state <= DDR_DATA_VALID_STATE;
-							end else begin
+// 							// Rudimentary single-word data cache
+// 							if ((address == address_prev) && ((wren == 0) || ((wren == 1) && (wren_prev == 1) && (data_write == data_write_prev)))) begin
+// 								// Do nothing!
+// 								ddr_op_in_progress <= 1;
+// 								pause_unbuffered <= 0;
+// 								state <= DDR_DATA_VALID_STATE;
+// 							end else begin
 								// DEACTIVATED--see below
 								//cmd_addr[29:2] <= address;	//starting address 17 bits--shove into upper 28b of 30b addr to leave room for two 0's
 								//cmd_addr[1:0] <= 0;
@@ -261,28 +285,46 @@ module mem_manager(
 								cmd_addr[2:0] <= 0;
 
 								//determine read or write operation
-								if (wren == 1) begin	//if a write signal is received, begin write	
-									wr_data <= data_write;	//write whole 32-bit word
-									//wr_data <= 32'hf0806020;
-									data_read_unbuffered <= data_write;	// When writing, pass the write data through to the read port.  This allows proper operation of the same-address write-->read turnaround portion of the data cache above
-									wr_en <= 1;	//now that data is in data path, assert write enable
-									state <= WRITE_DELAY_STATE;
-									ddr_op_in_progress <= 1;
-									pause_unbuffered <= 1;
-									pause <= 1;		// Set the actual pause signal as well--if the memory controller comes up with the data before the no return time pause will be deasserted as if it was never set.  Without this "bypass" assignment pause is not set when it needs to be and data transfers fail.
+								if (wren == 1) begin	//if a write signal is received, begin write
+									if ((address >= 200000) && (address < 232768)) begin // if in this range, write data to fast single-port bram
+										bram_addr <= address - 200000;
+										bram_data_write <= data_write;
+										data_read_unbuffered <= data_write;	// When writing, pass the write data through to the read port.  This allows proper operation of the same-address write-->read turnaround portion of the data cache above
+										bram_wren <= 1'b1;
+										pause_unbuffered <= 1;
+										pause <= 1;
+										state <= BRAM_DATA_WRITE;
+									end else begin // otherwise, write to main ddr memory.
+										wr_data <= data_write;	//write whole 32-bit word
+										//wr_data <= 32'hf0806020;
+										data_read_unbuffered <= data_write;	// When writing, pass the write data through to the read port.  This allows proper operation of the same-address write-->read turnaround portion of the data cache above
+										wr_en <= 1;	//now that data is in data path, assert write enable
+										state <= WRITE_DELAY_STATE;
+										ddr_op_in_progress <= 1;
+										pause_unbuffered <= 1;
+										pause <= 1;		// Set the actual pause signal as well--if the memory controller comes up with the data before the no return time pause will be deasserted as if it was never set.  Without this "bypass" assignment pause is not set when it needs to be and data transfers fail.
+									end
 								end else begin	//wren == 0
-									cmd_instr <= READ;
-									//burst length set to constant 1
-									//address already set in LATCH STATE
-									cmd_en <= 1;	//enable read command with addr, burst length, and instruction data set in IDLE STATE
-									rd_en <= 1;	//output data as soon as it becomes available
-									state <= READ_STATE;
-									word_read <= 0;
-									ddr_op_in_progress <= 1;
-									pause_unbuffered <= 1;
-									pause <= 1;		// Set the actual pause signal as well--if the memory controller comes up with the data before the no return time pause will be deasserted as if it was never set.  Without this "bypass" assignment pause is not set when it needs to be and data transfers fail.
+									if ((address >= 200000) && (address < 232768)) begin // if in this range, read data from fast single-port bram
+										bram_addr <= address - 200000;
+										bram_wren <= 1'b0;
+										pause_unbuffered <= 1;
+										pause <= 1;
+										state <= BRAM_DATA_READ;
+									end else begin
+										cmd_instr <= READ;
+										//burst length set to constant 1
+										//address already set in LATCH STATE
+										cmd_en <= 1;	//enable read command with addr, burst length, and instruction data set in IDLE STATE
+										rd_en <= 1;	//output data as soon as it becomes available
+										state <= READ_STATE;
+										word_read <= 0;
+										ddr_op_in_progress <= 1;
+										pause_unbuffered <= 1;
+										pause <= 1;		// Set the actual pause signal as well--if the memory controller comes up with the data before the no return time pause will be deasserted as if it was never set.  Without this "bypass" assignment pause is not set when it needs to be and data transfers fail.
+									end
 								end // end else
-							end
+// 							end
 		
 							wren_prev <= wren;
 							data_write_prev <= data_write;
@@ -292,6 +334,22 @@ module mem_manager(
 						end
 					end
 
+			BRAM_DATA_WRITE: begin
+						bram_wren <= 1'b0;
+						pause_unbuffered <= 0;
+						state <= DDR_DATA_VALID_STATE;
+					end
+
+			BRAM_DATA_READ: begin
+						state <= BRAM_DATA_READ_READY;
+					end
+			
+			BRAM_DATA_READ_READY: begin
+						data_read_unbuffered <= bram_data_read;
+						pause_unbuffered <= 0;
+						state <= DDR_DATA_VALID_STATE;
+					end
+			
 			//-----WRITE CYCLE
 			WRITE_DELAY_STATE: begin
 						wr_en <= 0;	//complete wr_en pulse, delay before setting cmd (necessary)?
@@ -358,6 +416,9 @@ module mem_manager(
 	
 			//-----occurs only when an entire data word has been written or read to/from DDR
 			DDR_DATA_VALID_STATE: begin
+						// reset bram write
+						bram_wren <= 1'b0;
+						
 						rd_en <= 0;
 						wr_en <= 0;
 						cmd_en <= 0;

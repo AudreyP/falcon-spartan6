@@ -55,7 +55,8 @@ module clock_manager_test;
 
 	wire [31:0] data_read;
 	reg [31:0] data_write = 0;
-	reg [17:0] address = 0;
+	//reg [17:0] address = 0;
+	reg [17:0] address = 200000;
 	reg wren = 0;
 
 	wire dram_ck;
@@ -117,7 +118,21 @@ module clock_manager_test;
 		input_clk_stable = 0;
 		#100
 		input_clk_stable = 1;
-		#1000
+		#260
+// 		wren = 1;
+// 		#20
+// 		wren = 0;
+// 		#20
+// 		wren = 1;
+// 		#20;
+// 		wren = 0;
+// 		#500
+		address = 200000;
+		#80
+		address = 200001;
+		#80
+		address = 200002;
+		#100
 		$finish;
 	end
 
@@ -125,17 +140,21 @@ module clock_manager_test;
 	always begin
 		#5 input_clk = !input_clk;
 	end
-
-	reg [7:0] test_count = 0;
-	always @(posedge modified_clock) begin
-		if (global_pause == 0) begin
-			test_count = test_count + 1;
-			if (test_count > 2) begin
-				wren = 1;
-				address = test_count - 2;
-			end
-		end
-	end
+	
+// 	always @(posedge modified_clock) begin
+// 		address = address + 1;
+// 	end
+	
+//	reg [7:0] test_count = 0;
+//	always @(posedge modified_clock) begin
+//		if (global_pause == 0) begin
+//			test_count = test_count + 1;
+//			if (test_count > 2) begin
+//				wren = 1;
+//				address = test_count - 2;
+//			end
+//		end
+//	end
 
 // 	reg [15:0] ddr_test_count = 0;
 // 	always @(posedge dram_ck_n) begin	// Every 7.5ns

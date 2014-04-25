@@ -3,14 +3,14 @@
    <wave_state>
    </wave_state>
    <db_ref_list>
-      <db_ref path="/home/audrey/Xilinx Projects/Falcon_Spartan6/clock_manager_test_isim_beh.wdb" id="1" type="auto">
+      <db_ref path="/home/audrey/Xilinx Projects/falcon-spartan6/clock_manager_test_isim_beh.wdb" id="1" type="auto">
          <top_modules>
             <top_module name="clock_manager_test" />
             <top_module name="glbl" />
          </top_modules>
       </db_ref>
    </db_ref_list>
-   <WVObjectSize size="55" />
+   <WVObjectSize size="58" />
    <wvobject fp_name="/clock_manager_test/modified_clock" type="logic" db_ref_id="1">
       <obj_property name="ElementShortName">modified_clock</obj_property>
       <obj_property name="ObjectShortName">modified_clock</obj_property>
@@ -47,10 +47,6 @@
       <obj_property name="ElementShortName">modified_clock_period[7:0]</obj_property>
       <obj_property name="ObjectShortName">modified_clock_period[7:0]</obj_property>
       <obj_property name="Radix">HEXRADIX</obj_property>
-   </wvobject>
-   <wvobject fp_name="/clock_manager_test/data_read" type="array" db_ref_id="1">
-      <obj_property name="ElementShortName">data_read[31:0]</obj_property>
-      <obj_property name="ObjectShortName">data_read[31:0]</obj_property>
    </wvobject>
    <wvobject fp_name="/clock_manager_test/modified_clk" type="logic" db_ref_id="1">
       <obj_property name="ElementShortName">modified_clk</obj_property>
@@ -156,6 +152,11 @@
       <obj_property name="ElementShortName">input_clk_stable</obj_property>
       <obj_property name="ObjectShortName">input_clk_stable</obj_property>
    </wvobject>
+   <wvobject fp_name="/clock_manager_test/data_read" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">data_read[31:0]</obj_property>
+      <obj_property name="ObjectShortName">data_read[31:0]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
    <wvobject fp_name="/clock_manager_test/data_write" type="array" db_ref_id="1">
       <obj_property name="ElementShortName">data_write[31:0]</obj_property>
       <obj_property name="ObjectShortName">data_write[31:0]</obj_property>
@@ -163,6 +164,7 @@
    <wvobject fp_name="/clock_manager_test/address" type="array" db_ref_id="1">
       <obj_property name="ElementShortName">address[17:0]</obj_property>
       <obj_property name="ObjectShortName">address[17:0]</obj_property>
+      <obj_property name="Radix">UNSIGNEDDECRADIX</obj_property>
    </wvobject>
    <wvobject fp_name="/clock_manager_test/wren" type="logic" db_ref_id="1">
       <obj_property name="ElementShortName">wren</obj_property>
@@ -184,11 +186,6 @@
    <wvobject fp_name="/clock_manager_test/mem_manager/clk_sync" type="array" db_ref_id="1">
       <obj_property name="ElementShortName">clk_sync[7:0]</obj_property>
       <obj_property name="ObjectShortName">clk_sync[7:0]</obj_property>
-      <obj_property name="Radix">HEXRADIX</obj_property>
-   </wvobject>
-   <wvobject fp_name="/clock_manager_test/test_count" type="array" db_ref_id="1">
-      <obj_property name="ElementShortName">test_count[7:0]</obj_property>
-      <obj_property name="ObjectShortName">test_count[7:0]</obj_property>
       <obj_property name="Radix">HEXRADIX</obj_property>
    </wvobject>
    <wvobject fp_name="/clock_manager_test/mem_manager/address" type="array" db_ref_id="1">
@@ -240,5 +237,24 @@
    <wvobject fp_name="/clock_manager_test/mem_manager/rd_empty" type="logic" db_ref_id="1">
       <obj_property name="ElementShortName">rd_empty</obj_property>
       <obj_property name="ObjectShortName">rd_empty</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/mem_manager/bram/wea" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">wea[0:0]</obj_property>
+      <obj_property name="ObjectShortName">wea[0:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/mem_manager/bram/addra" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">addra[14:0]</obj_property>
+      <obj_property name="ObjectShortName">addra[14:0]</obj_property>
+      <obj_property name="Radix">UNSIGNEDDECRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/mem_manager/bram/dina" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">dina[31:0]</obj_property>
+      <obj_property name="ObjectShortName">dina[31:0]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="/clock_manager_test/mem_manager/bram/douta" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">douta[31:0]</obj_property>
+      <obj_property name="ObjectShortName">douta[31:0]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
    </wvobject>
 </wave_config>
