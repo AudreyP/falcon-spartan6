@@ -24,8 +24,9 @@ module blob_sorting(
 	input wire pause,
 	input wire enable_blob_sorting,	
 	input wire [7:0] minimum_blob_size,
-	input wire [7:0] slide_switches,
 	input wire [15:0] blob_extraction_blob_counter,
+	input wire find_biggest,
+	input wire find_highest,	
 	
 	input wire [4:0] pointer_memory_read_addr_b,
 	output wire [17:0] pointer_memory_data_read_b,
@@ -184,41 +185,28 @@ module blob_sorting(
 						//write zeros to the 0-17 slots in the blob sizes array
 						case (blob_data_initialization) 
 							0: begin
-								wren_blob_data = 1'b0;
+								wren_blob_data = 1'b1;
 								blob_data_addr_a = 0;
 								blob_data_data_write = 0;
 								blob_data_initialization = 1;
 							end
 							1: begin
-								blob_data_data_write = 0;
-								wren_blob_data = 1'b1;
-								blob_data_initialization = 2;
-							end
-							2: begin
-								wren_blob_data = 1'b0;
 								blob_data_addr_a = blob_data_addr_a + 1;
 								//reset addresses after words 0-17 written
 								if (blob_data_addr_a > 17) begin
 									blob_data_addr_a = 0;
 								end
-								blob_data_initialization = 1; //bounce between states 1 and 2 (0 state is initial only)
 							end
 						endcase
 						// initialize pointer memory to all ones (7fff)
 						case (pointer_memory_initialization) 
 							0: begin
-								wren_pointer_memory = 1'b0;
+								wren_pointer_memory = 1'b1;
 								pointer_memory_addr_a = 0;
-								pointer_memory_data_write = 18'h7ffff;
+								pointer_memory_data_write = 18'h3ffff;
 								pointer_memory_initialization = 1;
 							end
 							1: begin
-								pointer_memory_data_write = 18'h7ffff;
-								wren_pointer_memory = 1'b1;
-								pointer_memory_initialization = 2;
-							end
-							2: begin
-								wren_pointer_memory = 1'b0;
 								pointer_memory_addr_a = pointer_memory_addr_a + 1;
 								//reset addresses after words 0-17 written
 								if (pointer_memory_addr_a > 17) begin
@@ -226,7 +214,6 @@ module blob_sorting(
 									blob_data_addr_a = 0;
 									main_state = GET_NEW_BLOB_DATA;
 								end
-								pointer_memory_initialization = 1; //bounce between states 1 and 2 (0 state is initial only)
 							end
 						endcase
 					end
@@ -284,12 +271,16 @@ module blob_sorting(
 							endcase
 							// read switches determine the type of comparison that will be done.
 							// x or y centroid or blob size? Smallest or largest?
-							case (slide_switches[3:2])
-								2'b00: comparison_type = BLOB_BIGGEST; //default
-								2'b01: comparison_type = BLOB_SMALLEST;
-								2'b10: comparison_type = Y_CENTROID_HIGHEST;
-								2'b11: comparison_type = Y_CENTROID_LOWEST;
-							endcase		
+// 							case (slide_switches[3:2])
+// 								2'b00: comparison_type = BLOB_BIGGEST; //default
+// 								2'b01: comparison_type = BLOB_SMALLEST;
+// 								2'b10: comparison_type = Y_CENTROID_HIGHEST;
+// 								2'b11: comparison_type = Y_CENTROID_LOWEST;
+// 							endcase		
+ 							if (find_highest)
+								comparison_type = Y_CENTROID_HIGHEST;
+							else
+								comparison_type = BLOB_BIGGEST;
 						end else begin
 // 							blob_sorting_done = 1;
 // 							main_state = DONE;

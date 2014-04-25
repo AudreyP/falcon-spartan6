@@ -154,11 +154,6 @@ module tracking_output_assembly (
 									markers_and_protocol = markers_and_protocol + 1;
 								end
 								1: begin
-									// Wait for no reason whatsoever because I really like to WASTE TIME...hehehe...
-									markers_and_protocol = markers_and_protocol + 1;
-								end
-								2: begin
-									// this is written regardless of blob rank.
 									tracking_output_addr_a = 1;
 									wren_tracking_output = 1;
 									case (tracking_mode)
@@ -168,12 +163,7 @@ module tracking_output_assembly (
 									endcase
 									markers_and_protocol = markers_and_protocol + 1;
 								end
-								3: begin
-									// Wait for no reason whatsoever because I really like to WASTE TIME...hehehe...
-									markers_and_protocol = markers_and_protocol + 1;
-								end
-								4: begin
-									// this is written regardless of blob rank.
+								2: begin
 									wren_tracking_output = 1;
 									case (tracking_mode)
 										1: tracking_output_addr_a = 26;
@@ -183,12 +173,7 @@ module tracking_output_assembly (
 									tracking_output_data_write = ASCII_10;
 									markers_and_protocol = markers_and_protocol + 1;
 								end
-								5: begin
-									// Wait for no reason whatsoever because I really like to WASTE TIME...hehehe...
-									markers_and_protocol = markers_and_protocol + 1;
-								end
-								6: begin
-									// this is written regardless of blob rank.
+								3: begin
 									wren_tracking_output = 1;
 									case (tracking_mode)
 										1: tracking_output_addr_a = 27;
@@ -198,11 +183,7 @@ module tracking_output_assembly (
 									tracking_output_data_write = ASCII_13;
 									markers_and_protocol = markers_and_protocol + 1;
 								end
-								7: begin
-									// Wait for no reason whatsoever because I really like to WASTE TIME...hehehe...
-									markers_and_protocol = markers_and_protocol + 1;
-								end
-								8: begin
+								4: begin
 									// write pulse low
 									wren_tracking_output = 0;
 									markers_and_protocol = 0;
@@ -212,7 +193,7 @@ module tracking_output_assembly (
 							endcase
 						end
 						GET_NEW_BLOB_INFO: begin
-							if ((blob_pointer >= 200000) && (blob_pointer < 524288)) begin // if blob is valid
+							if (blob_pointer != 18'h3ffff) begin // if blob is valid
 								//set blob rank
 								if (blob_pointer_addr < 6) begin
 									 blob_rank = 1;
@@ -291,13 +272,14 @@ module tracking_output_assembly (
 							end
 						end
 						STORE_MODE_1_BLOB_INFO: begin
-							// in mode one, only the rank 1 and rank 2 blobs are used.
-							//sequence to store rank 1 blob info in memory according to mode 1 pattern
+							// Mode 1: Simultaneous tracking of 6 objects
+							// Three colors (R, G, B)
+							// Two objects (blobs ranked 1 and 2)
+							// Reference FALCON user guide to see storing pattern
 							
 							case (store_blobs_mode1)
 							//in mode one, only Red, Green, and Blue colors are used.
 								0: begin
-									wren_tracking_output = 0;
 									// set address and data lines according to blob rank and blob color.
 									// the first data written for each blob is the x-centroid coordinate.
 									if (blob_rank == 1) begin
@@ -315,7 +297,6 @@ module tracking_output_assembly (
 												tracking_output_data_write = blob_data_word_two[31:24]; //x centroid
 											end
 										endcase
-										store_blobs_mode1 = store_blobs_mode1 + 1;
 									end
 									else if (blob_rank == 2) begin
 										case (blob_color)
@@ -332,15 +313,11 @@ module tracking_output_assembly (
 												tracking_output_data_write = blob_data_word_two[31:24]; //x centroid
 											end
 										endcase
-										store_blobs_mode1 = store_blobs_mode1 + 1;
 									end
+									store_blobs_mode1 = store_blobs_mode1 + 1;
+									wren_tracking_output = 1;
 								end
 								1: begin
-									wren_tracking_output = 1;	
-									store_blobs_mode1 = store_blobs_mode1 + 1;
-								end
-								2: begin
-									wren_tracking_output = 0;
 									// set address and data lines according to blob rank and blob color.
 									// the second data written for each blob is the y-centroid coordinate.
 									if (blob_rank == 1) begin
@@ -375,14 +352,10 @@ module tracking_output_assembly (
 											end
 										endcase
 									end
+									wren_tracking_output = 1;
 									store_blobs_mode1 = store_blobs_mode1 + 1;
 								end
-								3: begin
-									wren_tracking_output = 1;	
-									store_blobs_mode1 = store_blobs_mode1 + 1;
-								end
-								4: begin
-									wren_tracking_output = 0;
+								2: begin
 									// set address and data lines according to blob rank and blob color.
 									// the third data written for each blob is the upper 8 bits of the blob size.
 									if (blob_rank == 1) begin
@@ -417,14 +390,10 @@ module tracking_output_assembly (
 											end
 										endcase
 									end
+									wren_tracking_output = 1;
 									store_blobs_mode1 = store_blobs_mode1 + 1;
 								end
-								5: begin
-									wren_tracking_output = 1;	
-									store_blobs_mode1 = store_blobs_mode1 + 1;
-								end
-								6: begin
-									wren_tracking_output = 0;
+								3: begin
 									// set address and data lines according to blob rank and blob color.
 									// the final data written for each blob is the lower 8 bits of the blob size.
 									if (blob_rank == 1) begin
@@ -459,13 +428,10 @@ module tracking_output_assembly (
 											end
 										endcase
 									end
+									wren_tracking_output = 1;
 									store_blobs_mode1 = store_blobs_mode1 + 1;
 								end
-								7: begin
-									wren_tracking_output = 1;	
-									store_blobs_mode1 = store_blobs_mode1 + 1;
-								end
-								8: begin
+								4: begin
 									wren_tracking_output = 0;
 									store_blobs_mode1 = 0;
 									blobs_written = blobs_written + 1;
@@ -481,7 +447,6 @@ module tracking_output_assembly (
 							case (store_blobs_mode2)
 							//in mode one, only Red, Green, and Blue colors are used.
 								0: begin
-									wren_tracking_output = 0;
 									// set address and data lines according to blob rank and blob color.
 									// the first data written for each blob is the x-centroid coordinate.
 									if (blob_rank == 1) begin
@@ -540,14 +505,10 @@ module tracking_output_assembly (
 											end
 										endcase
 									end
+									wren_tracking_output = 1;
 									store_blobs_mode2 = store_blobs_mode2 + 1;
 								end
 								1: begin
-									wren_tracking_output = 1;	
-									store_blobs_mode2 = store_blobs_mode2 + 1;
-								end
-								2: begin
-									wren_tracking_output = 0;
 									// set address and data lines according to blob rank and blob color.
 									// the second data written for each blob is the y-centroid coordinate.
 									if (blob_rank == 1) begin
@@ -606,14 +567,10 @@ module tracking_output_assembly (
 											end
 										endcase
 									end
+									wren_tracking_output = 1;
 									store_blobs_mode2 = store_blobs_mode2 + 1;
 								end
-								3: begin
-									wren_tracking_output = 1;	
-									store_blobs_mode2 = store_blobs_mode2 + 1;
-								end
-								4: begin
-									wren_tracking_output = 0;
+								2: begin
 									// set address and data lines according to blob rank and blob color.
 									// the third data written for each blob is the upper 8 bits of the blob size.
 									if (blob_rank == 1) begin
@@ -672,14 +629,10 @@ module tracking_output_assembly (
 											end
 										endcase
 									end
+									wren_tracking_output = 1;
 									store_blobs_mode2 = store_blobs_mode2 + 1;
 								end
-								5: begin
-									wren_tracking_output = 1;	
-									store_blobs_mode2 = store_blobs_mode2 + 1;
-								end
-								6: begin
-									wren_tracking_output = 0;
+								3: begin
 									// set address and data lines according to blob rank and blob color.
 									// the final data written for each blob is the lower 8 bits of the blob size.
 									if (blob_rank == 1) begin
@@ -738,13 +691,11 @@ module tracking_output_assembly (
 											end
 										endcase
 									end
+									wren_tracking_output = 1;
 									store_blobs_mode2 = store_blobs_mode2 + 1;
 								end
-								7: begin
-									wren_tracking_output = 1;	
-									store_blobs_mode2 = store_blobs_mode2 + 1;
-								end
-								8: begin
+								4: begin
+									wren_tracking_output = 0;
 									store_blobs_mode2 = 0;
 									blobs_written = blobs_written + 1;
 									main_state = INC_ADDR;

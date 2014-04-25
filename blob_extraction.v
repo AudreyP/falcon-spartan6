@@ -297,45 +297,45 @@ module blob_extraction(
 							end else begin
 								// Write end-of-data words
 								case (blob_extractor_termination_record_loop)
+// 									0: begin
+// 										blob_extraction_blob_counter = 0; //DEBUGGING--only writes one blob (to match simulation)
+// 										address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+0));
+// 										data_write = 32'hff000001;
+// 										wren = 1;
+// 										blob_extractor_termination_record_loop = 1;
+// 									end
+// 									1: begin
+// 										address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+1));
+// 										data_write = 32'ha07803e8;
+// 										wren = 1;
+// 										blob_extractor_termination_record_loop = 2;
+// 									end
+// 									2: begin
+// 										address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+2));
+// 										data_write = 32'h37236955;
+// 										wren = 1;
+// 										blob_extractor_termination_record_loop = 3;
+// 									end
 									0: begin
-										blob_extraction_blob_counter = 0; //DEBUGGING--only writes one blob (to match simulation)
+// 										blob_extraction_blob_counter = blob_extraction_blob_counter + 1;
 										address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+0));
-										data_write = 32'hff000001;
+										data_write = 32'hffffffff;
 										wren = 1;
 										blob_extractor_termination_record_loop = 1;
 									end
 									1: begin
 										address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+1));
-										data_write = 32'ha07803e8;
+										data_write = 32'hffffffff;
 										wren = 1;
 										blob_extractor_termination_record_loop = 2;
 									end
 									2: begin
 										address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+2));
-										data_write = 32'h37236955;
+										data_write = 32'hffffffff;
 										wren = 1;
 										blob_extractor_termination_record_loop = 3;
 									end
 									3: begin
-										blob_extraction_blob_counter = blob_extraction_blob_counter + 1;
-										address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+0));
-										data_write = 32'hffffffff;
-										wren = 1;
-										blob_extractor_termination_record_loop = 4;
-									end
-									4: begin
-										address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+1));
-										data_write = 32'hffffffff;
-										wren = 1;
-										blob_extractor_termination_record_loop = 5;
-									end
-									5: begin
-										address = ((blob_extraction_blob_counter * 3) + (BlobStorageOffset+2));
-										data_write = 32'hffffffff;
-										wren = 1;
-										blob_extractor_termination_record_loop = 6;
-									end
-									6: begin
 										// Done!
 										blob_extraction_y = 0;
 										blob_extraction_counter_tog = 0;
