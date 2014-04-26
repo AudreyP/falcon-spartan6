@@ -74,9 +74,9 @@ module convert_rgb_to_hsv(
 	reg [7:0] green;
 	reg [7:0] blue;
 
-	reg [7:0] min;
-	reg [7:0] max;
-	reg [7:0] delta;
+	reg [15:0] min;
+	reg [15:0] max;
+	reg [15:0] delta;
 
 	reg red_is_max;
 	reg green_is_max;
@@ -107,10 +107,10 @@ module convert_rgb_to_hsv(
 							green_is_max = 0;
 							blue_is_max = 0;
 
-							if ((red > green) && (red > blue)) begin
+							if ((red >= green) && (red >= blue)) begin
 								max = red;
 								red_is_max = 1;
-							end else if ((green > red) && (green > blue)) begin
+							end else if ((green >= red) && (green >= blue)) begin
 								max = green;
 								green_is_max = 1;
 							end else begin
@@ -118,9 +118,9 @@ module convert_rgb_to_hsv(
 								blue_is_max = 1;
 							end
 
-							if ((red < green) && (red < blue)) begin
+							if ((red <= green) && (red <= blue)) begin
 								min = red;
-							end else if ((green < red) && (green < blue)) begin
+							end else if ((green <= red) && (green <= blue)) begin
 								min = green;
 							end else begin
 								min = blue;
