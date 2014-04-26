@@ -158,6 +158,7 @@ module tracking_output_assembly (
 									if (tracking_output_addr_a > 51) begin
 										tracking_output_addr_a = 0;
 										main_state = SET_MARKERS_AND_PROTOCOL;
+										markers_and_protocol = 0;
 										tracking_output_initialization = 0;
 									end else begin
 										tracking_output_initialization = 1; //bounce between states 1 and 2 (0 state is initial only)
@@ -308,14 +309,17 @@ module tracking_output_assembly (
 											RED: begin
 												tracking_output_addr_a = 2;		
 												tracking_output_data_write = blob_data_word_two[31:24]; //x centroid
+												wren_tracking_output = 1;
 											end
 											GREEN: begin
 												tracking_output_addr_a = 4;		
 												tracking_output_data_write = blob_data_word_two[31:24]; //x centroid
+												wren_tracking_output = 1;
 											end
 											BLUE: begin
 												tracking_output_addr_a = 6;		
 												tracking_output_data_write = blob_data_word_two[31:24]; //x centroid
+												wren_tracking_output = 1;
 											end
 										endcase
 									end
@@ -324,19 +328,21 @@ module tracking_output_assembly (
 											RED: begin
 												tracking_output_addr_a = 8;		
 												tracking_output_data_write = blob_data_word_two[31:24]; //x centroid
+												wren_tracking_output = 1;
 											end
 											GREEN: begin
 												tracking_output_addr_a = 10;		
 												tracking_output_data_write = blob_data_word_two[31:24]; //x centroid
+												wren_tracking_output = 1;
 											end
 											BLUE: begin
 												tracking_output_addr_a = 12;		
 												tracking_output_data_write = blob_data_word_two[31:24]; //x centroid
+												wren_tracking_output = 1;
 											end
 										endcase
 									end
 									store_blobs_mode1 = store_blobs_mode1 + 1;
-									wren_tracking_output = 1;
 								end
 								1: begin
 									// set address and data lines according to blob rank and blob color.
@@ -346,14 +352,17 @@ module tracking_output_assembly (
 											RED: begin
 												tracking_output_addr_a = 3;		
 												tracking_output_data_write = blob_data_word_two[23:16]; //y centroid
+												wren_tracking_output = 1;
 											end
 											GREEN: begin
 												tracking_output_addr_a = 5;		
 												tracking_output_data_write = blob_data_word_two[23:16]; //y centroid
+												wren_tracking_output = 1;
 											end
 											BLUE: begin
 												tracking_output_addr_a = 7;		
 												tracking_output_data_write = blob_data_word_two[23:16]; //y centroid
+												wren_tracking_output = 1;
 											end
 										endcase
 									end
@@ -362,18 +371,20 @@ module tracking_output_assembly (
 											RED: begin
 												tracking_output_addr_a = 9;		
 												tracking_output_data_write = blob_data_word_two[23:16]; //y centroid
+												wren_tracking_output = 1;
 											end
 											GREEN: begin
 												tracking_output_addr_a = 11;		
 												tracking_output_data_write = blob_data_word_two[23:16]; //y centroid
+												wren_tracking_output = 1;
 											end
 											BLUE: begin
 												tracking_output_addr_a = 13;		
 												tracking_output_data_write = blob_data_word_two[23:16]; //y centroid
+												wren_tracking_output = 1;
 											end
 										endcase
 									end
-									wren_tracking_output = 1;
 									store_blobs_mode1 = store_blobs_mode1 + 1;
 								end
 								2: begin
@@ -384,14 +395,17 @@ module tracking_output_assembly (
 											RED: begin
 												tracking_output_addr_a = 14;		
 												tracking_output_data_write = blob_data_word_two[15:8]; //upper size byte
+												wren_tracking_output = 1;
 											end
 											GREEN: begin
 												tracking_output_addr_a = 16;		
 												tracking_output_data_write = blob_data_word_two[15:8]; 
+												wren_tracking_output = 1;
 											end
 											BLUE: begin
 												tracking_output_addr_a = 18;		
-												tracking_output_data_write = blob_data_word_two[15:8]; 
+												tracking_output_data_write = blob_data_word_two[15:8];
+												wren_tracking_output = 1;
 											end
 										endcase
 									end
@@ -400,14 +414,17 @@ module tracking_output_assembly (
 											RED: begin
 												tracking_output_addr_a = 20;		
 												tracking_output_data_write = blob_data_word_two[15:8]; //upper size byte
+												wren_tracking_output = 1;
 											end
 											GREEN: begin
 												tracking_output_addr_a = 22;		
 												tracking_output_data_write = blob_data_word_two[15:8];
+												wren_tracking_output = 1;
 											end
 											BLUE: begin
 												tracking_output_addr_a = 24;		
 												tracking_output_data_write = blob_data_word_two[15:8];
+												wren_tracking_output = 1;
 											end
 										endcase
 									end
@@ -422,14 +439,17 @@ module tracking_output_assembly (
 											RED: begin
 												tracking_output_addr_a = 15;		
 												tracking_output_data_write = blob_data_word_two[7:0]; //lower size byte
+												wren_tracking_output = 1;
 											end
 											GREEN: begin
 												tracking_output_addr_a = 17;		
 												tracking_output_data_write = blob_data_word_two[7:0];
+												wren_tracking_output = 1;
 											end
 											BLUE: begin
 												tracking_output_addr_a = 19;		
 												tracking_output_data_write = blob_data_word_two[7:0];
+												wren_tracking_output = 1;
 											end
 										endcase
 									end
@@ -438,18 +458,20 @@ module tracking_output_assembly (
 											RED: begin
 												tracking_output_addr_a = 21;
 												tracking_output_data_write = blob_data_word_two[7:0]; //lower size byte
+												wren_tracking_output = 1;
 											end
 											GREEN: begin
 												tracking_output_addr_a = 23;		
 												tracking_output_data_write = blob_data_word_two[7:0];
+												wren_tracking_output = 1;
 											end
 											BLUE: begin
 												tracking_output_addr_a = 25;		
 												tracking_output_data_write = blob_data_word_two[7:0];
+												wren_tracking_output = 1;
 											end
 										endcase
 									end
-									wren_tracking_output = 1;
 									store_blobs_mode1 = store_blobs_mode1 + 1;
 								end
 								4: begin
@@ -475,26 +497,32 @@ module tracking_output_assembly (
 											RED: begin
 												tracking_output_addr_a = 2;		
 												tracking_output_data_write = blob_data_word_two[31:24]; //x centroid
+												wren_tracking_output = 1;
 											end
 											ORANGE: begin
 												tracking_output_addr_a = 4;		
-												tracking_output_data_write = blob_data_word_two[31:24]; 
+												tracking_output_data_write = blob_data_word_two[31:24];
+												wren_tracking_output = 1;
 											end
 											YELLOW: begin
 												tracking_output_addr_a = 6;		
-												tracking_output_data_write = blob_data_word_two[31:24]; 
+												tracking_output_data_write = blob_data_word_two[31:24];
+												wren_tracking_output = 1;
 											end
 											GREEN: begin
 												tracking_output_addr_a = 8;		
-												tracking_output_data_write = blob_data_word_two[31:24]; 
+												tracking_output_data_write = blob_data_word_two[31:24];
+												wren_tracking_output = 1;
 											end
 											BLUE: begin
 												tracking_output_addr_a = 10;		
 												tracking_output_data_write = blob_data_word_two[31:24];
+												wren_tracking_output = 1;
 											end
 											PURPLE: begin
 												tracking_output_addr_a = 12;		
 												tracking_output_data_write = blob_data_word_two[31:24];
+												wren_tracking_output = 1;
 											end
 										endcase
 									end
@@ -503,30 +531,35 @@ module tracking_output_assembly (
 											RED: begin
 												tracking_output_addr_a = 14;		
 												tracking_output_data_write = blob_data_word_two[31:24]; //x centroid
+												wren_tracking_output = 1;
 											end
 											ORANGE: begin
 												tracking_output_addr_a = 16;		
-												tracking_output_data_write = blob_data_word_two[31:24]; 
+												tracking_output_data_write = blob_data_word_two[31:24];
+												wren_tracking_output = 1;
 											end
 											YELLOW: begin
 												tracking_output_addr_a = 18;		
-												tracking_output_data_write = blob_data_word_two[31:24]; 
+												tracking_output_data_write = blob_data_word_two[31:24];
+												wren_tracking_output = 1;
 											end
 											GREEN: begin
 												tracking_output_addr_a = 20;		
 												tracking_output_data_write = blob_data_word_two[31:24]; 
+												wren_tracking_output = 1;
 											end
 											BLUE: begin
 												tracking_output_addr_a = 22;		
 												tracking_output_data_write = blob_data_word_two[31:24];
+												wren_tracking_output = 1;
 											end
 											PURPLE: begin
 												tracking_output_addr_a = 24;		
 												tracking_output_data_write = blob_data_word_two[31:24];
+												wren_tracking_output = 1;
 											end
 										endcase
 									end
-									wren_tracking_output = 1;
 									store_blobs_mode2 = store_blobs_mode2 + 1;
 								end
 								1: begin
@@ -537,26 +570,32 @@ module tracking_output_assembly (
 											RED: begin
 												tracking_output_addr_a = 3;		
 												tracking_output_data_write = blob_data_word_two[23:16]; //y centroid
+												wren_tracking_output = 1;
 											end
 											ORANGE: begin
 												tracking_output_addr_a = 5;		
-												tracking_output_data_write = blob_data_word_two[23:16]; 
+												tracking_output_data_write = blob_data_word_two[23:16];
+												wren_tracking_output = 1;
 											end
 											YELLOW: begin
 												tracking_output_addr_a = 7;		
-												tracking_output_data_write = blob_data_word_two[23:16]; 
+												tracking_output_data_write = blob_data_word_two[23:16];
+												wren_tracking_output = 1;
 											end
 											GREEN: begin
 												tracking_output_addr_a = 9;		
-												tracking_output_data_write = blob_data_word_two[23:16]; 
+												tracking_output_data_write = blob_data_word_two[23:16];
+												wren_tracking_output = 1;
 											end
 											BLUE: begin
 												tracking_output_addr_a = 11;		
-												tracking_output_data_write = blob_data_word_two[23:16]; 
+												tracking_output_data_write = blob_data_word_two[23:16];
+												wren_tracking_output = 1;
 											end
 											PURPLE: begin
 												tracking_output_addr_a = 13;		
-												tracking_output_data_write = blob_data_word_two[23:16]; 
+												tracking_output_data_write = blob_data_word_two[23:16];
+												wren_tracking_output = 1;
 											end
 										endcase
 									end
@@ -565,30 +604,35 @@ module tracking_output_assembly (
 											RED: begin
 												tracking_output_addr_a = 15;		
 												tracking_output_data_write = blob_data_word_two[23:16]; //y centroid
+												wren_tracking_output = 1;
 											end
 											ORANGE: begin
 												tracking_output_addr_a = 17;		
-												tracking_output_data_write = blob_data_word_two[23:16]; 
+												tracking_output_data_write = blob_data_word_two[23:16];
+												wren_tracking_output = 1;
 											end
 											YELLOW: begin
 												tracking_output_addr_a = 19;		
-												tracking_output_data_write = blob_data_word_two[23:16]; 
+												tracking_output_data_write = blob_data_word_two[23:16];
+												wren_tracking_output = 1;
 											end
 											GREEN: begin
 												tracking_output_addr_a = 21;		
-												tracking_output_data_write = blob_data_word_two[23:16]; 
+												tracking_output_data_write = blob_data_word_two[23:16];
+												wren_tracking_output = 1;
 											end
 											BLUE: begin
 												tracking_output_addr_a = 23;		
-												tracking_output_data_write = blob_data_word_two[23:16]; 
+												tracking_output_data_write = blob_data_word_two[23:16];
+												wren_tracking_output = 1;
 											end
 											PURPLE: begin
 												tracking_output_addr_a = 25;		
-												tracking_output_data_write = blob_data_word_two[23:16]; 
+												tracking_output_data_write = blob_data_word_two[23:16];
+												wren_tracking_output = 1;
 											end
 										endcase
 									end
-									wren_tracking_output = 1;
 									store_blobs_mode2 = store_blobs_mode2 + 1;
 								end
 								2: begin
@@ -599,26 +643,32 @@ module tracking_output_assembly (
 											RED: begin
 												tracking_output_addr_a = 26;		
 												tracking_output_data_write = blob_data_word_two[15:8]; //upper size byte
+												wren_tracking_output = 1;
 											end
 											ORANGE: begin
 												tracking_output_addr_a = 28;		
-												tracking_output_data_write = blob_data_word_two[15:8]; 
+												tracking_output_data_write = blob_data_word_two[15:8];
+												wren_tracking_output = 1;
 											end
 											YELLOW: begin
 												tracking_output_addr_a = 30;		
-												tracking_output_data_write = blob_data_word_two[15:8]; 
+												tracking_output_data_write = blob_data_word_two[15:8];
+												wren_tracking_output = 1;
 											end
 											GREEN: begin
 												tracking_output_addr_a = 32;		
-												tracking_output_data_write = blob_data_word_two[15:8]; 
+												tracking_output_data_write = blob_data_word_two[15:8];
+												wren_tracking_output = 1;
 											end
 											BLUE: begin
 												tracking_output_addr_a = 34;		
-												tracking_output_data_write = blob_data_word_two[15:8]; 
+												tracking_output_data_write = blob_data_word_two[15:8];
+												wren_tracking_output = 1;
 											end
 											PURPLE: begin
 												tracking_output_addr_a = 36;		
-												tracking_output_data_write = blob_data_word_two[15:8]; 
+												tracking_output_data_write = blob_data_word_two[15:8];
+												wren_tracking_output = 1;
 											end
 										endcase
 									end
@@ -627,30 +677,35 @@ module tracking_output_assembly (
 											RED: begin
 												tracking_output_addr_a = 38;		
 												tracking_output_data_write = blob_data_word_two[15:8]; //upper size byte
+												wren_tracking_output = 1;
 											end
 											ORANGE: begin
 												tracking_output_addr_a = 40;		
 												tracking_output_data_write = blob_data_word_two[15:8]; 
+												wren_tracking_output = 1;
 											end
 											YELLOW: begin
 												tracking_output_addr_a = 42;
 												tracking_output_data_write = blob_data_word_two[15:8]; 
+												wren_tracking_output = 1;
 											end
 											GREEN: begin
 												tracking_output_addr_a = 44;
-												tracking_output_data_write = blob_data_word_two[15:8]; 
+												tracking_output_data_write = blob_data_word_two[15:8];
+												wren_tracking_output = 1;
 											end
 											BLUE: begin
 												tracking_output_addr_a = 46;
-												tracking_output_data_write = blob_data_word_two[15:8]; 
+												tracking_output_data_write = blob_data_word_two[15:8];
+												wren_tracking_output = 1; 
 											end
 											PURPLE: begin
 												tracking_output_addr_a = 48;
-												tracking_output_data_write = blob_data_word_two[15:8]; 
+												tracking_output_data_write = blob_data_word_two[15:8];
+												wren_tracking_output = 1;
 											end
 										endcase
 									end
-									wren_tracking_output = 1;
 									store_blobs_mode2 = store_blobs_mode2 + 1;
 								end
 								3: begin
@@ -661,26 +716,32 @@ module tracking_output_assembly (
 											RED: begin
 												tracking_output_addr_a = 27;		
 												tracking_output_data_write = blob_data_word_two[7:0]; //lower size byte
+												wren_tracking_output = 1;
 											end
 											ORANGE: begin
 												tracking_output_addr_a = 29;		
-												tracking_output_data_write = blob_data_word_two[7:0]; 
+												tracking_output_data_write = blob_data_word_two[7:0];
+												wren_tracking_output = 1;
 											end
 											YELLOW: begin
 												tracking_output_addr_a = 31;		
 												tracking_output_data_write = blob_data_word_two[7:0]; 
+												wren_tracking_output = 1;
 											end
 											GREEN: begin
 												tracking_output_addr_a = 33;		
-												tracking_output_data_write = blob_data_word_two[7:0]; 
+												tracking_output_data_write = blob_data_word_two[7:0];
+												wren_tracking_output = 1; 
 											end
 											BLUE: begin
 												tracking_output_addr_a = 35;		
-												tracking_output_data_write = blob_data_word_two[7:0]; 
+												tracking_output_data_write = blob_data_word_two[7:0];
+												wren_tracking_output = 1;
 											end
 											PURPLE: begin
 												tracking_output_addr_a = 37;		
-												tracking_output_data_write = blob_data_word_two[7:0]; 
+												tracking_output_data_write = blob_data_word_two[7:0];
+												wren_tracking_output = 1;
 											end
 										endcase
 									end
@@ -689,30 +750,35 @@ module tracking_output_assembly (
 											RED: begin
 												tracking_output_addr_a = 39;		
 												tracking_output_data_write = blob_data_word_two[7:0]; //lower size byte
+										 		wren_tracking_output = 1;
 											end
 											ORANGE: begin
 												tracking_output_addr_a = 41;		
 												tracking_output_data_write = blob_data_word_two[7:0]; 
+												wren_tracking_output = 1;
 											end
 											YELLOW: begin
 												tracking_output_addr_a = 43;		
 												tracking_output_data_write = blob_data_word_two[7:0]; 
+												wren_tracking_output = 1;
 											end
 											GREEN: begin
 												tracking_output_addr_a = 45;		
 												tracking_output_data_write = blob_data_word_two[7:0]; 
+												wren_tracking_output = 1;
 											end
 											BLUE: begin
 												tracking_output_addr_a = 47;		
 												tracking_output_data_write = blob_data_word_two[7:0]; 
+												wren_tracking_output = 1;
 											end
 											PURPLE: begin
 												tracking_output_addr_a = 49;		
-												tracking_output_data_write = blob_data_word_two[7:0]; 
+												tracking_output_data_write = blob_data_word_two[7:0];
+												wren_tracking_output = 1;
 											end
 										endcase
 									end
-									wren_tracking_output = 1;
 									store_blobs_mode2 = store_blobs_mode2 + 1;
 								end
 								4: begin
@@ -756,6 +822,7 @@ module tracking_output_assembly (
 				blobs_written = 0;
 				blob_pointer_addr = 0;
 				main_state = INITIALIZATION;
+				tracking_output_initialization = 0;
 				address = 18'b0;
 				data_write = 32'b0;
 				wren = 1'b0;

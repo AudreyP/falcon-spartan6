@@ -446,7 +446,7 @@ module main(
 	
 	reg [7:0] edge_detection_threshold_red = 30; 
 	reg [7:0] edge_detection_threshold_green = 30;
-	reg [7:0] edge_detection_threshold_blue = 0;
+	reg [7:0] edge_detection_threshold_blue = 30;
 	
 	edge_detection #(
 		.ImageWidth(ImageWidth),
@@ -456,7 +456,7 @@ module main(
 		.clk(clk),
 		.pause(global_pause),
 		.data_read(data_read),
-		.base_image_buffer_pointer(base_image_buffer_pointer),
+		.base_image_buffer_pointer((slide_switches[4] == 0)?base_image_buffer_pointer:ImageBufferRGB),
 		.enable_edge_detection(enable_edge_detection),
 		.edge_detection_threshold_red(edge_detection_threshold_red),
 		.edge_detection_threshold_green(edge_detection_threshold_green),
@@ -1014,7 +1014,8 @@ module main(
 					end
 					
 					if ((run_frame_dump_internal == 1) || (run_single_shot_test_internal == 1) || (run_online_recognition_internal == 1)) begin
-						current_main_processing_state = STATE_MEMORY_BLANKING;
+						//current_main_processing_state = STATE_MEMORY_BLANKING;
+						current_main_processing_state = STATE_CAMERA_CAPTURE;
 					end
 				end
 
@@ -1023,11 +1024,11 @@ module main(
 					enable_memory_blanking = 1;
 					if (memory_blanking_done == 1) begin
 						enable_memory_blanking = 0;
-						if (slide_switches[4] == 0) begin
+// 						if (slide_switches[4] == 0) begin
 							current_main_processing_state = STATE_CAMERA_CAPTURE;
-						end else begin
-							current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY****
-						end
+// 						end else begin
+// 							current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY****
+// 						end
 					end
 				end
 				
@@ -1082,11 +1083,11 @@ module main(
 					enable_y_pixel_filling = 1;
 					if (y_pixel_filling_done == 1) begin
 						enable_y_pixel_filling = 0;
-						if (slide_switches[5] == 0) begin
+// 						if (slide_switches[5] == 0) begin
 							current_main_processing_state = STATE_BORDER_DRAWING;
-						end else begin
-							current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY****
-						end
+// 						end else begin
+// 							current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY****
+// 						end
 					end
 				end		
 				
@@ -1108,11 +1109,11 @@ module main(
 					enable_blob_extraction = 1;
 					if (blob_extraction_done == 1) begin
 						enable_blob_extraction = 0;
-						if (slide_switches[6] == 0) begin
+// 						if (slide_switches[6] == 0) begin
 							current_main_processing_state = STATE_BLOB_SORTING;
-						end else begin
-							current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY****
-						end
+// 						end else begin
+// 							current_main_processing_state = STATE_DATA_OUTPUT_CTL;	 // ****DEBUG ONLY****
+// 						end
 					end
 				end
 				
