@@ -670,14 +670,16 @@ module blob_extraction(
 								
 								//for (blob_extraction_color_loop = 0; blob_extraction_color_loop < 6; blob_extraction_color_loop = blob_extraction_color_loop + 1) begin
 									//for (blob_extraction_slot_loop = 0; blob_extraction_slot_loop < 8; blob_extraction_slot_loop = blob_extraction_slot_loop + 1) begin
+										blob_extraction_current_difference = 0;
+
 										// Red
 										if (ignore_color_field_in_match[0] == 1'b0) begin
 											if (blob_extraction_red_average_final > primary_color_slots_doutb[7:0]) begin
 												//old syntax was primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][7:0] 
 												
-												blob_extraction_current_difference = blob_extraction_red_average_final - primary_color_slots_doutb[7:0];
+												blob_extraction_current_difference = (blob_extraction_current_difference + (blob_extraction_red_average_final - primary_color_slots_doutb[7:0]));
 											end else begin
-												blob_extraction_current_difference = primary_color_slots_doutb[7:0] - blob_extraction_red_average_final;
+												blob_extraction_current_difference = (blob_extraction_current_difference + (primary_color_slots_doutb[7:0] - blob_extraction_red_average_final));
 											end
 										end
 										
@@ -686,8 +688,7 @@ module blob_extraction(
 											if (blob_extraction_green_average_final > primary_color_slots_doutb[15:8]) begin
 												//old syntax was primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][15:8]
 													
-												blob_extraction_current_difference = 
-												(blob_extraction_current_difference + (blob_extraction_green_average_final - primary_color_slots_doutb[15:8]));
+												blob_extraction_current_difference = (blob_extraction_current_difference + (blob_extraction_green_average_final - primary_color_slots_doutb[15:8]));
 											end else begin
 												blob_extraction_current_difference = (blob_extraction_current_difference + (primary_color_slots_doutb[15:8] - blob_extraction_green_average_final));
 											end
@@ -698,13 +699,9 @@ module blob_extraction(
 											if (blob_extraction_blue_average_final > primary_color_slots_doutb[23:16]) begin
 												//old syntax was primary_color_slots[blob_extraction_color_loop][blob_extraction_slot_loop][23:16]
 												
-												blob_extraction_current_difference = 
-												(blob_extraction_current_difference + (blob_extraction_blue_average_final 
-													- primary_color_slots_doutb[23:16]));
+												blob_extraction_current_difference = (blob_extraction_current_difference + (blob_extraction_blue_average_final - primary_color_slots_doutb[23:16]));
 											end else begin
-												blob_extraction_current_difference = 
-												(blob_extraction_current_difference 
-													+ (primary_color_slots_doutb[23:16] - blob_extraction_blue_average_final));
+												blob_extraction_current_difference = (blob_extraction_current_difference + (primary_color_slots_doutb[23:16] - blob_extraction_blue_average_final));
 											end
 										end
 										
