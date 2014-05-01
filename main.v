@@ -33,7 +33,8 @@ module main(
 	output LD5, 
 	output LD6, 
 	output LD7, 
-	output TxD,
+	output TxD_primary,
+	output TxD_secondary,
 
 	output SEG0,
 	output SEG1,
@@ -49,7 +50,8 @@ module main(
 	output SCTL2,
 	output SCTL3,
 
-	input RxD,
+	input RxD_primary,
+	input RxD_secondary,
 
 	input wire [7:0] slide_switches,
 
@@ -119,6 +121,13 @@ module main(
 	//parameter I2ClkCyclesToWait = (InternalClkFrequency / 1);
 
 	parameter MemoryToSystemClockRatio = 8;	// Ratio of the memory controller clock to the main system clock
+
+	wire TxD;
+	assign TxD_secondary = TxD;
+	assign TxD_primary = TxD;
+	
+	wire RxD;
+	assign RxD = (slide_switches[5])?RxD_secondary:RxD_primary;
 
 	wire clk;
 	(* KEEP = "TRUE" *) wire modified_clock;
@@ -444,9 +453,9 @@ module main(
 	wire [17:0] address_edge_detection;
 	wire [31:0] data_write_edge_detection;
 	
-	reg [7:0] edge_detection_threshold_red = 30; 
-	reg [7:0] edge_detection_threshold_green = 30;
-	reg [7:0] edge_detection_threshold_blue = 30;
+	reg [7:0] edge_detection_threshold_red = 30; //V
+	reg [7:0] edge_detection_threshold_green = 30; //S
+	reg [7:0] edge_detection_threshold_blue = 30; //H
 	
 	edge_detection #(
 		.ImageWidth(ImageWidth),
@@ -836,6 +845,7 @@ module main(
 			display_value = display_value_timer;
 		end
 		
+		
 		if (slide_switches[4:0] == 0) begin
 			display_value = debug0;
 		end
@@ -856,17 +866,17 @@ module main(
 			display_value = address[17:5];
 		end
 		if (slide_switches[4:0] == 6) begin
-			display_value = camera_debug_current_address[19:4];
+			display_value = edge_detection_threshold_red;
 		end
 		if (slide_switches[4:0] == 7) begin
-			display_value = camera_debug_current_address_module[18:4];
+			display_value = edge_detection_threshold_green;
 		end
 		if (slide_switches[4:0] == 8) begin
-// 			display_value = camera_fifo_debug;
-			display_value = blob_debug[7:0];	// red slot, red
+			display_value = edge_detection_threshold_blue;
 		end
 		if (slide_switches[4:0] == 9) begin
-			display_value = sram_debug0;
+			display_value = color_similarity_threshold;
+// 			display_value = sram_debug0;
 // 			display_value = blob_debug[15:8];	//red slot, green
 // 			display_value = tracking_output_blob_data;
 //  			display_value = blob_extraction_blob_counter;

@@ -103,10 +103,14 @@ NET "SEG5"         LOC = "C17" | IOSTANDARD = "LVCMOS33";   #Bank = 1, Pin name 
 NET "SEG6"         LOC = "A16" | IOSTANDARD = "LVCMOS33";   #Bank = 1, Pin name = IO_L61P,                           Sch name = CG
 NET "SEG7"         LOC = "B16" | IOSTANDARD = "LVCMOS33";   #Bank = 1, Pin name = IO_L61N,                           Sch name = DP
 
-NET "TxD" 				LOC = "A14" | IOSTANDARD = "LVCMOS33";	#serial output (from fpga)
-NET "RxD" 				LOC = "B14" | IOSTANDARD = "LVCMOS33";		#serial input (to fpga )
+#NET "TxD_primary" 				LOC = "A14" | IOSTANDARD = "LVCMOS33";	#serial output (from fpga)
+#NET "RxD_primary" 				LOC = "B14" | IOSTANDARD = "LVCMOS33";		#serial input (to fpga )
+NET "TxD_primary" 				LOC = "A6" | IOSTANDARD = "LVCMOS33";	#serial output (from fpga)
+NET "RxD_primary" 				LOC = "B6" | IOSTANDARD = "LVCMOS33";		#serial input (to fpga )
+NET "TxD_secondary" 				LOC = "D8" | IOSTANDARD = "LVCMOS33";	#serial output (from fpga)
+NET "RxD_secondary" 				LOC = "C8" | IOSTANDARD = "LVCMOS33";		#serial input (to fpga )
 
-##### User I/O on I/O Bank 2
+#### User I/O on I/O Bank 2
 #
 #NET "slide_switches<0>" LOC = "R3" | IOSTANDARD = "LVCMOS33";
 #NET "slide_switches<1>" LOC = "T3" | IOSTANDARD = "LVCMOS33";

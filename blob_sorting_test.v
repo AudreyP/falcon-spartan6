@@ -48,7 +48,6 @@ module blob_sorting_test;
 		.blob_extraction_blob_counter(blob_extraction_blob_counter), 
 		.enable_blob_sorting(enable_blob_sorting), 
 		.minimum_blob_size(minimum_blob_size), 
-		.slide_switches(slide_switches), 
 		.data_read(data_read), 
 		.wren(wren), 
 		.data_write(data_write), 
@@ -61,10 +60,9 @@ module blob_sorting_test;
 		clk = 0;
 		clk_fast = 0;
 		pause = 0;
-		blob_extraction_blob_counter = 1;
+		blob_extraction_blob_counter = 3;
 		enable_blob_sorting = 0;
-		minimum_blob_size = 0;
-		slide_switches = 0; //0: find biggest blob; 1: find smallest blob; 2: find highest blob; 3: find lowest blob
+		minimum_blob_size = 10;
 		data_read = 0;
 
 		// Wait 100 ns for global reset to finish

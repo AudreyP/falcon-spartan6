@@ -229,44 +229,40 @@ module blob_sorting(
 									get_new_blob_data = 1;
 								end
 								1: begin
-									//read new blob data from first word into registers
-									
-									// debugging
-// 									if (address == 200000) begin
-// 										debug_display = data_read[7:0];
-// 									end
-									
 									if (data_read[7:0] == 0) begin // this is the color slot data from blob word one. 
 										// blob is NOT of interest and will not be stored. Get new.
 										tracking_output_pointer = tracking_output_pointer + 3; // increment to next blob
 										get_new_blob_data = 0; //return to initial state in GET_NEW_BLOB_DATA with new pointer
 									end else begin
-										// blob is of interest
+										//set address to get blob data from second word
 										matching_color_slot = data_read[7:0];
-										new_blob_ptr = address; //points to the beginning of the blob's info in main memory (allows for signal propogation from state 0)
-										number_of_valid_blobs = number_of_valid_blobs + 1;
 										tracking_output_pointer = tracking_output_pointer + 1;
+										address = tracking_output_pointer + BlobStorageOffset;
 										get_new_blob_data = 2;
 									end
 								end
 								2: begin
-									address = tracking_output_pointer + BlobStorageOffset; // set address with new tracking output pointer value.
-									get_new_blob_data = 3;
-								end
-								3: begin
-									// debugging
-									if (address == 200001) begin
-										debug_display = data_read[7:0];
-									end
 									// read new blob data from second word
-									new_x_centroid_coord = data_read[31:24];
-									new_y_centroid_coord = data_read[23:16];
-									new_blob_size = data_read[15:0];
-									// increment address by two (skip 3rd blob data word)
-									tracking_output_pointer = tracking_output_pointer + 2;
-// 									address = tracking_output_pointer + BlobStorageOffset;
-									get_new_blob_data = 0;
-									main_state = GET_RANK_ONE_BLOB;
+									//determine if blob is of large enough to be of interest
+									if (data_read[15:0] < minimum_blob_size) begin
+										// blob is NOT of interest and will not be stored. Get new.
+										tracking_output_pointer = tracking_output_pointer + 2;
+										address = tracking_output_pointer + BlobStorageOffset; // set address with new tracking output pointer value.
+										get_new_blob_data = 0; 
+										main_state = GET_NEW_BLOB_DATA;
+									end else begin
+										//blob is of interest. Store its data in registers.
+										new_x_centroid_coord = data_read[31:24];
+										new_y_centroid_coord = data_read[23:16];
+										new_blob_size = data_read[15:0];
+										new_blob_ptr = address - 1;
+										number_of_valid_blobs = number_of_valid_blobs + 1;
+
+										tracking_output_pointer = tracking_output_pointer + 2;
+										address = tracking_output_pointer + BlobStorageOffset; // set address with new tracking output pointer value.
+										get_new_blob_data = 0; 
+										main_state = GET_RANK_ONE_BLOB;
+									end
 								end
 							endcase
 							// read switches determine the type of comparison that will be done.
